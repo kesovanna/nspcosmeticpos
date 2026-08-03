@@ -1,0 +1,449 @@
+{% if print_mode %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Barcodes - NSP POS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        /* -----------------------------------------------------------------
+           កំណត់ទំហំក្រដាស 30x20mm សម្រាប់ម៉ាស៊ីនព្រីន (ត្រូវនៅក្រៅ media print)
+           ----------------------------------------------------------------- */
+        @page {
+            size: 30mm 20mm; 
+            margin: 0 !important;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* -----------------------------------------------------------------
+           SCREEN VIEW: ទម្រង់មើលលើអេក្រង់កុំព្យូទ័រធម្មតា (រក្សាភាពស្អាត)
+           ----------------------------------------------------------------- */
+        .print-container {
+            padding: 20px;
+            max-width: 1000px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .label-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .barcode-label {
+            border: 1px dashed #ccc;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border-radius: 6px;
+        }
+
+        .barcode-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .barcode-item {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .product-name-label {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .price-text-label {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .barcode-number-label {
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1.5px;
+            margin-top: 4px;
+            text-align: center;
+            color: #1e293b;
+            background: #f8fafc;
+            padding: 2px 4px;
+            border-radius: 3px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .exp-text-label {
+            font-size: 11px;
+            color: #475569;
+            font-weight: 500;
+        }
+
+        /* -----------------------------------------------------------------
+           PRINT VIEW: ទម្រង់សម្រាប់ព្រីន (កម្ទេច Grid និងបង្ខំការកាត់សន្លឹក)
+           ----------------------------------------------------------------- */
+        @media print {
+    /* ប្តូរទំហំសន្លឹកឱ្យទៅជា Landscape (៣០មម ទទឹង និង ២០មម កម្ពស់) */
+    @page {
+        size: 30mm 20mm landscape; 
+        margin: 0 !important;
+    }
+
+    html, body {
+        width: 30mm !important;
+        height: 20mm !important;
+        background-color: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* បង្ខំឲ្យពណ៌ខ្មៅព្រីនជាពណ៌ខ្មៅពេញ (កុំឲ្យប្រែជាពណ៌ប្រផេះស្រាល) */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    .no-print {
+        display: none !important;
+    }
+
+    .print-container {
+        display: block !important;
+        width: 30mm !important;
+        height: 20mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        max-width: none !important;
+    }
+
+    .label-grid {
+        display: block !important; 
+        width: 30mm !important;
+        height: 20mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        gap: 0 !important;
+    }
+
+    .barcode-label {
+        display: block !important;
+        width: 30mm !important;
+        height: 20mm !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        padding: 0.8mm !important;
+        border: none !important;
+        
+        page-break-inside: avoid !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        
+        text-align: center !important;
+        overflow: hidden !important;
+        background: white !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    .barcode-label:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+    }
+
+    .product-name-label {
+        display: block !important;
+        font-size: 7px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        color: #000 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        line-height: 1.2 !important;
+    }
+
+    .barcode-wrapper {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        width: 100% !important;
+        margin: 0.5mm 0 !important;
+    }
+
+    /* បន្ទាត់ barcode ត្រូវក្រាស់ និងច្បាស់ (គ្មាន CSS បង្រួញបន្ថែម) */
+    .barcode-item {
+        display: block !important;
+        max-width: 28mm !important;
+        max-height: 6.5mm !important;
+        width: auto !important;
+        height: auto !important;
+    }
+
+    .barcode-number-label {
+        display: block !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        font-family: 'Courier New', monospace !important;
+        letter-spacing: 1px !important;
+        margin: 0.3mm 0 0 0 !important;
+        color: #000 !important;
+        background: none !important;
+        padding: 0 !important;
+        border: none !important;
+        line-height: 1.2 !important;
+    }
+
+    .price-text-label {
+        display: block !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        margin: 0.3mm 0 0 0 !important;
+        color: #000 !important;
+        line-height: 1.2 !important;
+    }
+
+    .exp-text-label {
+        display: block !important;
+        font-size: 7px !important;
+        color: #000 !important;
+        margin: 0.3mm 0 0 0 !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+    }
+}   
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Print Header (No Print) -->
+    <div class="no-print bg-white shadow-md p-4 sticky top-0 z-50 flex justify-between items-center px-8">
+        <div class="flex items-center gap-4">
+            <a href="{{ url_for('print_barcodes') }}" class="text-gray-600 hover:text-gray-900 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+                Back to Selection
+            </a>
+            <h1 class="text-xl font-bold text-gray-800">Barcode Preview</h1>
+        </div>
+        <button onclick="window.print()" class="bg-green-800 hover:bg-green-900 text-white font-bold py-2 px-6 rounded-lg transition-all flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
+            </svg>
+            Print Barcodes
+        </button>
+    </div>
+
+    <!-- Printable Area -->
+    <div class="print-container">
+        <div class="label-grid" id="labelGrid">
+            {% for p in products %}
+            <div class="barcode-label">
+                <div class="product-name-label truncate">{{ p.name }}</div>
+                <div class="barcode-wrapper">
+                    <canvas class="barcode-item" 
+                        data-barcode="{{ p.barcode if p.barcode else '%04d' % (loop.index) }}"
+                        data-name="{{ p.name }}"></canvas>
+                </div>
+                <div class="barcode-number-label">{{ p.barcode if p.barcode else '%04d' % (loop.index) }}</div>
+                <div class="price-text-label">
+                    ${{ "%.2f"|format(p.price) }} | ៛ {{ "{:,}".format(p.price_riel) }}
+                </div>
+                <div class="exp-text-label uppercase">
+                    EXP: {{ p.expiry_date if p.expiry_date else '12/2026' }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const barcodeElements = document.querySelectorAll('.barcode-item');
+            const PRINT_DPI = 300;               /* 300 DPI = គុណភាពខ្ពស់សម្រាប់ thermal printer */
+            const PX_PER_MM_PRINT = PRINT_DPI / 25.4;  /* ~11.8px ក្នុង 1mm នៅ 300 DPI */
+            const DISPLAY_DPI = 96;
+            const PX_PER_MM_DISPLAY = DISPLAY_DPI / 25.4; /* ~3.78px ក្នុង 1mm លើអេក្រង់ */
+            const BARCODE_WIDTH_MM = 28;         /* barcode ទទឹង 28mm ក្នុងស្លាក 30mm */
+            const BARCODE_HEIGHT_MM = 6;         /* barcode កម្ពស់ 6mm (សមស្របនឹងស្លាក 20mm) */
+
+            /* ប៉ាន់ស្មានចំនួន modules របស់ CODE128 ដើម្បីគណនា module width */
+            function estimateModules(code) {
+                if (/^\d+$/.test(code)) {
+                    const pairs = Math.ceil(code.length / 2);
+                    return 11 + pairs * 11 + 11 + 13 + 20; /* start + data + checksum + stop + quiet zones */
+                }
+                return 11 + code.length * 11 + 11 + 13 + 20;
+            }
+
+            barcodeElements.forEach(el => {
+                const value = el.getAttribute('data-barcode');
+                const modules = estimateModules(value);
+                const targetPrintWidth = BARCODE_WIDTH_MM * PX_PER_MM_PRINT; /* ~330px @300DPI */
+
+                /* module width ត្រូវក្រាស់យ៉ាងហោចណាសាសម្រាប់ thermal printer (min 4px = 0.34mm)
+                   បើតូចជាងវាបង្ហាញឡើងវិញឲ្យពេញទទឹង 28mm ដើម្បី scanner អានបានច្បាស់ */
+                let moduleWidth = Math.max(4, targetPrintWidth / modules);
+
+                function renderBarcode(w) {
+                    JsBarcode(el, value, {
+                        format: "CODE128",
+                        width: w,
+                        height: BARCODE_HEIGHT_MM * PX_PER_MM_PRINT,
+                        displayValue: false, /* លេខ barcode បង្ហាញដោយ HTML ដាច់ដោយឡែក ឲ្យច្បាស់ */
+                        margin: 0
+                    });
+                }
+
+                renderBarcode(moduleWidth);
+
+                /* បើ canvas ត្រូវមានទំហំតូចជាងចង្វាក់ដែលត្រូវការ (ព្រោះ module count ពិតប្រាកដច្រើនជាងការប៉ាន់ស្មាន)
+                   នោហ render ឡើងវិញឲ្យពេញទទឹង — កុំឲ្យពេលព្រីនរូបភាពធំប៉ុន្តែព្រិល */
+                if (el.width < targetPrintWidth - 4) {
+                    const actualModules = el.width / moduleWidth;
+                    renderBarcode(targetPrintWidth / actualModules);
+                }
+
+                /* កំណត់ទំហំបង្ហាញលើអេក្រង់ឲ្យត្រូវនឹង mm ពិតប្រាកដ
+                   (canvas ខាងក្នុងមាន resolution 300 DPI ប៉ុន្តែបង្ហាញតូចជាង) */
+                el.style.width = (BARCODE_WIDTH_MM * PX_PER_MM_DISPLAY) + 'px';
+                el.style.height = (BARCODE_HEIGHT_MM * PX_PER_MM_DISPLAY) + 'px';
+            });
+        });
+    </script>
+</body>
+</html>
+{% else %}
+{% extends "pos_layout.html" %}
+
+{% block title %}Barcode Generation - NSP POS{% endblock %}
+{% block page_title %}Barcode Printing{% endblock %}
+{% block page_subtitle %}Select products to generate printable labels using their assigned barcodes{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    .selection-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .btn-green {
+        background-color: #065f46; 
+    }
+    .btn-green:hover {
+        background-color: #064e3b; 
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="selection-card overflow-hidden">
+    <form action="{{ url_for('print_barcodes') }}" method="POST" id="printForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="bg-gray-50 border-b border-gray-200 p-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-4 flex-grow">
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                    </span>
+                    <input type="text" id="productSearch" class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent w-full sm:w-64" placeholder="Search products...">
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
+                    <input type="checkbox" id="selectAll" class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                    Select All
+                </label>
+            </div>
+            <button type="submit" class="bg-green-800 hover:bg-green-900 text-white font-bold py-2 px-8 rounded-lg shadow-lg transition-all flex items-center gap-2">
+                <i data-lucide="printer" class="w-5 h-5"></i>
+                Generate Labels
+            </button>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-gray-700 uppercase text-xs font-semibold">
+                    <tr>
+                        <th class="px-6 py-4 w-16">Select</th>
+                        <th class="px-6 py-4">Product Name</th>
+                        <th class="px-6 py-4">Barcode</th>
+                        <th class="px-6 py-4">Category</th>
+                        <th class="px-6 py-4 text-right">Price</th>
+                    </tr>
+                </thead>
+                <tbody id="productTableBody" class="divide-y divide-gray-200">
+                    {% for p in products %}
+                    <tr class="product-row hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <input type="checkbox" name="product_ids" value="{{ p.id }}" class="product-checkbox w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                        </td>
+                        <td class="px-6 py-4 font-medium text-gray-900 product-name-cell">{{ p.name }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                                {{ p.barcode if p.barcode else 'Auto-Gen' }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-gray-600">{{ p.category }}</td>
+                        <td class="px-6 py-4 text-right font-semibold text-gray-900">${{ "%.2f"|format(p.price) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+
+    const searchInput = document.getElementById('productSearch');
+    const rows = document.querySelectorAll('.product-row');
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        rows.forEach(row => {
+            const name = row.querySelector('.product-name-cell').innerText.toLowerCase();
+            row.style.display = name.includes(query) ? '' : 'none';
+        });
+    });
+
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const productCheckboxes = document.querySelectorAll('.product-checkbox');
+
+    selectAllCheckbox.addEventListener('change', function() {
+        productCheckboxes.forEach(cb => {
+            if (cb.parentElement.parentElement.style.display !== 'none') {
+                cb.checked = this.checked;
+            }
+        });
+    });
+</script>
+{% endblock %}
+{% endif %}

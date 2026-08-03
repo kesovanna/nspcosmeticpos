@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NSP Cosmetic POS{% endblock %}</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&family=Moul&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pos_layout.css') }}">
+    {% block extra_css %}{% endblock %}
+    
+    <!-- Icons (Lucide) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Persistent Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-profile" style="padding: 0; display: flex; flex-direction: column; align-items: center; border-bottom: 1px solid var(--border-color); gap: 0; overflow: hidden; position: relative;">
+                <div style="position: relative; width: 100%; height: 140px; overflow: hidden;" id="coverGalleryContainer" title="ចុចដើម្បីគ្រប់គ្រងរូបភាព (Click to manage gallery)">
+                    <div id="coverSlideshow" style="width: 100%; height: 100%; position: relative;">
+                        <img id="sidebarCoverImg" src="{{ current_user.cover_image if current_user.cover_image else '/static/images/default.jpg' }}" onerror="this.src='/static/images/default.jpg';" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; transition: opacity 1s ease-in-out; z-index: 0;">
+                    </div>
+                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, transparent 20%, rgba(0,0,0,0.8) 100%); z-index: 1;"></div>
+                    
+                    <button type="button" onclick="openCoverGalleryModal(event)" class="sidebar-camera-btn" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; z-index: 20; border: 1px solid rgba(255,255,255,0.4); cursor: pointer; padding: 0;">
+                        <i data-lucide="images" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </div>
+                
+                <div style="padding: 0 15px 15px; display: flex; flex-direction: column; align-items: center; width: 100%; position: relative;">
+                    <div class="profile-circle" style="margin-top: -35px; z-index: 10; width: 70px; height: 70px; border: 4px solid white; border-radius: 50%; overflow: hidden; background: white;">
+                        <img src="{{ current_user.profile_image if current_user.profile_image else url_for('static', filename='images/Picture Profile.jpg') }}" alt="Profile" class="profile-img" onerror="this.src='/static/images/default.jpg'" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                    <div class="profile-info" style="text-align: center; margin-top: 5px;">
+                        <span class="profile-phone" style="display: block; font-weight: bold; font-size: 14px;">{{ current_user.username if current_user and current_user.username else '086966244' }}</span>
+                        <span class="profile-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(0,0,0,0.05); color: #666; font-weight: bold;">{{ current_user.role|upper if current_user and current_user.role else 'ADMIN' }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <a href="/" class="menu-item {% if active_page == 'home' %}active{% endif %}">
+                    <i data-lucide="home"></i>
+                    <span>POS Home</span>
+                </a>
+                <a href="/manager" class="menu-item {% if active_page == 'inventory' %}active{% endif %}">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Inventory</span>
+                </a>
+                <a href="/notifications" class="menu-item {% if active_page == 'notifications' %}active{% endif %}">
+                    <i data-lucide="bell"></i>
+                    <span>Notification</span>
+                </a>
+                <a href="/reports" class="menu-item {% if active_page == 'reports' %}active{% endif %}">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span>Sales Reports</span>
+                </a>
+                <a href="/activities" class="menu-item {% if active_page == 'activities' %}active{% endif %}">
+                    <i data-lucide="activity"></i>
+                    <span>Activities</span>
+                </a>
+                <a href="/users" class="menu-item {% if active_page == 'users' %}active{% endif %}">
+                    <i data-lucide="users"></i>
+                    <span>Manage Staff</span>
+                </a>
+                <a href="/cosmets" class="menu-item {% if active_page == 'products' %}active{% endif %}">
+                    <i data-lucide="package"></i>
+                    <span>Products</span>
+                </a>
+                <a href="{{ url_for('print_barcodes') }}" class="menu-item {% if active_page == 'barcodes' %}active{% endif %}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; opacity: 0.8;">
+                        <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                        <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                        <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                        <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                        <line x1="7" y1="12" x2="17" y2="12"></line>
+                    </svg>
+                    <span>Barcode</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="menu-item logout">
+                    <i data-lucide="log-out"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="content-header">
+                <div class="header-left">
+                    <h2 class="page-title">{% block page_title %}Dashboard{% endblock %}</h2>
+                    <p class="page-subtitle">{% block page_subtitle %}Welcome back to your POS system{% endblock %}</p>
+                </div>
+
+                <div class="header-right d-flex align-items-center gap-3">
+                    <!-- New Live Date/Time Badge -->
+                    <div id="topbar-live-date" class="topbar-date-badge">
+                        <i data-lucide="calendar" class="me-2" style="width: 16px; height: 16px;"></i>
+                        <span id="live-clock-text">Loading...</span>
+                    </div>
+
+                    <!-- Exchange Rate Display/Update -->
+                    <div class="exchange-rate-group" style="display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 6px 12px; border-radius: 20px; border: 1px solid #e2e8f0; margin-right: 15px;">
+                        <i data-lucide="circle-dollar-sign" style="width: 16px; height: 16px; color: #059669;"></i>
+                        <span style="font-size: 13px; font-weight: 600; color: #64748b;">1$ = </span>
+                        {% if current_user.role == 'admin' %}
+                            <input type="number" id="exchangeRateInput" value="{{ RIEL_RATE }}" 
+                                   style="width: 70px; border: none; background: transparent; font-weight: 700; color: #1e293b; padding: 0; outline: none; text-align: center;">
+                            <button onclick="saveExchangeRate()" class="save-rate-btn" 
+                                    style="background: #059669; color: white; border: none; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; transition: all 0.2s;">
+                                រក្សាទុក
+                            </button>
+                        {% else %}
+                            <span style="font-weight: 700; color: #1e293b;">{{ RIEL_RATE }}</span>
+                        {% endif %}
+                        <span style="font-size: 13px; font-weight: 600; color: #64748b;">៛</span>
+                    </div>
+
+                    <div id="notifTrigger" class="notification-bell" title="System Notifications">
+                        <i data-lucide="bell"></i>
+                        <div id="notifBadge" class="notification-badge" style="display: none;">0</div>
+                    </div>
+                    
+                    <!-- Notification Dropdown -->
+                    <div id="notifDropdown" class="notification-dropdown">
+                        <div class="notif-header">
+                            <h4>ការជូនដំណឹង (Notifications)</h4>
+                            <span id="notifCountText" style="font-size: 12px; color: var(--text-muted);">0 New</span>
+                        </div>
+                        <div id="notifList" class="notif-content">
+                            <!-- Notifications will be injected here -->
+                            <div style="padding: 30px; text-align: center; color: var(--text-muted);">
+                                <i data-lucide="bell-off" style="width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.5;"></i>
+                                <p style="font-size: 14px;">មិនមានការជូនដំណឹងថ្មីទេ</p>
+                            </div>
+                        </div>
+                        <div class="notif-footer">
+                            <a href="/notifications" class="btn-view-all">View All Notifications</a>
+                        </div>
+                    </div>
+
+                    <div class="user-status">
+                        <span class="user-phone">👤 {{ current_user.username if current_user and current_user.username else 'Guest' }}</span>
+                        <span class="user-role">{{ current_user.role|capitalize if current_user and current_user.role else 'Administrator' }}</span>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Quick Actions Container -->
+            {% block quick_actions %}
+            <section class="quick-actions-section">
+                <div class="quick-actions-card">
+                    <div class="qa-info">
+                        <h3>សកម្មភាពរហ័ស (Quick Actions)</h3>
+                        <p>គ្រប់គ្រងទិន្នន័យផលិតផលរបស់អ្នក</p>
+                    </div>
+                    <div class="qa-buttons">
+                        <a href="{{ url_for('add_product') }}" class="btn-qa btn-primary">
+                            <i data-lucide="plus"></i>
+                            Add New Product
+                        </a>
+                        <button onclick="typeof triggerSync === 'function' ? triggerSync() : alert('Sync feature not available on this page')" class="btn-qa btn-primary">
+                            <i data-lucide="refresh-cw"></i>
+                            Sync Now
+                        </button>
+                    </div>
+                </div>
+            </section>
+            {% endblock %}
+            
+            <!-- Page-Specific Content -->
+            <div class="content-body">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Inventory Alert Modal -->
+    <div id="inventoryAlertOverlay" class="inventory-modal-overlay">
+        <div id="inventoryModal" class="inventory-modal">
+            <div class="modal-alert-icon">
+                <i id="modalIcon" data-lucide="alert-circle"></i>
+            </div>
+            <h2 id="modalTitle" class="modal-title">អស់ពីស្តុក (Out of Stock)</h2>
+            <p id="modalDescription" class="modal-description">ផលិតផលនេះអស់ពីស្តុកហើយ! សូមពិនិត្យមើលសារពើភ័ណ្ឌរបស់អ្នក។</p>
+            <div class="modal-actions">
+                <button id="dismissAlertBtn" class="btn-modal btn-modal-dismiss">បិទ (Dismiss)</button>
+                <button id="viewAllAlertsBtn" class="btn-modal btn-modal-action">មើលទាំងអស់ (View All)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cover Gallery Modal -->
+    <div id="coverGalleryModal" class="modal-overlay" style="display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.75); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content" style="background-color: #fff; padding: 25px; border-radius: 20px; width: 100%; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); position: relative;">
+            <span class="close-modal" onclick="closeCoverGalleryModal()" style="position: absolute; right: 20px; top: 15px; font-size: 28px; cursor: pointer; color: #d81b60; font-weight: bold;">&times;</span>
+            <h2 style="font-family: 'Moul', serif; color: #d81b60; font-size: 18px; margin-bottom: 20px;">គ្រប់គ្រងរូបភាពគ្រប (Cover Gallery)</h2>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">អ្នកអាចបន្ថែមរូបភាពរហូតដល់ ១០ សន្លឹកសម្រាប់ធ្វើជា Slide។</p>
+            
+            <div id="coverGalleryList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-bottom: 20px;">
+                <!-- Gallery items will be injected here -->
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="document.getElementById('coverGalleryInput').click()" style="flex: 1; padding: 12px; border-radius: 12px; background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer;">
+                    <i data-lucide="plus"></i> បន្ថែមរូបភាពថ្មី
+                </button>
+                <input type="file" id="coverGalleryInput" style="display: none;" accept="image/*" onchange="uploadCoverToGallery(this)">
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .gallery-item {
+            position: relative;
+            width: 100%;
+            padding-top: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+        .gallery-item img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .gallery-item .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(220, 53, 69, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 10;
+        }
+    </style>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Initialize Lucide icons safely
+        document.addEventListener("DOMContentLoaded", () => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            } else {
+                console.warn("Lucide library failed to load or is not ready.");
+            }
+        });
+
+        let coverGallery = [];
+        let currentCoverIndex = 0;
+        let slideshowInterval;
+
+        async function fetchCoverGallery() {
+            try {
+                const response = await fetch('/api/user-covers');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    coverGallery = data.covers;
+                    renderCoverGalleryModal();
+                    startCoverSlideshow();
+                }
+            } catch (error) {
+                console.error('Failed to fetch cover gallery:', error);
+            }
+        }
+
+        function renderCoverGalleryModal() {
+            const list = document.getElementById('coverGalleryList');
+            if (!list) return;
+            
+            list.innerHTML = coverGallery.map(cover => `
+                <div class="gallery-item">
+                    <img src="${cover.image_data}" alt="Cover">
+                    <button class="delete-btn" onclick="deleteCover(${cover.id})">&times;</button>
+                </div>
+            `).join('');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+
+        async function uploadCoverToGallery(input) {
+            if (!input.files || !input.files[0]) return;
+            
+            if (coverGallery.length >= 10) {
+                Swal.fire('Error', 'អតិបរមា ១០ រូបភាពប៉ុណ្ណោះ (Maximum 10 images).', 'error');
+                return;
+            }
+
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const img = new Image();
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 800;
+                    canvas.height = 400;
+                    const ctx = canvas.getContext('2d');
+                    
+                    const ratio = img.width / img.height;
+                    const targetRatio = 800 / 400;
+                    let sx, sy, sw, sh;
+                    if (ratio > targetRatio) {
+                        sw = img.height * targetRatio;
+                        sh = img.height;
+                        sx = (img.width - sw) / 2;
+                        sy = 0;
+                    } else {
+                        sw = img.width;
+                        sh = img.width / targetRatio;
+                        sx = 0;
+                        sy = (img.height - sh) / 2;
+                    }
+                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 800, 400);
+                    const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    try {
+                        const res = await fetch('/api/upload-cover-gallery', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image_data: base64 })
+                        });
+                        const result = await res.json();
+                        if (result.status === 'success') {
+                            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'បានបន្ថែមរូបភាព!', showConfirmButton: false, timer: 1500 });
+                            fetchCoverGallery();
+                        } else {
+                            Swal.fire('Error', result.message, 'error');
+                        }
+                    } catch (err) {
+                        console.error('Upload error:', err);
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function deleteCover(id) {
+            if (await Swal.fire({ title: 'លុបរូបភាព?', text: "តើអ្នកប្រាកដថាចង់លុបរូបភាពនេះមែនទេ?", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'លុប' }).then(r => r.isConfirmed)) {
+                try {
+                    const res = await fetch(`/api/delete-cover/${id}`, { method: 'POST' });
+                    const result = await res.json();
+                    if (result.status === 'success') {
+                        fetchCoverGallery();
+                    }
+                } catch (err) {
+                    console.error('Delete error:', err);
+                }
+            }
+        }
+
+        function openCoverGalleryModal(event) {
+            if (event) event.stopPropagation();
+            document.getElementById('coverGalleryModal').style.display = 'flex';
+            renderCoverGalleryModal();
+        }
+
+        function closeCoverGalleryModal() {
+            document.getElementById('coverGalleryModal').style.display = 'none';
+        }
+
+        function startCoverSlideshow() {
+            if (slideshowInterval) clearInterval(slideshowInterval);
+            if (coverGallery.length <= 1) return;
+
+            const container = document.getElementById('coverSlideshow');
+            if (!container) return;
+
+            slideshowInterval = setInterval(() => {
+                currentCoverIndex = (currentCoverIndex + 1) % coverGallery.length;
+                const nextImg = coverGallery[currentCoverIndex].image_data;
+                
+                const img = document.createElement('img');
+                img.src = nextImg;
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.style.position = 'absolute';
+                img.style.top = '0';
+                img.style.left = '0';
+                img.style.opacity = '0';
+                img.style.transition = 'opacity 1s ease-in-out';
+                img.style.zIndex = '0';
+                
+                container.appendChild(img);
+                img.offsetWidth;
+                img.style.opacity = '1';
+                
+                const oldImgs = container.querySelectorAll('img');
+                if (oldImgs.length > 2) {
+                    setTimeout(() => {
+                        if (oldImgs[0] && oldImgs[0].parentNode === container) {
+                            container.removeChild(oldImgs[0]);
+                        }
+                    }, 1000);
+                } else if (oldImgs.length === 2) {
+                    setTimeout(() => {
+                        oldImgs[0].style.opacity = '0';
+                        setTimeout(() => {
+                            if (oldImgs[0] && oldImgs[0].parentNode === container) {
+                                container.removeChild(oldImgs[0]);
+                            }
+                        }, 1000);
+                    }, 50);
+                }
+            }, 5000);
+        }
+
+        // Clipboard Paste Functionality for Cover Gallery
+        document.addEventListener('paste', function(e) {
+            // Only proceed if the Cover Gallery Modal is visible
+            const modal = document.getElementById('coverGalleryModal');
+            if (!modal || modal.style.display === 'none') return;
+
+            if (!e.clipboardData || !e.clipboardData.items) return;
+
+            let items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    let file = items[i].getAsFile();
+                    let fileInput = document.getElementById('coverGalleryInput');
+                    if (fileInput) {
+                        let dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        fileInput.files = dataTransfer.files;
+
+                        // Call the upload function directly as 'change' might not be enough if same file is pasted
+                        uploadCoverToGallery(fileInput);
+                        
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'Image pasted to gallery!',
+                            showConfirmButton: false,
+                            timer: 2000
+                        });
+                    }
+                    break;
+                }
+            }
+        });
+
+
+        function startTopbarClock() {
+            const clockElement = document.getElementById('live-clock-text');
+            if (!clockElement) return;
+
+            function updateTime() {
+                const now = new Date();
+                const options = { 
+                    weekday: 'short', 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                };
+                clockElement.textContent = now.toLocaleDateString('en-US', options);
+            }
+            updateTime();
+            setInterval(updateTime, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            startTopbarClock();
+            fetchCoverGallery();
+        });
+
+        // --- Notification System ---
+        const notifTrigger = document.getElementById('notifTrigger');
+        const notifDropdown = document.getElementById('notifDropdown');
+        const notifBadge = document.getElementById('notifBadge');
+        const notifList = document.getElementById('notifList');
+        const notifCountText = document.getElementById('notifCountText');
+        
+        // Modal elements
+        const alertOverlay = document.getElementById('inventoryAlertOverlay');
+        const modalContainer = document.getElementById('inventoryModal');
+        const modalIcon = document.getElementById('modalIcon');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalDesc = document.getElementById('modalDescription');
+
+        // Track seen notifications to avoid repeating modals across page loads
+        let currentCriticalAlerts = [];
+
+        // Toggle dropdown
+        notifTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notifDropdown.classList.toggle('active');
+            if (notifDropdown.classList.contains('active')) {
+                fetchNotifications();
+            }
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+            if (notifDropdown && !notifDropdown.contains(e.target) && !notifTrigger.contains(e.target)) {
+                notifDropdown.classList.remove('active');
+            }
+        });
+
+        async function fetchNotifications() {
+            try {
+                const response = await fetch('/api/notifications');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    renderNotifications(data.notifications);
+                    updateBadge(data.count);
+                    checkCriticalAlerts(data.notifications);
+                }
+            } catch (error) {
+                console.error('Failed to fetch notifications:', error);
+            }
+        }
+
+        function renderNotifications(notifications) {
+            if (notifications.length === 0) {
+                notifList.innerHTML = `
+                    <div style="padding: 30px; text-align: center; color: var(--text-muted);">
+                        <i data-lucide="bell-off" style="width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.5;"></i>
+                        <p style="font-size: 14px;">មិនមានការជូនដំណឹងថ្មីទេ</p>
+                    </div>`;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                return;
+            }
+
+            notifList.innerHTML = notifications.map(n => `
+                <a href="#" class="notif-item notif-${n.type}" onclick="handleNotifClick('${n.id}')">
+                    <div class="notif-icon-wrapper" style="background: ${n.bg_color || ''}; color: ${n.color || ''}">
+                        <i data-lucide="${n.icon || 'bell'}" style="width: 20px; height: 20px;"></i>
+                    </div>
+                    <div class="notif-info-wrapper">
+                        <div class="notif-title">${n.title}</div>
+                        <div class="notif-message">${n.message}</div>
+                        <div class="notif-time">${n.time}</div>
+                    </div>
+                </a>
+            `).join('');
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            notifCountText.innerText = `${notifications.length} New`;
+        }
+
+        function updateBadge(count) {
+            if (count > 0) {
+                notifBadge.innerText = count > 9 ? '9+' : count;
+                notifBadge.style.display = 'flex';
+            } else {
+                notifBadge.style.display = 'none';
+            }
+        }
+
+        function checkCriticalAlerts(notifications) {
+            const acknowledged = JSON.parse(localStorage.getItem('acknowledgedInventoryAlerts') || '{}');
+            
+            // Find high severity alerts that are either new or have updated stock levels
+            const criticalAlerts = notifications.filter(n => {
+                if (n.severity !== 'high') return false;
+                const lastStock = acknowledged[n.id];
+                // Show if never seen OR if stock quantity has changed since last dismissal
+                return lastStock === undefined || lastStock !== n.stock_quantity;
+            });
+
+            if (criticalAlerts.length > 0 && !alertOverlay.classList.contains('active')) {
+                currentCriticalAlerts = criticalAlerts;
+                showInventoryModal(criticalAlerts[0], criticalAlerts.length);
+            }
+        }
+
+        function showInventoryModal(alert, count) {
+            modalTitle.innerText = alert.title;
+            modalDesc.innerText = count > 1 ? `${alert.message} (និងបញ្ហាផ្សេងទៀតចំនួន ${count - 1})` : alert.message;
+            modalIcon.setAttribute('data-lucide', alert.icon);
+            
+            // Set severity class
+            modalContainer.className = `inventory-modal modal-${alert.severity}`;
+            
+            alertOverlay.classList.add('active');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function markAlertsAsAcknowledged() {
+            const acknowledged = JSON.parse(localStorage.getItem('acknowledgedInventoryAlerts') || '{}');
+            currentCriticalAlerts.forEach(n => {
+                acknowledged[n.id] = n.stock_quantity;
+            });
+            localStorage.setItem('acknowledgedInventoryAlerts', JSON.stringify(acknowledged));
+            currentCriticalAlerts = [];
+        }
+
+        function closeInventoryModal() {
+            alertOverlay.classList.remove('active');
+        }
+
+        // Modal Action Handlers
+        document.getElementById('dismissAlertBtn').addEventListener('click', () => {
+            markAlertsAsAcknowledged();
+            closeInventoryModal();
+        });
+
+        document.getElementById('viewAllAlertsBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            markAlertsAsAcknowledged();
+            closeInventoryModal();
+            // Programmatically navigate to ensure lifecycle isn't hijacked
+            setTimeout(() => {
+                window.location.href = '/cosmets';
+            }, 50);
+        });
+
+        function handleNotifClick(id) {
+            console.log('Notification clicked:', id);
+            if (id.startsWith('inv-')) {
+                window.location.href = '/cosmets';
+            }
+        }
+
+        // Initial fetch for badge count
+        fetchNotifications();
+        // Refresh every 1 minute for more "real-time" feel
+        setInterval(fetchNotifications, 60000);
+
+        // Basic sync trigger placeholder if not defined
+        if (typeof triggerSync !== 'function') {
+            window.triggerSync = async function(isSilent = false) {
+                console.log("Sync triggered from layout");
+                try {
+                    const response = await fetch('/api/sync', { method: 'POST' });
+                    let result = null;
+
+                    try {
+                        result = await response.json();
+                    } catch (innerError) {
+                        console.error('Sync response JSON parse failed:', innerError);
+                        console.error('Raw sync response:', await response.text().catch(() => 'unreadable'));
+                    }
+
+                    if (!result || typeof result !== 'object') {
+                        console.error('Invalid /api/sync response payload:', result);
+                        if (!isSilent) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'បញ្ហា',
+                                text: 'មិនទទួលបានចម្លើយត្រឹមត្រូវពីម៉ាស៊ីនមេ។'
+                            });
+                        }
+                        return;
+                    }
+
+                    if (!isSilent) {
+                        if (result.status === 'success') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'ជោគជ័យ',
+                                text: 'ការធ្វើសមកាលកម្មបានបញ្ចប់!',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'បញ្ហា',
+                                text: result.message || 'Sync failed'
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Sync error:', error);
+                    if (!isSilent) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'បរាជ័យ',
+                            text: 'មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេបានទេ'
+                        });
+                    }
+                }
+            }
+        }
+
+        async function saveExchangeRate() {
+            const rateInput = document.getElementById('exchangeRateInput');
+            if (!rateInput) return;
+            const newRate = parseInt(rateInput.value, 10);
+            
+            if (!newRate || isNaN(newRate)) {
+                Swal.fire({ 
+                    icon: 'error', 
+                    title: 'បរាជ័យ', 
+                    text: 'សូមបញ្ចូលអត្រាប្តូរប្រាក់ឱ្យបានត្រឹមត្រូវ! (Please enter a valid rate)' 
+                });
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/settings/exchange-rate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ exchange_rate: newRate })
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`Server returned ${response.status}: ${errText}`);
+                }
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'ជោគជ័យ',
+                        text: result.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.reload(); 
+                    });
+                } else {
+                    throw new Error(result.message || "Failed to update database records.");
+                }
+            } catch (error) {
+                console.error("Exchange rate save error:", error);
+                Swal.fire({ 
+                    icon: 'error', 
+                    title: 'Error', 
+                    text: 'Connection failed or server error. Please verify the endpoint controller configuration.' 
+                });
+            }
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

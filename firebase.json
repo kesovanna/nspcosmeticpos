@@ -1,0 +1,45 @@
+{
+  "hosting": {
+    "site": "nsp-cosmetic-store-pos",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "main.py",
+      "requirements.txt",
+      "serviceAccountKey.json",
+      "firestore.indexes.json",
+      ".firebaserc",
+      "venv/**",
+      ".venv/**",
+      "__pycache__/**",
+      "templates/**"
+    ],
+    "rewrites": [
+    {
+      "source": "**",
+      "function": "nsp_cosmetic_store_pos"
+    }
+  ]
+  },
+  "functions": {
+    "source": ".",
+    "runtime": "python311",
+    "ignore": [
+      ".venv*",
+      "venv*",
+      "node_modules",
+      "node_modules/**",
+      ".git",
+      ".firebase",
+      "__pycache__",
+      "serviceAccountKey.json",
+      ".env",
+      ".env.template"
+    ]
+  },
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  }
+}

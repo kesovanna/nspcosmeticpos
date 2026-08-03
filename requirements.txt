@@ -1,0 +1,15 @@
+firebase-functions>=0.1.0
+firebase-admin>=6.5.0
+flask
+Flask-Login
+Flask-WTF>=1.1.1
+waitress
+urllib3
+python-dotenv
+werkzeug
+python-barcode
+Pillow
+telethon
+grpcio
+google-cloud-firestore
+weasyprint

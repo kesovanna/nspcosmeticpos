@@ -1,0 +1,275 @@
+{% extends "pos_layout.html" %}
+
+{% set active_page = 'users' %}
+
+{% block title %}Manage Staff - NSP Cosmetic{% endblock %}
+
+{% block page_title %}គ្រប់គ្រងបុគ្គលិក (Manage Staff){% endblock %}
+
+{% block quick_actions %}
+<section class="quick-actions-section">
+    <div class="quick-actions-card">
+        <div class="qa-info">
+            <h3>សកម្មភាពបុគ្គលិក (Staff Actions)</h3>
+            <p>គ្រប់គ្រងការចូលប្រើប្រាស់ និងតួនាទីរបស់បុគ្គលិក</p>
+        </div>
+        <div class="qa-buttons">
+            <button onclick="openAddStaffModal()" class="btn-qa btn-primary">
+                <i data-lucide="user-plus"></i>
+                + បន្ថែមបុគ្គលិកថ្មី (Add New Staff)
+            </button>
+            <button onclick="fetchStaffMembers()" class="btn-qa btn-primary">
+                <i data-lucide="refresh-cw"></i>
+                Refresh List
+            </button>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm p-4">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle" id="staffTable">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 50px;">No.</th>
+                    <th>ឈ្មោះ (Name)</th>
+                    <th>ឈ្មោះអ្នកប្រើ (Username)</th>
+                    <th>តួនាទី (Role)</th>
+                    <th>ស្ថានភាព (Status)</th>
+                    <th class="text-end">សកម្មភាព (Actions)</th>
+                </tr>
+            </thead>
+            <tbody id="userList">
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <div id="loading-state">
+                            <h3 class="text-muted">កំពុងទាញយកទិន្នន័យ...</h3>
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Staff Modal -->
+<div id="addStaffModal" class="inventory-modal-overlay">
+    <div class="inventory-modal">
+        <div class="modal-alert-icon" style="background: var(--primary-color);">
+            <i data-lucide="user-plus"></i>
+        </div>
+        <h2 class="modal-title">បន្ថែមបុគ្គលិកថ្មី</h2>
+        <p class="modal-description">សូមបំពេញព័ត៌មានខាងក្រោមដើម្បីបង្កើតគណនីបុគ្គលិក។</p>
+        
+        <form id="addStaffForm" class="mt-3">
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">ឈ្មោះអ្នកប្រើ (Username)</label>
+                <input type="text" id="new_username" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+            </div>
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">លេខសម្ងាត់ (Password)</label>
+                <input type="password" id="new_password" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+            </div>
+            <div style="text-align: left; margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">តួនាទី (Role)</label>
+                <select id="new_role" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    <option value="user">User (Staff)</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" onclick="closeAddStaffModal()" class="btn-modal btn-modal-dismiss">បោះបង់</button>
+                <button type="submit" class="btn-modal btn-modal-action">បង្កើត</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // fetchStaffMembers is now provided by app.js with defensive checks
+        fetchStaffMembers();
+        
+        // Handle form submission
+        document.getElementById('addStaffForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('new_username').value;
+            const password = document.getElementById('new_password').value;
+            const role = document.getElementById('new_role').value;
+            
+            try {
+                const response = await fetch('/api/users/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, role })
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    Swal.fire('ជោគជ័យ', result.message, 'success');
+                    closeAddStaffModal();
+                    fetchStaffMembers();
+                    document.getElementById('addStaffForm').reset();
+                } else {
+                    Swal.fire('កំហុស', result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error creating staff:', error);
+                Swal.fire('បរាជ័យ', 'មិនអាចបង្កើតបុគ្គលិកបានទេ', 'error');
+            }
+        });
+    });
+
+    function renderStaffTable(staff) {
+        const tableBody = document.getElementById('userList');
+        if (!tableBody) return;
+        
+        if (staff.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4">មិនមានទិន្នន័យបុគ្គលិកទេ</td></tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = staff.map((member, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <img src="${member.profile_image || '/static/images/default.jpg'}" 
+                             style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"
+                             onerror="this.src='/static/images/default.jpg'">
+                        <span>${member.display_name}</span>
+                    </div>
+                </td>
+                <td><span class="badge bg-light text-dark">${member.username}</span></td>
+                <td><span class="badge bg-info text-white">${member.role.toUpperCase()}</span></td>
+                <td>
+                    <span class="badge ${member.status === 'active' ? 'bg-success' : 'bg-warning'} text-white">
+                        ${member.status === 'active' ? 'សកម្ម' : 'រង់ចាំ'}
+                    </span>
+                </td>
+                <td class="text-end">
+                    <div style="display: flex; justify-content: flex-end; gap: 5px;">
+                        <button onclick="changeRole('${member.username}', '${member.role === 'admin' ? 'user' : 'admin'}')" 
+                                class="btn-qa" style="padding: 5px 10px; font-size: 12px;" title="ប្តូរតួនាទី">
+                            <i data-lucide="shield-alert" style="width: 16px; height: 16px;"></i>
+                        </button>
+                        <button onclick="deleteStaff('${member.username}')" 
+                                class="btn-qa" style="padding: 5px 10px; font-size: 12px; background: #fee2e2; color: #dc2626;" title="លុប">
+                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function openAddStaffModal() {
+        document.getElementById('addStaffModal').classList.add('active');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function closeAddStaffModal() {
+        document.getElementById('addStaffModal').classList.remove('active');
+    }
+
+    async function changeRole(username, newRole) {
+        const confirm = await Swal.fire({
+            title: 'ប្តូរតួនាទី?',
+            text: `តើអ្នកចង់ប្តូរតួនាទីរបស់ ${username} ទៅជា ${newRole} មែនទេ?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'យល់ព្រម',
+            cancelButtonText: 'បោះបង់'
+        });
+
+        if (confirm.isConfirmed) {
+            try {
+                const response = await fetch(`/api/users/${username}/set-role`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: newRole })
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    Swal.fire('ជោគជ័យ', result.message, 'success');
+                    fetchStaffMembers();
+                } else {
+                    Swal.fire('កំហុស', result.message, 'error');
+                }
+            } catch (error) {
+                Swal.fire('បរាជ័យ', 'មានបញ្ហាបច្ចេកទេស', 'error');
+            }
+        }
+    }
+
+    async function deleteStaff(username) {
+        const confirm = await Swal.fire({
+            title: 'លុបគណនី?',
+            text: `តើអ្នកប្រាកដថាចង់លុបគណនី ${username} មែនទេ? សកម្មភាពនេះមិនអាចត្រឡប់ក្រោយបានទេ!`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            confirmButtonText: 'លុបចេញ',
+            cancelButtonText: 'បោះបង់'
+        });
+
+        if (confirm.isConfirmed) {
+            try {
+                const response = await fetch(`/api/users/${username}/delete`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    Swal.fire('ជោគជ័យ', result.message, 'success');
+                    fetchStaffMembers();
+                } else {
+                    Swal.fire('កំហុស', result.message, 'error');
+                }
+            } catch (error) {
+                Swal.fire('បរាជ័យ', 'មានបញ្ហាបច្ចេកទេស', 'error');
+            }
+        }
+    }
+</script>
+
+<style>
+    .btn-qa {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        color: var(--text-main);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .btn-primary {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+    }
+    .btn-primary:hover {
+        background: var(--primary-hover);
+        transform: translateY(-2px);
+    }
+    .badge {
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}

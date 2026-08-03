@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>វិក្កយបត្រ - NSP Cosmetic Store</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap');
+
+        /* Custom Font for PDF Rendering */
+        @font-face {
+            font-family: 'Khmer OS Moul Light';
+            src: url('/static/fonts/KhmerOSmuollight.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        @font-face {
+            font-family: 'Khmer OS Battambang';
+            src: url('/static/fonts/KhmerOSbattambang.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        :root { --primary-color: #d81b60; --secondary-color: #ad144b; --bg-color: #f0f2f5; --card-bg: #ffffff; --text-main: #333333; --text-muted: #666666; --border-color: #eeeeee; }
+        body { font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; background-color: var(--bg-color); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; height: auto; }
+        .invoice-card { background: var(--card-bg); width: 100%; max-width: 450px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); position: relative; overflow: hidden; height: auto; }
+        .invoice-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 8px; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); }
+        .header { text-align: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px dashed var(--border-color); }
+        .logo { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 3px solid var(--bg-color); }
+        h1 { 
+            margin: 0; 
+            font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important; 
+            font-weight: normal; 
+            font-size: 20px; 
+            color: var(--primary-color); 
+            letter-spacing: 0.5px; 
+        }
+        .invoice-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 5px; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        .info-section { margin-bottom: 20px; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+        .info-label { color: var(--text-muted); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        .info-value { font-weight: 700; color: var(--text-main); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        th { text-align: left; font-size: 12px; color: var(--text-muted); border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; text-transform: uppercase; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        td { padding: 12px 0; border-bottom: 1px solid var(--bg-color); font-size: 14px; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        .item-qty { text-align: center; color: var(--text-muted); }
+        .item-price { text-align: right; font-weight: 600; }
+        .total-section { background: var(--bg-color); padding: 15px; border-radius: 12px; margin-top: 10px; }
+        .total-row { display: flex; justify-content: space-between; align-items: center; }
+        .total-label { font-size: 16px; font-weight: 700; color: var(--text-main); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        .total-amount { font-size: 24px; font-weight: 800; color: var(--primary-color); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        .btn-group { margin-top: 25px; display: flex; flex-direction: column; gap: 12px; }
+        .btn { border: none; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; text-decoration: none; }
+        .btn-aba { background: #005a9c; color: white; box-shadow: 0 4px 15px rgba(0, 90, 156, 0.2); }
+        .btn-aba:hover { background: #004a80; transform: translateY(-2px); }
+        .btn-print { background: white; color: var(--text-main); border: 1px solid #ddd; }
+        .btn-print:hover { background: #f9f9f9; }
+        .btn-back { background: transparent; color: var(--text-muted); font-weight: 400; font-size: 13px; }
+        .btn-back:hover { color: var(--text-main); text-decoration: underline; }
+        .aba-qr-container { text-align: center; padding: 10px; }
+        .aba-qr-img { width: 220px; height: 220px; margin: 0 auto 15px; border: 8px solid white; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .aba-deeplink { display: inline-block; margin-top: 15px; padding: 12px 25px; background: #005a9c; color: white; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 14px; }
+        @media (max-width: 600px) { h1, h2 { font-size: 1.5rem !important; text-align: center; } }
+
+        /* WeasyPrint & Thermal Printer Optimization */
+        @page {
+            size: 80mm 140mm;
+            margin: 4mm;
+        }
+        
+        /* Apply to both screen and print for WeasyPrint compatibility */
+        {% if is_pdf %}
+        html {
+            height: auto;
+        }
+        body {
+            background: white;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            height: auto;
+            font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+            -webkit-font-smoothing: antialiased;
+            display: block;
+        }
+        .invoice-card {
+            box-shadow: none;
+            border-radius: 0;
+            padding: 0;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            margin: 0;
+        }
+        .invoice-card::before {
+            display: none;
+        }
+        .btn-group, .btn-back {
+            display: none !important;
+        }
+        .total-section {
+            background: #f0f0f0 !important;
+        }
+        .logo {
+            width: 50px;
+            height: 50px;
+        }
+        h1 {
+            font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important;
+            font-size: 16px;
+        }
+        table {
+            font-size: 12px;
+        }
+        .item-price {
+            font-size: 12px;
+        }
+        #total-riel {
+            font-size: 20px !important;
+        }
+        {% endif %}
+
+        @media print {
+            @page {
+                size: 80mm 140mm;
+                margin: 4mm;
+            }
+            html {
+                height: auto;
+            }
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+                width: 100%;
+                height: auto;
+                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+                -webkit-font-smoothing: antialiased;
+                display: block;
+            }
+            .invoice-card {
+                box-shadow: none;
+                border-radius: 0;
+                padding: 0;
+                width: 100%;
+                max-width: 100%;
+                height: auto;
+                margin: 0;
+            }
+            .invoice-card::before {
+                display: none;
+            }
+            .btn-group, .btn-back {
+                display: none !important;
+            }
+            .total-section {
+                background: #f0f0f0 !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            .logo {
+                width: 50px;
+                height: 50px;
+            }
+            h1 {
+                font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important;
+                font-size: 16px;
+                -webkit-font-smoothing: antialiased;
+            }
+            table {
+                font-size: 12px;
+                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+            }
+            td, th {
+                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+            }
+            .item-price {
+                font-size: 12px;
+                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+            }
+            #total-riel {
+                font-size: 20px !important;
+                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+            }
+            .info-label, .info-value {
+                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+            }
+            .total-label {
+                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="invoice-card">
+    <div class="header">
+        <img src="{{ url_for('static', filename='images/nsp_logo.png') }}" class="logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/924/924514.png';">
+        <h1>ហាងគ្រឿងសម្អាង NSP</h1>
+        <div class="invoice-title">Official Invoice</div>
+    </div>
+    <div class="info-section">
+        <div class="info-row"><span class="info-label">កាលបរិច្ឆេទ | Date</span><span class="info-value" id="current-date">{{ date }}</span></div>
+        <div class="info-row"><span class="info-label">លេខវិក្កយបត្រ | Inv #</span><span class="info-value">INV-{{ date.replace('/', '').replace(':', '').replace(' ', '') }}</span></div>
+    </div>
+    <table>
+        <thead><tr><th>Item</th><th style="text-align: center;">Qty</th><th style="text-align: right;">Price</th></tr></thead>
+        <tbody>
+            {% for item in items %}
+            {% set qty = item.quantity or item.qty or 1 %}
+            {% set price = item.price|float %}
+            {% set subtotal = price * qty %}
+            <tr>
+                <td>
+                    {{ item.name }}<br>
+                    <small style="color:#28a745; font-size:12px; font-weight:bold;">៛ {{ "{:,.0f}".format(price * RIEL_RATE) }}</small> | 
+                    <small style="color:#d81b60; font-size:11px;">$ {{ "{:,.2f}".format(price) }}</small>
+                </td>
+                <td class="item-qty">{{ qty }}</td>
+                <td class="item-price">
+                    <span style="color:#28a745; font-weight:bold; font-size:16px;">៛ {{ "{:,.0f}".format(subtotal * RIEL_RATE) }}</span><br>
+                    <small style="color:#d81b60; font-size:11px;">$ {{ "{:,.2f}".format(subtotal) }}</small>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="total-section">
+        <div class="total-row" style="flex-direction: column; align-items: flex-end; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                <span class="total-label">សរុប | Grand Total</span>
+                <span id="total-riel" style="font-size: 26px; font-weight: 800; color: #28a745;">៛ {{ "{:,.0f}".format(total|float * RIEL_RATE) }}</span>
+            </div>
+            <div class="total-amount" style="font-size: 16px; color: #d81b60; font-weight: 600;">$ {{ "{:,.2f}".format(total|float) }}</div>
+        </div>
+    </div>
+    <div class="btn-group">
+        {% if payment_method|lower == 'qr' %}
+        <button class="btn btn-aba" onclick="payWithABA()">
+            <img src="https://www.ababank.com/typo3conf/ext/aba/Resources/Public/Images/aba-logo.png" style="height: 18px;" alt="ABA">
+            បង់ប្រាក់ជាមួយ ABA Pay
+        </button>
+        {% else %}
+        <button class="btn btn-aba" style="background: #28a745;" onclick="confirmCashPayment()">
+            <span style="font-size: 24px;">💵</span>
+            បញ្ជាក់ការបង់ប្រាក់ | Confirm Payment
+        </button>
+        {% endif %}
+        <button class="btn btn-print" onclick="window.print()"><span>🖨️</span> បោះពុម្ពវិក្កយបត្រ | Print</button>
+        <a href="/" class="btn btn-back">ត្រឡប់ទៅហាងវិញ | Back to Shop</a>
+    </div>
+</div>
+
+<script>
+    let pollingInterval; 
+    const TOTAL_AMOUNT = "{{ total }}";
+    const CART_ITEMS = {{ items | tojson }};
+    const RIEL_RATE = {{ RIEL_RATE }};
+    const PAYMENT_METHOD = "{{ payment_method|lower }}";
+
+    // Table is now rendered by Jinja2 for PDF compatibility
+    // We only need to handle fallback if Jinja variables are empty (e.g. page refresh)
+    if (!CART_ITEMS || CART_ITEMS.length === 0) {
+        const savedCart = sessionStorage.getItem('checkout_cart');
+        const savedTotal = sessionStorage.getItem('checkout_total');
+        if (savedCart && savedTotal) {
+            // If we have session data but no Jinja data, we need to reload with the data
+            // or just let the user go back to shop since this is a direct URL access
+            window.location.href = '/'; 
+        } else {
+            window.location.href = '/'; 
+        }
+    }
+
+    // Cash Payment Handler
+    async function confirmCashPayment() {
+        try {
+            Swal.fire({ 
+                title: 'កំពុងដំណើរការ... | Processing...', 
+                text: 'សូមរង់ចាំបន្តិច | Please wait',
+                allowOutsideClick: false, 
+                didOpen: () => { Swal.showLoading(); } 
+            });
+
+            // Get items from cart or sessionStorage
+            const itemsToProcess = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
+            const totalAmount = parseFloat(TOTAL_AMOUNT);
+
+            // Call /checkout API to save the order
+            const response = await fetch('/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    items: itemsToProcess,
+                    total: totalAmount.toFixed(2),
+                    discount: 0,
+                    tran_id: 'CASH-' + Date.now()
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                // Order saved successfully
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ការលក់ជោគជ័យ! | Payment Confirmed!',
+                    text: 'វិក្កយបត្រកំពុងបោះពុម្ព | Receipt printing...',
+                    timer: 2500,
+                    showConfirmButton: false
+                });
+
+                // Clear cart from sessionStorage
+                sessionStorage.removeItem('checkout_cart');
+                sessionStorage.removeItem('checkout_total');
+                sessionStorage.removeItem('checkout_discount');
+
+                // Redirect to home after success
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2500);
+            } else {
+                Swal.fire('បញ្ហា | Error', data.message || 'មិនអាចដំណើរការបានទេ | Unable to process payment', 'error');
+            }
+        } catch (error) {
+            console.error("confirmCashPayment error:", error);
+            Swal.fire('បញ្ហា | Error', 'ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា | Server connection failed', 'error');
+        }
+    }
+
+    async function payWithABA() {
+        try {
+            Swal.fire({ title: 'កំពុងរៀបចំ... | Preparing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+            
+            // Generate a temporary transaction ID
+            const tran_id = "TX" + Date.now(); 
+            
+            // Get items for the backend
+            const itemsToSend = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
+
+            const response = await fetch('/create-aba-payment', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ 
+                    items: itemsToSend,
+                    total: parseFloat(TOTAL_AMOUNT),
+                    discount: 0,
+                    tran_id: tran_id 
+                }) 
+            });
+
+            const data = await response.json();
+            
+            if (data.status === "success") {
+                showQRPopup(tran_id);
+            } else {
+                Swal.fire("បញ្ហា", data.message || "មិនអាចបង្កើតការបង់ប្រាក់បានទេ", "error");
+            }
+        } catch (error) { 
+            console.error("payWithABA error:", error);
+            Swal.fire("បញ្ហា", "ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា", "error"); 
+        }
+    }
+
+    function showQRPopup(tran_id) {
+        const rielTotal = (parseFloat(TOTAL_AMOUNT) * RIEL_RATE).toLocaleString();
+        Swal.fire({
+            title: 'ស្កេនដើម្បីបង់ប្រាក់ | Scan to Pay',
+            html: `
+                <div class="aba-qr-container">
+                    <img src="/static/images/aba_qr.jpg" class="aba-qr-img" style="width:250px; height:250px;">
+                    <div style="font-weight:800; color:#28a745; font-size:26px; margin: 5px 0;">៛ ${rielTotal}</div>
+                    <div style="font-weight:700; color:#d81b60; font-size:18px; margin-bottom: 10px;">$ ${parseFloat(TOTAL_AMOUNT).toFixed(2)}</div>
+                    <p style="font-size:14px; font-weight:bold; color:#cc0000; margin-bottom:10px;">⚠️ បញ្ចូលទឹកប្រាក់ឲ្យបានត្រឹមត្រូវ / Input exact amount</p>
+                    <p style="font-size:13px; color:#666;">សូមស្កេន QR នេះជាមួយកម្មវិធី <b>ABA Mobile</b></p>
+                    <div id="polling-status" style="font-size:14px; color:#005a9c; margin-top:15px; font-weight:bold; animation: pulse 2s infinite;">🔄 កំពុងរង់ចាំការបង់ប្រាក់...</div>
+                </div>
+            `,
+            showConfirmButton: false, showCloseButton: true, allowOutsideClick: false, width: '400px'
+        });
+        startPolling(tran_id);
+    }
+
+    function startPolling(tran_id) {
+        if (pollingInterval) clearInterval(pollingInterval);
+        
+        // This loop runs every 3 seconds
+        pollingInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/check-status?tran_id=${tran_id}`);
+                const data = await response.json();
+
+                // Check if the server returned 'paid'
+                if (data.status === "paid" || data.status === "completed" || data.code === "00") { 
+                    // STOP the loop so it doesn't keep running
+                    clearInterval(pollingInterval);
+                    
+                    // REDIRECT the user to the success page
+                    window.location.href = `/success?tran_id=${tran_id}`;
+                }
+            } catch (error) {
+                console.error("Polling error:", error);
+            }
+        }, 3000);
+    }
+</script>
+<style> @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } } </style>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{% extends "pos_layout.html" %}
+
+{% set active_page = 'notifications' %}
+
+{% block title %}Notifications - NSP POS{% endblock %}
+
+{% block page_title %}ការជូនដំណឹង (Notifications){% endblock %}
+
+{% block extra_css %}
+    <style>
+        .notification-list { display: flex; flex-direction: column; gap: 15px; padding-bottom: 30px; }
+        .notification-item { background: white; padding: 15px 20px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; gap: 15px; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .icon-box { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; }
+        .info { flex: 1; }
+        .info h4 { margin: 0 0 5px 0; font-size: 15px; }
+        .info p { margin: 0; font-size: 13px; color: var(--text-muted); }
+        .time { font-size: 11px; color: var(--text-muted); }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="notification-list">
+        <div class="notification-item">
+            <div class="icon-box" style="background: #4caf50;"><i data-lucide="check-circle"></i></div>
+            <div class="info">
+                <h4>ការបង់ប្រាក់បានសម្រេច</h4>
+                <p>វិក្កយបត្រ #ABA-12345 ត្រូវបានបង់ដោយជោគជ័យ។</p>
+                <span class="time">10 នាទីមុន</span>
+            </div>
+        </div>
+        <div class="notification-item">
+            <div class="icon-box" style="background: #ff9800;"><i data-lucide="alert-triangle"></i></div>
+            <div class="info">
+                <h4>ស្តុកទំនិញតិច</h4>
+                <p>ផលិតផល "Senka Perfect Whip" នៅសល់តែ 2 ក្នុងស្តុក។</p>
+                <span class="time">1 ម៉ោងមុន</span>
+            </div>
+        </div>
+        <div class="notification-item">
+            <div class="icon-box" style="background: #2196f3;"><i data-lucide="user-plus"></i></div>
+            <div class="info">
+                <h4>អ្នកប្រើប្រាស់ថ្មី</h4>
+                <p>មានអ្នកចុះឈ្មោះថ្មីម្នាក់ កំពុងរង់ចាំការអនុញ្ញាត។</p>
+                <span class="time">2 ម៉ោងមុន</span>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,123 @@
+
+/* Product Form Dark Styling */
+.product-form-dark {
+    background-color: #1e1e1e;
+    color: #fff;
+    padding: 10px;
+    border-radius: 15px;
+}
+
+.product-form-dark .form-group {
+    margin-bottom: 15px;
+}
+
+.product-form-dark label {
+    display: block;
+    font-size: 13px;
+    color: #bbb;
+    margin-bottom: 5px;
+    font-family: 'Kantumruy Pro', sans-serif;
+}
+
+.product-form-dark .form-control {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #444;
+    background: #333 !important;
+    color: #fff !important;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.product-form-dark .form-control:focus {
+    border-color: #d81b60;
+}
+
+.product-form-dark .input-group {
+    display: flex;
+    gap: 8px;
+}
+
+.product-form-dark .scan-btn {
+    padding: 10px 15px;
+    border-radius: 10px;
+    border: 1px solid #444;
+    background: #333;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: 0.3s;
+}
+
+.product-form-dark .scan-btn:hover {
+    background: #444;
+}
+
+.product-form-dark .image-upload-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.product-form-dark .preview-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    border: 1px solid #444;
+    overflow: hidden;
+    background: #333;
+    object-fit: cover;
+}
+
+.product-form-dark .submit-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    background: #d81b60;
+    color: white;
+    font-weight: bold;
+    font-family: 'Moul', serif;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(216, 27, 96, 0.3);
+    transition: 0.3s;
+    margin-top: 15px;
+}
+
+.product-form-dark .submit-btn:hover {
+    background: #ad144b;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(216, 27, 96, 0.4);
+}
+
+.product-form-dark small.text-info {
+    color: #d81b60 !important;
+    font-size: 12px;
+    margin-top: 5px;
+    font-weight: bold;
+    display: block;
+}
+
+/* =========================================================
+   Z-INDEX STACKING FIXES
+   Ensures SweetAlert and Category Modals always stay on top
+   ========================================================= */
+
+/* Ensure SweetAlert popups ALWAYS float above everything */
+.swal2-container {
+    z-index: 10070 !important;
+}
+
+/* Force the Category Creation popup to be above standard Bootstrap modals (10050) */
+/* This is crucial for index.html where addProductModal is at 3000 */
+#createCategoryModal {
+    z-index: 10060 !important;
+}
+
+/* Ensure the backdrop for this modal is also correctly layered */
+body.modal-open .modal-backdrop {
+    z-index: 10059 !important;
+}

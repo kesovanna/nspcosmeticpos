@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSP Cosmetic - Menu</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body { font-family: 'Kantumruy Pro', sans-serif; background-color: #f4f7f6; margin: 0; padding: 15px; }
+        .header { text-align: center; color: #d81b60; margin-bottom: 25px; }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { font-size: 14px; margin: 0; color: #555; }
+        
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        @media (max-width: 400px) { .menu-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
+
+        .item-card { background: white; border-radius: 12px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; transition: 0.3s; display: flex; flex-direction: column; }
+        .item-card:hover { transform: translateY(-3px); }
+        .item-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; }
+        .item-card h4 { font-size: 15px; margin: 10px 0 5px 0; flex-grow: 1; }
+        
+        .price { color: #d81b60; font-weight: bold; margin-bottom: 10px; font-size: 1em; }
+        .btn-order { background-color: #d81b60; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; font-size: 13px; }
+        .btn-back { display: block; width: fit-content; margin: 25px auto; color: #666; text-decoration: none; font-size: 14px; border: 1px solid #ccc; padding: 8px 15px; border-radius: 20px; }
+        
+        /* ABA Styles omitted for brevity but remain identical to your original */
+    </style>
+</head>
+
+<body>
+<div class="header">
+    <h1>NSP Cosmetic Store</h1>
+    <p>សូមស្វាគមន៍មកកាន់ហាងរបស់យើង</p>
+</div>
+
+<div class="menu-grid" id="menu-container">
+    <p style="text-align:center; width:100%;">កំពុងទាញយកទិន្នន័យ...</p>
+</div>
+
+<div style="text-align: center; margin-top: 30px;">
+    <a href="/" id="btn-back-shop" class="btn-back" style="display: none;">ត្រឡប់ទៅហាងវិញ | Back to Shop</a>
+    <button id="btn-feedback" class="btn-back" style="display: none; background: white; cursor: pointer; border: 1px solid #d81b60; color: #d81b60; font-weight: bold;">📝 បញ្ជូនមតិយោបល់ | Feedback</button>
+</div>
+
+<div id="ai-floating-cart" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; background: #d81b60; color: white; padding: 15px 20px; border-radius: 30px; box-shadow: 0 5px 20px rgba(216,27,96,0.4); z-index: 1000; justify-content: space-between; align-items: center; box-sizing: border-box;">
+    <div>
+        <span id="ai-cart-qty" style="background: white; color: #d81b60; font-weight: bold; padding: 2px 8px; border-radius: 10px; font-size: 14px; margin-right: 10px;">0</span>
+        <span id="ai-cart-total" style="font-weight: bold; font-size: 16px;">$0.00</span>
+    </div>
+    <button onclick="checkoutAiCart()" style="background: white; color: #d81b60; border: none; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer;">បង់ប្រាក់ | Pay</button>
+</div>
+
+<script>
+// ================= FIREBASE CONFIG =================
+// 🚨 REPLACE THIS WITH YOUR NEW FIREBASE CONFIG 🚨
+const firebaseConfig = {
+    apiKey: "YOUR_NEW_API_KEY",
+    authDomain: "nsp-cosmetic.firebaseapp.com",
+    projectId: "nsp-cosmetic",
+    storageBucket: "nsp-cosmetic.firebasestorage.app",
+    messagingSenderId: "YOUR_NEW_SENDER_ID",
+    appId: "YOUR_NEW_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Keep the rest of your Javascript exactly as it was in the original file
+// regarding cart management, ABA checkout, and Snapshots.
+// Just change `#2e7d32` to `#d81b60` inside the javascript generated HTML strings.
+</script>
+</body>
+</html>

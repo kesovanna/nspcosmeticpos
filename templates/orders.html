@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ការកុម្ម៉ង់ថ្មីៗ - NSP Cosmetic Store</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-color: #f4f7f6; --card-bg: #ffffff; --text-color: #333333; --header-bg: #d81b60; --border-color: #eeeeee; --primary-color: #d81b60; }
+        [data-theme="dark"] { --bg-color: #1a1a1a; --card-bg: #2d2d2d; --text-color: #e0e0e0; --header-bg: #ad144b; --border-color: #444444; }
+        body { font-family: 'Kantumruy Pro', sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: var(--header-bg); color: white; padding: 15px 25px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .order-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+        .order-card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 8px solid #ff9800; transition: transform 0.2s; display: flex; flex-direction: column; color: var(--text-color); }
+        .order-card:hover { transform: translateY(-5px); }
+        .order-header { font-size: 20px; font-weight: bold; color: var(--primary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .item-list { flex-grow: 1; margin-bottom: 20px; }
+        .item-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0px; font-size: 16px; }
+        .item-name { font-weight: bold; color: #d32f2f; }
+        .total-row { border-top: 2px solid #d81b60; padding-top: 15px; margin-top: 15px; font-weight: bold; display: flex; justify-content: space-between; font-size: 18px; align-items: center; }
+        .items-group { border: 1px solid #ddd; border-radius: 8px; padding: 12px; background-color: rgba(216, 27, 96, 0.05); margin-bottom: 15px; }
+        .items-group .item-row { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .items-group .item-row:last-child { border-bottom: none; }
+        .btn-complete { width: 100%; background-color: var(--primary-color); color: white; border: none; padding: 12px; border-radius: 8px; font-family: 'Kantumruy Pro', sans-serif; font-size: 16px; cursor: pointer; transition: background 0.3s; }
+        .btn-complete:hover { background-color: #ad144b; }
+        .badge-time { font-size: 14px; background: rgba(0,0,0,0.1); padding: 2px 8px; border-radius: 5px; color: inherit; font-weight: normal; }
+        .action-container { display: flex; gap: 10px; margin-top: 15px; }
+        .form-complete { flex: 2; }
+        .form-delete { flex: 1; }
+        .btn-delete { width: 100%; background: #f44336; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-family: 'Kantumruy Pro', sans-serif; }
+        .no-order-container { grid-column: 1 / -1; text-align: center; padding: 50px; color: #888; }
+        .btn-back { background: white; color: var(--primary-color); text-decoration: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; }
+        @media (max-width: 600px) { .header { flex-direction: column; gap: 10px; text-align: center; } .order-container { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body id="body">
+<script>
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') document.body.setAttribute('data-theme', 'dark');
+</script>
+<div class="header">
+    <a href="/" class="btn-back">← Back</a>
+    <h2 style="margin:0; font-family: 'Moul', serif;">🔔 បញ្ជីកុម្ម៉ង់ថ្មីៗ (Live Orders)</h2>
+    <div id="status">កំពុងតភ្ជាប់...</div>
+</div>
+
+<div class="order-container">
+    {% for order in active_orders %}
+    <div class="order-card">
+        <div class="order-header">
+            <span>🛒 Order #{{ loop.index }}</span>
+            <span class="badge-time">🕒 {{ order.display_time if order.display_time else 'ទើបតែហ្នឹង' }}</span>
+        </div>
+        <div class="item-list">
+            {% if order['items'] and order['items']|length > 0 %}
+                <!-- Display all items in a single grouped view -->
+                <div style="border: 1px solid #ddd; border-radius: 8px; padding: 12px; background-color: rgba(255,255,255,0.5); margin-bottom: 15px;">
+                    {% for item in order['items'] %}
+                    <div class="item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; {% if loop.last %}border-bottom: none;{% endif %}">
+                        <span style="flex: 1;">
+                            <span class="item-name" style="font-weight: bold; color: #d32f2f;">{{ item.name }}</span>
+                            <span style="color: #666; margin-left: 8px;">x{{ item.quantity }}</span>
+                        </span>
+                        <span style="text-align: right; flex: 0 0 auto; margin-left: 10px;">
+                            <div style="color: #28a745; font-size: 1.05em; font-weight: bold;">៛ {{ "{:,.0f}".format((item.price|float) * (item.quantity|int) * RIEL_RATE) }}</div>
+                            <small style="color:#d81b60; font-size:11px;">$ {{ "{:,.2f}".format((item.price|float) * (item.quantity|int)) }}</small>
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="item-row" style="color: #999; font-style: italic; padding: 15px; text-align: center;">
+                    No items in this order
+                </div>
+            {% endif %}
+            
+            <!-- Total Section -->
+            <div class="total-row" style="background-color: #f9f9f9; padding: 12px; border-radius: 6px; margin-top: 10px;">
+                <span style="font-weight: bold; font-size: 18px;">💰 សរុប (Total):</span>
+                <span style="text-align: right;">
+                    <div style="color: #28a745; font-size: 24px; font-weight: bold;">៛ {{ "{:,.0f}".format(order.total|float * RIEL_RATE) }}</div>
+                    <span style="font-size: 14px; color: #d81b60; font-weight: normal;">$ {{ "{:,.2f}".format(order.total|float) }}</span>
+                </span>
+            </div>
+        </div>
+        
+        <div class="action-container">
+            <form action="{{ url_for('complete_order', order_id=order.id) }}" method="POST" class="form-complete">
+                <!-- SECURITY: CSRF token for form submission -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn-complete">✅ ធ្វើរួចរាល់ | Done</button>
+            </form>
+            <form action="{{ url_for('delete_order', order_id=order.id) }}" method="POST" class="form-delete" onsubmit="return confirm('តើបងពិតជាចង់លុបមែនទេ?')">
+                <!-- SECURITY: CSRF token for form submission -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn-delete">❌ លុប</button>
+            </form>
+        </div>
+    </div>
+   {% else %}
+        <div class="no-order-container">
+            <h3>មិនទាន់មានការកុម្ម៉ង់នៅឡើយទេ...</h3>
+        </div>
+        {% endfor %}
+</div>
+
+<script>
+    setTimeout(function(){ window.location.reload(); }, 10000);
+    document.getElementById('status').innerText = "Last Update: " + new Date().toLocaleTimeString();
+</script>
+</body>
+</html>

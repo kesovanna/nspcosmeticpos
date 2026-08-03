@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Edit Product - NSP Cosmetic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Kantumruy Pro', sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .form-container {
+            background-color: #2d2d2d;
+            padding: 30px;
+            border-radius: 15px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h2 { text-align: center; margin-top: 0; margin-bottom: 25px; color: #ffffff; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; color: #cccccc; }
+        
+        input[type="text"], input[type="number"], select, input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            box-sizing: border-box;
+            font-family: 'Kantumruy Pro', sans-serif;
+        }
+        
+        .barcode-group { display: flex; gap: 10px; }
+        .barcode-group input { flex: 1; }
+        .btn-scan-small {
+            background-color: #444;
+            color: white;
+            border: 1px solid #555;
+            padding: 0 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn-scan-small:hover { background-color: #666; }
+
+        .btn-clear-photo {
+            background-color: transparent;
+            color: #ff5252;
+            border: 1px solid #ff5252;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            margin-top: 10px;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-clear-photo:hover { 
+            background-color: rgba(255, 82, 82, 0.1);
+        }
+
+        .btn-save {
+            background-color: #d81b60;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.3s;
+        }
+        .btn-save:hover { background-color: #ad144b; }
+        
+        .cancel-link {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            color: #888;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .cancel-link:hover { color: #fff; }
+
+        /* Scanner Overlay */
+        .scanner-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 3000;
+        }
+        #reader {
+            width: 100% !important;
+            height: 100% !important;
+            border: none !important;
+        }
+        #reader video {
+            object-fit: cover !important;
+        }
+        .scanner-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 3001;
+        }
+        .scanner-header {
+            padding: 20px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: auto;
+        }
+        .scanner-header h3 {
+            color: white;
+            margin: 0;
+            font-size: 18px;
+        }
+        .btn-close-scanner {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .scanner-frame-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .scanner-frame {
+            width: 280px;
+            height: 200px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            position: relative;
+            box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5);
+        }
+        .scanner-frame::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #d81b60;
+            box-shadow: 0 0 10px #d81b60;
+            animation: scan-anim 2s linear infinite;
+        }
+        @keyframes scan-anim {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+        .scanner-footer {
+            padding: 30px;
+            background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+            text-align: center;
+            color: white;
+        }
+
+        /* Khmer Font Standardization */
+        .khmer-font, 
+        select.khmer-font option, 
+        .swal2-popup,
+        .swal2-title,
+        .swal2-content,
+        .swal2-input,
+        .swal2-confirm,
+        .swal2-cancel {
+            font-family: 'Kantumruy Pro', 'Khmer OS Battambang', 'Hanuman', sans-serif !important;
+        }
+
+        select option {
+            font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="form-container">
+    <h2>Edit Product</h2>
+    <form id="productForm" action="{{ url_for('edit_product', product_id=product_id) }}" method="POST" enctype="multipart/form-data">
+        <!-- SECURITY: CSRF token for form submission -->
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        <div class="form-group">
+            <label>១. ឈ្មោះទំនិញ (Product Name) <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control text-white bg-dark border-secondary khmer-font" value="{{ product.name }}" required>
+        </div>
+
+        <div class="form-group">
+            <label>២. ប្រភេទ (Category) <span class="text-danger">*</span></label>
+            <select name="category" id="categorySelect" required onchange="handleCategoryChange(this)" class="form-select text-white bg-dark border-secondary khmer-font">
+                <option value="" disabled>-- សូមជ្រើសរើសប្រភេទ (Select Category) --</option>
+                {% for cat in categories %}
+                    <option value="{{ cat }}" {% if product.category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+                <option value="__NEW__" style="font-weight: bold; color: #ff2a6d;">+ បង្កើតប្រភេទថ្មី (Create New Category)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>៣. តម្លៃលក់ (Selling Price in Riel ៛) <span class="text-danger">*</span></label>
+            <input type="number" step="any" name="price" id="productPrice" value="{{ "{:.0f}".format(product.price * RIEL_RATE) }}" onkeyup="updateUSDConverter(this.value)" required class="form-control text-white bg-dark border-secondary khmer-font">
+            <div id="usdPreview" style="font-size: 16px; color: #00d4ff; font-weight: bold; margin-top: 8px;" class="khmer-font">≈ $ {{ "{:,.2f}".format(product.price) }}</div>
+        </div>
+
+        <script>
+            function updateUSDConverter(rielVal) {
+                const exchangeRate = {{ RIEL_RATE | default(4000) }};
+                const price = parseFloat(rielVal) || 0;
+                const usdVal = (price / exchangeRate).toFixed(2);
+                document.getElementById('usdPreview').innerText = "≈ $ " + usdVal;
+            }
+
+            // Sanitize price on form submission
+            document.getElementById('productForm').addEventListener('submit', function(e) {
+                const priceInput = document.getElementById('productPrice');
+                if (priceInput && priceInput.value) {
+                    priceInput.value = Math.round(parseFloat(priceInput.value));
+                }
+            });
+        </script>
+
+        <div class="form-group">
+            <label>៤. ថ្លៃដើម (Cost Price $) <span class="text-danger">*</span></label>
+            <input type="number" name="cost_price" value="{{ product.cost_price | default(0.0) }}" min="0" step="any" required class="form-control text-white bg-dark border-secondary khmer-font">
+        </div>
+
+        <div class="form-group">
+            <label>៥. ចំនួនក្នុងស្តុក (Current Stock) <span class="text-danger">*</span></label>
+            <input type="number" name="stock_quantity" value="{{ product.stock_quantity | default(0) }}" min="0" step="any" required class="form-control text-white bg-dark border-secondary khmer-font">
+        </div>
+
+        <div class="form-group">
+            <label>៦. កំណត់ស្តុកជិតអស់ (Low Stock Level) <span class="text-danger">*</span></label>
+            <input type="number" name="low_stock_level" value="{{ product.low_stock_level | default(5) }}" min="0" step="any" required class="form-control text-white bg-dark border-secondary khmer-font">
+        </div>
+
+        <div class="form-group">
+            <label>៧. បាកូដ (Barcode)</label>
+            <div class="barcode-group">
+                <input type="text" id="barcodeInput" name="barcode" value="{{ product.barcode | default('') }}" placeholder="Scan or type barcode number..." class="form-control text-white bg-dark border-secondary khmer-font">
+                <button type="button" class="btn-scan-small" onclick="openScanner()">📷 Scan</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>៨. ថ្ងៃផុតកំណត់ (Expiration Date - Optional)</label>
+            <input type="date" name="expiry_date" value="{{ product.expiry_date | default('') }}" class="form-control text-white bg-dark border-secondary khmer-font">
+        </div>
+
+        <div class="form-group">
+            <label>៩. រូបភាព (Image)</label>
+            <div id="imagePreviewContainer" style="margin-bottom: 10px;">
+                <img id="imagePreview" src="{{ url_for('static', filename='images/' + (product.image if product.image else 'default.jpg')) }}" alt="Current Image" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #444;" onerror="this.src='/static/images/default.jpg'">
+            </div>
+            
+            <input type="file" id="imageInput" accept="image/*" class="form-control text-white bg-dark border-secondary khmer-font">
+            <input type="hidden" name="image_base64" id="imageBase64">
+            <input type="hidden" name="delete_current_image" id="deleteCurrentImage" value="false">
+            <button type="button" class="btn-clear-photo" onclick="clearProductPhoto()">
+                <span>🗑️</span> លុបរូបភាព (Clear Photo)
+            </button>
+            <div id="newFileName" style="font-size: 12px; color: #d81b60; margin-top: 5px; font-weight: bold;"></div>
+            <small style="color: #888; display: block; margin-top: 5px;">ទុកចោលបើមិនចង់ប្តូររូបភាព (Leave empty to keep current image)</small>
+        </div>
+
+        <button type="submit" class="btn-save">១០. រក្សាទុកការកែប្រែ (Save Changes)</button>
+        <a href="{{ url_for('manager') }}" class="cancel-link">Cancel</a>
+    </form>
+</div>
+
+<!-- Updated Full Screen Scanner -->
+<div id="scannerModal" class="scanner-overlay">
+    <div id="reader"></div>
+    <div class="scanner-ui">
+        <div class="scanner-header">
+            <h3>ស្កេនបាកូដ (Scan Barcode)</h3>
+            <button type="button" class="btn-close-scanner" onclick="closeScanner()">✕</button>
+        </div>
+        <div class="scanner-frame-container">
+            <div class="scanner-frame"></div>
+        </div>
+        <div class="scanner-footer">
+            <p>សូមតម្រង់បាកូដមកចំកណ្តាលស៊ុម</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    function handleCategoryChange(select) {
+        if (typeof window.handleCategoryChange === 'function') {
+            window.handleCategoryChange(select);
+        }
+    }
+
+    // Automatically select the correct category from the database
+    document.addEventListener("DOMContentLoaded", function() {
+        const categoryValue = "{{ product.category | default('more') }}";
+        const selectBox = document.getElementById('categorySelect');
+        if (selectBox.querySelector(`option[value="${categoryValue}"]`)) {
+            selectBox.value = categoryValue;
+        } else {
+            selectBox.value = 'more';
+        }
+        
+        // Handle initial image preview if it's already base64
+        const currentImage = "{{ product.image }}";
+        if (currentImage.startsWith('data:image')) {
+            document.getElementById('imagePreview').src = currentImage;
+        }
+    });
+
+    // ==========================================
+    // BARCODE SCANNER LOGIC
+    // ==========================================
+    let html5QrCode = null;
+
+    async function applyCameraConstraints(videoElement) {
+        try {
+            const stream = videoElement.srcObject;
+            const track = stream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            
+            // Modern optimization for distance: prioritize focus and zoom
+            const advancedConstraints = {};
+
+            // 1. Focus: Ensure continuous focus for varying distances
+            if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                advancedConstraints.focusMode = 'continuous';
+            }
+            
+            // 2. Zoom: Bridges the distance to small barcodes
+            if (capabilities.zoom) {
+                const min = capabilities.zoom.min || 1;
+                const max = capabilities.zoom.max || 1;
+                // Modern "Sweet Spot": 2.0x zoom handles distance and macro well on most phones
+                let targetZoom = 2.0;
+                if (targetZoom < min) targetZoom = min;
+                if (targetZoom > max) targetZoom = max;
+                advancedConstraints.zoom = targetZoom;
+            }
+
+            // 3. Image Quality: Continuous adjustments
+            if (capabilities.whiteBalanceMode && capabilities.whiteBalanceMode.includes('continuous')) {
+                advancedConstraints.whiteBalanceMode = 'continuous';
+            }
+            if (capabilities.exposureMode && capabilities.exposureMode.includes('continuous')) {
+                advancedConstraints.exposureMode = 'continuous';
+            }
+
+            if (Object.keys(advancedConstraints).length > 0) {
+                await track.applyConstraints({ advanced: [advancedConstraints] });
+            }
+        } catch (e) {
+            console.warn("Camera optimization failed:", e);
+        }
+    }
+
+    async function openScanner() {
+        try {
+            // Check for HTTPS or localhost
+            const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (!isSecure) {
+                Swal.fire({ 
+                    icon: 'warning', 
+                    title: 'Security Requirement', 
+                    text: 'កាមេរ៉ាត្រូវការ HTTPS ដើម្បីដំណើរការ (Camera requires HTTPS).',
+                    confirmButtonColor: '#d81b60'
+                });
+                return;
+            }
+
+            document.getElementById('scannerModal').style.display = 'block';
+            
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("reader");
+            }
+
+            // If already scanning, stop it first
+            if (html5QrCode.isScanning) {
+                await html5QrCode.stop();
+            }
+
+            const config = { 
+                fps: 60,
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const width = Math.min(viewfinderWidth * 0.85, 450);
+                    const height = Math.min(viewfinderHeight * 0.35, 200);
+                    return { width, height };
+                },
+                aspectRatio: 1.7777777778,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            };
+
+            // Explicitly request permission and get cameras
+            const cameras = await Html5Qrcode.getCameras();
+            
+            if (cameras && cameras.length > 0) {
+                try {
+                    await html5QrCode.start(
+                        { facingMode: "environment" }, 
+                        config, 
+                        onScanSuccess,
+                        onScanFailure
+                    );
+                } catch (startErr) {
+                    console.warn("Failed to start with facingMode, trying first available camera:", startErr);
+                    await html5QrCode.start(
+                        cameras[0].id, 
+                        config, 
+                        onScanSuccess,
+                        onScanFailure
+                    );
+                }
+
+                const video = document.querySelector('#reader video');
+                if (video) applyCameraConstraints(video);
+            } else {
+                throw new Error("No cameras found");
+            }
+        } catch (err) { 
+            console.error("Scanner error:", err);
+            document.getElementById('scannerModal').style.display = 'none';
+            
+            let errorMessage = 'សូមពិនិត្យមើលការអនុញ្ញាតកាមេរ៉ា ឬប្រើប្រាស់ HTTPS។';
+            if (err.name === 'NotAllowedError' || err === 'Permission denied') {
+                errorMessage = 'សូមអនុញ្ញាតឱ្យប្រើប្រាស់កាមេរ៉ា (Camera permission denied).';
+            } else if (err.name === 'NotFoundError' || err === 'No cameras found') {
+                errorMessage = 'រកមិនឃើញកាមេរ៉ាទេ (No camera found).';
+            } else if (err.name === 'NotReadableError') {
+                errorMessage = 'កាមេរ៉ាកំពុងត្រូវបានប្រើប្រាស់ដោយកម្មវិធីផ្សេង (Camera is already in use).';
+            }
+            
+            Swal.fire({ 
+                icon: 'error', 
+                title: 'កាមេរ៉ាមិនដំណើរការ', 
+                text: errorMessage,
+                confirmButtonColor: '#d81b60'
+            }); 
+        }
+    }
+
+    async function closeScanner() {
+        document.getElementById('scannerModal').style.display = 'none';
+        if (html5QrCode) {
+            try {
+                if (html5QrCode.isScanning) {
+                    await html5QrCode.stop();
+                }
+            } catch (err) {
+                console.error("Failed to stop scanner:", err);
+            }
+        }
+    }
+
+    // Helper to translate Khmer numerals to English numerals
+    function sanitizeBarcodeInput(inputString) {
+        if (!inputString) return "";
+        const khmerToEnglishMap = {
+            '០': '0', '១': '1', '២': '2', '៣': '3', '៤': '4',
+            '៥': '5', '៦': '6', '៧': '7', '៨': '8', '៩': '9'
+        };
+        return String(inputString).split('').map(char => khmerToEnglishMap[char] || char).join('');
+    }
+
+    async function onScanSuccess(decodedText, decodedResult) {
+        await closeScanner();
+        document.getElementById('barcodeInput').value = sanitizeBarcodeInput(decodedText);
+        if (navigator.vibrate) navigator.vibrate(100);
+        
+        Swal.fire({ 
+            toast: true, 
+            position: 'top-end', 
+            icon: 'success', 
+            title: 'បាកូដបានស្កេនរួចរាល់!', 
+            showConfirmButton: false, 
+            timer: 2000 
+        });
+    }
+
+    // --- HARDWARE BARCODE SCANNER SUPPORT ---
+    let hardwareBuffer = "";
+    let lastKeyTime = Date.now();
+
+    document.addEventListener('keydown', function(e) {
+        const currentTime = Date.now();
+
+        // Most scanners end with 'Enter'
+        if (e.key === 'Enter') {
+            if (hardwareBuffer.length >= 3) {
+                // 🛡️ CRITICAL FIX: Stop the Enter key from opening file dialogs or clicking focused buttons
+                e.preventDefault();
+                e.stopPropagation();
+
+                document.getElementById('barcodeInput').value = sanitizeBarcodeInput(hardwareBuffer);
+                hardwareBuffer = "";
+                
+                Swal.fire({ 
+                    toast: true, 
+                    position: 'top-end', 
+                    icon: 'success', 
+                    title: 'បាកូដបានបញ្ចូលរួចរាល់!', 
+                    showConfirmButton: false, 
+                    timer: 2000 
+                });
+            }
+            return;
+        }
+
+        // Reset buffer if delay is too long (manual typing)
+        if (currentTime - lastKeyTime > 50) {
+            hardwareBuffer = "";
+        }
+
+        if (e.key.length === 1) {
+            hardwareBuffer += e.key;
+        }
+        
+        lastKeyTime = currentTime;
+    });
+    // ------------------------------------------
+
+    function onScanFailure(error) {
+        // Ignore failures
+    }
+
+    // ==========================================
+    // IMAGE PROCESSING: RESIZE & CONVERT TO BASE64
+    // ==========================================
+    const imageInput = document.getElementById('imageInput');
+    const imageBase64 = document.getElementById('imageBase64');
+    const imagePreview = document.getElementById('imagePreview');
+
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                // Maximum dimensions
+                const MAX_WIDTH = 600;
+                const MAX_HEIGHT = 600;
+                let width = img.width;
+                let height = img.height;
+
+                // Calculate new dimensions
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                // Create canvas and draw resized image
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Convert to base64 (JPEG with 0.7 quality)
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                imageBase64.value = dataUrl;
+                
+                // Show preview
+                imagePreview.src = dataUrl;
+                document.getElementById('deleteCurrentImage').value = 'false';
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function clearProductPhoto() {
+        document.getElementById('imageInput').value = '';
+        document.getElementById('imageBase64').value = '';
+        document.getElementById('imagePreview').src = '/static/images/default.jpg';
+        document.getElementById('deleteCurrentImage').value = 'true';
+        document.getElementById('newFileName').textContent = 'Image cleared';
+    }
+
+    // Clipboard Paste Functionality
+    document.addEventListener('paste', function(e) {
+        // 1. Check if the clipboard contains any items
+        if (!e.clipboardData || !e.clipboardData.items) return;
+
+        let items = e.clipboardData.items;
+
+        // 2. Loop through the clipboard items to find an image
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                // We found an image! Extract it as a File object.
+                let file = items[i].getAsFile();
+
+                // 3. Inject the file into the HTML file input using DataTransfer
+                let fileInput = document.getElementById('imageInput');
+                if (fileInput) {
+                    let dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    fileInput.files = dataTransfer.files;
+
+                    // Trigger a 'change' event to run existing resize and preview logic
+                    fileInput.dispatchEvent(new Event('change'));
+                    
+                    // Show a small feedback
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Image pasted from clipboard!',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+
+                // Stop searching after the first image is found
+                break;
+            }
+        }
+    });
+</script>
+
+</body>
+</html>

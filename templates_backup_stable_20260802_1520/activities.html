@@ -1,0 +1,37 @@
+{% extends "pos_layout.html" %}
+
+{% set active_page = 'activities' %}
+
+{% block title %}Activities - NSP POS{% endblock %}
+
+{% block page_title %}សកម្មភាពថ្មីៗ (Recent Activities){% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; position: relative;">
+    
+    <div style="position: absolute; left: 24px; top: 0; bottom: 0; width: 2px; background: var(--border-color); z-index: 0;"></div>
+
+    <div style="display: flex; gap: 20px; position: relative; z-index: 1;">
+        <div style="width: 50px; height: 50px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(216, 27, 96, 0.3);">
+            <i data-lucide="shopping-bag"></i>
+        </div>
+        <div style="background: white; padding: 15px 20px; border-radius: 12px; border: 1px solid var(--border-color); flex: 1; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+            <h4 style="margin: 0 0 5px 0;">ការលក់ថ្មី (New Sale)</h4>
+            <p style="margin: 0; font-size: 13px; color: var(--text-muted);">បុគ្គលិក <strong>KESO VANNA</strong> បានលក់ <span style="color: var(--primary-color);">CeraVe Hydrating Facial Cleanser</span> ចំនួន 2 មុខ។</p>
+            <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 5px;">ម៉ោង 02:30 PM</span>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 20px; position: relative; z-index: 1;">
+        <div style="width: 50px; height: 50px; border-radius: 50%; background: #2196f3; color: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);">
+            <i data-lucide="log-in"></i>
+        </div>
+        <div style="background: white; padding: 15px 20px; border-radius: 12px; border: 1px solid var(--border-color); flex: 1; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+            <h4 style="margin: 0 0 5px 0;">ប្រព័ន្ធ (System)</h4>
+            <p style="margin: 0; font-size: 13px; color: var(--text-muted);">អ្នកគ្រប់គ្រង <strong>admin</strong> បានចូលគណនីប្រព័ន្ធ។</p>
+            <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 5px;">ម៉ោង 01:15 PM</span>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,387 @@
+{% extends "pos_layout.html" %}
+
+{% set active_page = 'inventory' %}
+
+{% block title %}Inventory Management - NSP POS{% endblock %}
+
+{% block page_title %}គ្រប់គ្រងទំនិញ (Inventory Management){% endblock %}
+{% block page_subtitle %}គ្រប់គ្រងបញ្ជីផលិតផល និងស្តុករបស់អ្នក{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Table Styling Enhancements */
+    .card { 
+        border-radius: 16px; 
+        margin-bottom: 20px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.04); 
+    }
+    
+    table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    th { 
+        text-align: left; 
+        padding: 16px 12px; 
+        border-bottom: 2px solid #f1f5f9; 
+        color: #64748b; 
+        font-size: 13px; 
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+    }
+    td { 
+        padding: 12px; 
+        border-bottom: 1px solid #f1f5f9; 
+        vertical-align: middle;
+        transition: background-color 0.2s ease;
+    }
+    tr:hover td { background-color: #f8fafc; }
+
+    /* Product Image Container */
+    .product-img-container {
+        width: 45px;
+        height: 45px;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+    }
+    .product-img-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Currency Typography */
+    .price-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .price-khr {
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 15px;
+    }
+    .price-usd {
+        font-size: 12px;
+        color: #94a3b8;
+        font-weight: 500;
+    }
+
+    /* Action Button Group */
+    .action-group {
+        display: inline-flex;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        background: white;
+    }
+    .btn-action {
+        padding: 8px 12px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 13px;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #475569;
+    }
+    .btn-action:hover { background-color: #f8fafc; }
+    
+    .btn-edit-state:hover { color: #d97706; background-color: #fffbeb; }
+    .btn-delete-state:hover { color: #dc2626; background-color: #fef2f2; }
+    
+    .action-divider { width: 1px; background: #e2e8f0; }
+
+    /* Checkbox & Index Alignment */
+    .cell-center { text-align: center; }
+    .checkbox-custom {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #059669;
+        vertical-align: middle;
+    }
+    
+    .spin { animation: spin 2s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Products List</h3>
+        <div id="bulkActions" style="display: none; gap: 10px; align-items: center;">
+            <span id="selectedCount" style="font-size: 13px; color: #64748b;"></span>
+            <button onclick="deleteSelected()" style="padding: 8px 14px; background: #dc2626; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">
+                Delete Selected
+            </button>
+        </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th class="cell-center" style="width: 50px;">
+                        <input type="checkbox" id="selectAll" class="checkbox-custom" onchange="toggleAll(this)">
+                    </th>
+                    <th class="cell-center" style="width: 50px;">#</th>
+                    <th style="width: 80px;">Image</th>
+                    <th>Product Name</th>
+                    <th style="width: 150px;">Price</th>
+                    <th class="cell-center" style="width: 150px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="cell-center">
+                        <input type="checkbox" class="product-checkbox checkbox-custom" value="{{ item.id }}" data-id="{{ item.id }}" onchange="updateSelectedCount()">
+                    </td>
+                    <td class="cell-center">
+                        <span style="font-weight: 600; color: #64748b;">{{ loop.index }}</span>
+                    </td>
+
+                    <td>
+                        <div class="product-img-container">
+                            <img src="{{ item.image if item.image and item.image.startswith('data:image') else url_for('static', filename='images/' + (item.image if item.image else 'default.jpg')) }}" 
+                                 onerror="this.src='/static/images/default.jpg'" 
+                                 alt="{{ item.name }}">
+                        </div>
+                    </td>
+
+                    <td style="font-weight: 600; color: #1e293b;">
+                        {{ item.name }}
+                    </td>
+
+                    <td>
+                        <div class="price-group">
+                            {% set rate = RIEL_RATE if RIEL_RATE else 4000 %}
+                            <span class="price-khr">៛ {{ "{:,.0f}".format(item.price * rate) }}</span>
+                            <span class="price-usd">$ {{ "{:,.2f}".format(item.price) }}</span>
+                        </div>
+                    </td>
+
+                    <td class="cell-center">
+                        <div class="action-group">
+                            <a href="{{ url_for('edit_product', product_id=item.id) }}" class="btn-action btn-edit-state" title="Edit Product">
+                                <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i> Edit
+                            </a>
+                            <div class="action-divider"></div>
+                            <form action="{{ url_for('delete_product', product_id=item.id) }}" method="POST" onsubmit="return confirm('តើអ្នកពិតជាចង់លុបទំនិញនេះមែនទេ?');" style="margin: 0; display: contents;">
+                                <!-- SECURITY: CSRF token for form submission -->
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn-action btn-delete-state" title="Delete Product">
+                                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Del
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Helper function to safely initialize Lucide icons
+    function initLucideIcons() {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        } else {
+            console.warn('Lucide library not loaded yet');
+        }
+    }
+
+    // Initialize icons when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        initLucideIcons();
+    });
+
+    async function handleRestock() {
+        const productId = document.getElementById('restockProduct').value;
+        const quantity = document.getElementById('restockQty').value;
+        
+        if (!productId || !quantity || quantity <= 0) {
+            Swal.fire({ icon: 'error', title: 'សូមបំពេញព័ត៌មានឱ្យបានត្រឹមត្រូវ!' });
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/restock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: productId, quantity: parseInt(quantity) })
+            });
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'បានជោគជ័យ',
+                    text: result.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'បរាជ័យ', text: result.message });
+            }
+        } catch (error) {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Connection failed' });
+        }
+    }
+
+    function toggleAll(source) {
+        const checkboxes = document.querySelectorAll('.product-checkbox');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+        updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+        const checkboxes = document.querySelectorAll('.product-checkbox');
+        const selected = Array.from(checkboxes).filter(cb => cb.checked);
+        const bulkBar = document.getElementById('bulkActions');
+        const countText = document.getElementById('selectedCount');
+        
+        if (selected.length > 0) {
+            bulkBar.style.display = 'flex';
+            countText.innerText = `${selected.length} products selected`;
+        } else {
+            bulkBar.style.display = 'none';
+        }
+        
+        const selectAll = document.getElementById('selectAll');
+        if (selectAll) {
+            selectAll.checked = (selected.length === checkboxes.length && checkboxes.length > 0);
+        }
+    }
+
+    async function deleteSelected() {
+        const selected = Array.from(document.querySelectorAll('.product-checkbox:checked'));
+        const ids = selected.map(cb => cb.getAttribute('data-id'));
+        
+        if (ids.length === 0) return;
+        
+        const result = await Swal.fire({
+            title: 'តើអ្នកប្រាកដទេ?',
+            text: `តើអ្នកពិតជាចង់លុបទំនិញទាំង ${ids.length} នេះមែនទេ?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'បាទ/ចាស លុបវា!',
+            cancelButtonText: 'បោះបង់'
+        });
+        
+        if (result.isConfirmed) {
+            try {
+                const response = await fetch('/api/delete-multiple-products', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: ids })
+                });
+                
+                const resultData = await response.json();
+                
+                if (response.ok && resultData.status === 'success') {
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'លុបបានជោគជ័យ!',
+                        text: resultData.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    location.reload();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'បរាជ័យ',
+                        text: resultData.message || 'មានបញ្ហាក្នុងការលុបផលិតផល'
+                    });
+                }
+            } catch (error) {
+                console.error('Bulk delete error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'បញ្ហាការតភ្ជាប់',
+                    text: 'មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេបានទេ សូមពិនិត្យបណ្តាញរបស់អ្នក។'
+                });
+            }
+        }
+    }
+
+    // Helper function to safely initialize Lucide icons
+    function initLucideIcons() {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        } else {
+            console.warn('Lucide library not loaded yet');
+        }
+    }
+
+    // Override the global triggerSync for this page to add loading state
+    window.triggerSync = async function(isSilent = false) {
+        // Find the sync button in the quick actions card
+        const syncBtn = document.querySelector('button[onclick*="triggerSync"]');
+        let originalContent = '';
+        if (syncBtn) {
+            originalContent = syncBtn.innerHTML;
+            syncBtn.innerHTML = '<i data-lucide="refresh-cw" class="spin"></i> Syncing...';
+            initLucideIcons();
+            syncBtn.disabled = true;
+            syncBtn.style.opacity = '0.7';
+        }
+
+        try {
+            const response = await fetch('/api/sync', { method: 'POST' });
+            const result = await response.json();
+            if (result.status === 'success') {
+                if (!isSilent) {
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'ជោគជ័យ',
+                        text: 'ការធ្វើសមកាលកម្មបានបញ្ចប់!',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    location.reload();
+                }
+            } else {
+                if (!isSilent) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'បញ្ហា',
+                        text: result.message || 'Sync failed'
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Sync error:', error);
+            if (!isSilent) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'បរាជ័យ',
+                    text: 'មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេបានទេ'
+                });
+            }
+        } finally {
+            if (syncBtn) {
+                syncBtn.innerHTML = originalContent;
+                initLucideIcons();
+                syncBtn.disabled = false;
+                syncBtn.style.opacity = '1';
+            }
+        }
+    }
+</script>
+{% endblock %}
