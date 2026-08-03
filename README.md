@@ -21,6 +21,32 @@ A custom-built Point of Sale (POS) application designed specifically to streamli
 *   **Version Control:** Git & GitHub
 
 ## ⚙️ Installation & Local Setup
+2. Create and activate a virtual environment:
+
+Bash
+python -m venv .venv
+# For Windows:
+.venv\Scripts\activate
+# For macOS/Linux:
+source .venv/bin/activate
+3. Install required dependencies:
+
+Bash
+pip install -r requirements.txt
+4. Configure Environment Variables:
+Copy the .env.template file to a new file named .env and fill in your secure credentials (e.g., Database URIs, ABA PayWay API keys).
+
+5. Start the application:
+
+Bash
+python start_app.py
+The server will start locally. Open your browser and navigate to http://127.0.0.1:5000/
+
+👨‍💻 Developer
+Ream Kesovanna
+
+📄 License
+This project is proprietary and intended solely for the internal use of NSP Cosmetic Store. Unauthorized copying, modification, or distribution is prohibited.
 
 Follow these steps to get the development environment running on your local machine:
 
