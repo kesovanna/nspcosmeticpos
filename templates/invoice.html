@@ -73,30 +73,37 @@
         
         /* Apply to both screen and print for WeasyPrint compatibility */
         /* Jinja logic removed from CSS to fix linter errors */
+        * {
+            box-sizing: border-box;
+        }
         html {
             height: auto;
         }
         body.is-pdf {
             background: white;
-            padding: 0;
-            margin: 0;
-            width: 100%;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
             height: auto;
             font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
             -webkit-font-smoothing: antialiased;
             display: block;
+            overflow: hidden;
         }
         body.is-pdf .invoice-card {
-            box-shadow: none;
+            box-shadow: none !important;
             border-radius: 0;
-            padding: 0;
-            width: 100%;
-            max-width: 100%;
+            padding: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
             height: auto;
-            margin: 0;
+            margin: 0 !important;
+            overflow: hidden;
         }
         body.is-pdf .invoice-card::before {
             display: none;
+        }
         body.is-pdf .btn-group, body.is-pdf .btn-back {
             display: none !important;
         }
@@ -113,6 +120,11 @@
         }
         body.is-pdf table {
             font-size: 12px;
+            table-layout: fixed;
+            width: 100%;
+        }
+        body.is-pdf td, body.is-pdf th {
+            word-break: break-word;
         }
         body.is-pdf .item-price {
             font-size: 12px;

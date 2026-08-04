@@ -1,6 +1,7 @@
 import sys
 import random
 import os
+import uuid
 import webbrowser            # <-- 1. Add this near your top imports
 from threading import Timer  # <-- 2. Add this near your top imports
 # Fix for PyInstaller --windowed mode crashing with Firebase/Google Cloud loggers
@@ -951,8 +952,28 @@ def add_product():
         if delete_image_flag:
             filename = "default.jpg"
         else:
-            image_base64 = request.form.get('image_base64')
-            filename = image_base64 if image_base64 else "default.jpg"
+            # Check if a file was uploaded via the standard file input
+            if 'image' in request.files and request.files['image'].filename != '':
+                file = request.files['image']
+                # Extract original extension
+                ext = os.path.splitext(file.filename)[1]
+                if not ext:
+                    ext = '.jpg' # Default extension if none provided
+                # Generate a guaranteed unique filename
+                filename = f"{uuid.uuid4().hex}{ext}"
+                
+                # Ensure static/images directory exists
+                images_dir = os.path.join(app.static_folder, 'images')
+                if not os.path.exists(images_dir):
+                    os.makedirs(images_dir)
+                    
+                # Save the file
+                file_path = os.path.join(images_dir, filename)
+                file.save(file_path)
+            else:
+                # Fallback to base64 if provided (e.g., from modal)
+                image_base64 = request.form.get('image_base64')
+                filename = image_base64 if image_base64 else "default.jpg"
 
         # 5. Data Structuring
         prod_data = {
@@ -973,7 +994,6 @@ def add_product():
             # Basic validation failure handling
             return "Error: Product Name and a valid Category are required.", 400
 
-        import uuid
         local_id = str(uuid.uuid4())
 
         # 6. Storage & Sync Execution
@@ -997,6 +1017,8 @@ def add_product():
         # Schedule auto-sync to Firebase
         sync.trigger_auto_sync(delay=5)
 
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+            return jsonify({"status": "success", "message": "Product saved successfully", "product_id": local_id})
         return redirect(url_for('manager'))
 
     products = local_db.get_products()
@@ -1102,6 +1124,8 @@ def delete_product(product_id):
     # Schedule auto-sync to ensure everything is consistent
     sync.trigger_auto_sync(delay=2)
 
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
+        return jsonify({"status": "success", "message": "Product deleted successfully"})
     return redirect(url_for('manager'))
 
 @app.route('/api/delete-multiple-products', methods=['POST'])
@@ -1321,6 +1345,55 @@ def view_report(filename):
         return "File not found", 404
         
     return send_from_directory(reports_dir, filename)
+
+@app.route('/api/receipt/download/<tran_id>')
+@login_required
+def download_receipt(tran_id):
+    """
+    On-Demand Fallback for PDF generation.
+    Checks if PDF exists. If not, generates it synchronously.
+    """
+    try:
+        # SECURITY: Validate tran_id format
+        if not isinstance(tran_id, str) or not all(c.isalnum() or c in '-_' for c in tran_id):
+            return jsonify({"status": "error", "message": "Invalid transaction ID format"}), 400
+            
+        filename = f"invoice_{tran_id}.pdf"
+        reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
+        pdf_filepath = os.path.abspath(os.path.join(reports_dir, filename))
+        
+        # If file doesn't exist, generate it synchronously
+        if not os.path.exists(pdf_filepath):
+            order = local_db.get_order(tran_id)
+            if not order:
+                return jsonify({"status": "error", "message": "Order not found"}), 404
+                
+            riel_rate = get_riel_rate()
+            html_content = render_template('invoice.html', 
+                                         items=order.get('items', []),
+                                         total=order.get('total', 0),
+                                         discount=order.get('discount', 0),
+                                         date=datetime.fromisoformat(order.get('created_at', datetime.now().isoformat())).strftime("%d/%m/%Y %H:%M:%S"),
+                                         payment_method='cash',
+                                         RIEL_RATE=riel_rate,
+                                         is_pdf=True)
+            
+            if not os.path.exists(reports_dir):
+                os.makedirs(reports_dir)
+                
+            pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
+            with open(pdf_filepath, 'wb') as f:
+                f.write(pdf_bytes)
+                
+            local_db.update_order_receipt_status(tran_id, 1)
+            
+        return jsonify({
+            "status": "success", 
+            "url": f"/reports/view/{filename}"
+        })
+    except Exception as e:
+        print(f"Error in on-demand PDF generation: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/delete-report/<report_id>', methods=['DELETE'])
 @csrf.exempt

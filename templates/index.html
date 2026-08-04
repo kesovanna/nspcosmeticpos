@@ -28,8 +28,8 @@
 
         :root {
             --primary-color: #d81b60; 
-            --card-bg: rgba(255, 255, 255, 0.55);
-            --sidebar-bg: rgba(200, 144, 249, 0.65);
+            --card-bg: rgba(242, 213, 247, 0.65);
+            --sidebar-bg: rgba(242, 213, 247, 0.65);
             --topbar-bg: rgba(255, 255, 255, 0.65);
             --text-color: #1a1a1a;
             --sidebar-text: #000000;
@@ -272,7 +272,7 @@
         /* Modals & Scanner */
         .modal-overlay { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.75); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 20px; }
         .scanner-overlay { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
-        .modal-content { background-color: var(--card-bg); padding: 25px; border-radius: 20px; width: 100%; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); position: relative; border: 1px solid var(--border-color); color: var(--text-color); animation: modalScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .modal-content { background-color: #ffffff; padding: 25px; border-radius: 16px; width: 100%; max-width: 850px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); position: relative; border: none; color: #1e293b; animation: modalScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
         
         @keyframes modalScale {
             0% { transform: scale(0.9); opacity: 0; }
@@ -957,33 +957,19 @@
     
     <div class="sidebar-menu" style="margin-top: 5px;">
         <a href="#" class="menu-item active" onclick="event.preventDefault(); showView('posView', this); closeSidebarMobile();"><i data-lucide="home"></i> ទំព័រដើម</a>
-        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('notificationsView', this); closeSidebarMobile();"><i data-lucide="bell"></i> សេចក្តីជូនដំណឹង</a>
-        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('addProductView', this); closeSidebarMobile();"><i data-lucide="plus-circle"></i> បន្ថែមផលិតផលថ្មី</a>
         <a href="#" id="sidebarReportsBtn" class="menu-item" onclick="event.preventDefault(); showView('reportsView', this); closeSidebarMobile();"><i data-lucide="bar-chart-2"></i> របាយការណ៍លក់</a>
-        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('activitiesView', this); closeSidebarMobile();"><i data-lucide="activity"></i> សកម្មភាព</a>
+        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('inventoryView', this); closeSidebarMobile();"><i data-lucide="package"></i> គ្របគ្រងស្តុក</a>
+        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('addProductView', this); closeSidebarMobile();"><i data-lucide="plus-circle"></i> បន្ថែមផលិតផលថ្មី</a>
+        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('barcodeView', this); closeSidebarMobile();"><i data-lucide="barcode"></i> បោះពុម្ពបាកូដ</a>
+        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('notificationsView', this); closeSidebarMobile();"><i data-lucide="bell"></i> សេចក្តីជូនដំណឹង</a>
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('usersView', this); closeSidebarMobile();"><i data-lucide="users"></i> គណនីអ្នកប្រើប្រាស់</a>
-        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('inventoryView', this); closeSidebarMobile();"><i data-lucide="package"></i> ផលិតផលគ្រឿងសម្អាង</a>
-        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('barcodeView', this); closeSidebarMobile();">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; opacity: 0.8;">
-                <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
-                <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-                <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
-                <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
-                <line x1="7" y1="12" x2="17" y2="12"></line>
-            </svg>
-            បោះពុម្ពបាកូដ
-        </a>
-        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('terminologyView', this); closeSidebarMobile();"><i data-lucide="book-open"></i> វាក្យសព្ទ</a>
-
+        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('activitiesView', this); closeSidebarMobile();"><i data-lucide="activity"></i> សកម្មភាព</a>
+        <a href="#" class="menu-item" onclick="event.preventDefault(); showView('terminologyView', this); closeSidebarMobile();"><i data-lucide="book-open"></i> គោលការណ៍ប្រើប្រាស់</a>
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
-        <div style="padding: 10px 15px 5px; font-size: 11px; color: var(--text-muted); font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px;">អ្នកគ្រប់គ្រង</div>
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('managerView', this); closeSidebarMobile();"><i data-lucide="layout-dashboard"></i> ផ្ទាំងគ្រប់គ្រង</a>
         {% endif %}
-        
-        <div style="padding: 10px 15px 5px; font-size: 11px; color: var(--text-muted); font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px;">ប្រព័ន្ធ</div>
         <a href="#" class="menu-item logout" onclick="event.preventDefault(); logoutUser();"><i data-lucide="log-out"></i> ចាកចេញ</a>
     </div>
-
     <div class="sidebar-footer" style="justify-content: center; padding: 20px;">
         <div style="display: flex; align-items: center; gap: 12px;">
             <i data-lucide="moon" style="color: var(--text-muted); width: 20px;"></i>
@@ -1012,7 +998,7 @@
     <header class="top-bar">
         <div class="slogan-marquee-box">
             <span class="slogan">
-                សម្រស់របស់អស់លោកអ្នក គឺជាគុណភាពនៃផលិតផលក្នុងហាងរបស់យើង
+                *សូមស្វាគមន៍កមកាន់ហាងលក់គ្រឿងក្រអូប NSP Cosmetic Store * សម្រស់របស់អស់លោកអ្នក គឺជាគុណភាពនៃផលិតផលក្នុងហាងរបស់យើង * 
             </span>
         </div>
         <div class="top-row">
@@ -1206,9 +1192,9 @@
                         <div class="value" style="font-size: 36px; font-weight: 800; color: #2563eb;">{{ transaction_count }} ការកុម្ម៉ង់ទិញ</div>
                     </div>
                     <div class="stat-card" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; cursor: pointer;" onclick="showTopProductsModal()">
-                        <span class="label" style="font-size: 12px; color: #6b7280; margin-bottom: 10px; display: block;">ទំនិញលក់ដាច់ជាងគេប្រចាំថ្ងៃ ចំនួន ១០ម៉ាក</span>
+                        <span class="label" style="font-size: 12px; color: #6b7280; margin-bottom: 10px; display: block;">ទំនិញលក់ដាច់ជាងគេប្រចាំថ្ងៃ Top 10</span>
                         <div class="value" style="font-size: 28px; font-weight: 800; color: #dc2626; line-height: 1.4;">
-                            {% if top_items %}{{ top_items[0][0] }}<br><span style="font-size: 18px; display: block; margin-top: 8px;">({{ top_items[0][1]['qty'] }} មុខទំនិញ)</span>{% else %}N/A{% endif %}
+                            {% if top_items %}{{ top_items[0][0] }}<br><span style="font-size: 18px; display: block; margin-top: 8px;">({{ top_items[0][1]['qty'] }} ឯកតា)</span>{% else %}N/A{% endif %}
                         </div>
                     </div>
                 </div>
@@ -1355,11 +1341,11 @@
                                         <!-- Receipt -->
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                             {% set filename = "invoice_" + (order.tran_id or order.local_id)|string + ".pdf" %}
-                                            {% if order.has_receipt and order.status|lower in ['paid', 'completed'] %}
-                                                <a href="/reports/view/{{ filename }}" target="_blank" 
-                                                   style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block;">
+                                            {% if order.status|lower in ['paid', 'completed'] %}
+                                                <button onclick="viewReceipt('{{ order.tran_id or order.local_id }}')" 
+                                                   style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block; cursor: pointer;">
                                                     View PDF
-                                                </a>
+                                                </button>
                                             {% else %}
                                                 <span style="color: #6c757d; font-size: 11px;">No Receipt</span>
                                             {% endif %}
@@ -1469,9 +1455,15 @@
         <div id="inventoryView" class="view-container">
             <div style="max-width: 1400px; margin: 0 auto; width: 100%;">
                 <div class="card" style="background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 24px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 20px;">
-                        <h2 style="margin: 0; font-size: 18px; color: #1e293b; font-family: 'Siemreap', 'Battambang', cursive;">សកម្មភាពរហ័ស (Quick Actions)</h2>
+                    <div style="background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center; justify-content: center; gap: 12px; box-shadow: 0 2px 4px rgba(216, 27, 96, 0.05); border: 1px solid #fbcfe8;">
+                        <i data-lucide="package" style="width: 28px; height: 28px; color: #be185d;"></i>
+                        <h2 style="margin: 0; font-family: 'Khmer OS Moul Light', 'Moul', sans-serif !important; font-size: 24px; color: #be185d;">កន្លែងគ្រប់គ្រងស្តុក</h2>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 24px; gap: 20px;">
                         <div style="display: flex; gap: 12px;">
+                            <button id="bulkDeleteBtn" onclick="deleteSelectedProducts()" class="btn-qa" style="background: #ef4444; color: white; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 600; display: none; align-items: center; gap: 8px; cursor: pointer;">
+                                <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i> លុបដែលបានជ្រើសរើស (Bulk Delete)
+                            </button>
                             <a href="/add_product" class="btn-qa" style="background: #059669; color: white; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; text-decoration: none;">
                                 <i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i> Add New Product
                             </a>
@@ -1481,22 +1473,25 @@
                         </div>
                     </div>
 
-                    <div class="table-responsive" style="overflow-x: auto;">
+                    <div class="table-responsive" style="overflow-x: auto; max-width: 100%;">
                         <style>
-                            #cosmeticsTable { width: 100%; border-collapse: separate; border-spacing: 0; }
+                            #cosmeticsTable { width: 100%; border-collapse: collapse; box-sizing: border-box; }
                             #cosmeticsTable th { 
-                                text-align: left; 
+                                text-align: center; 
                                 padding: 16px 12px; 
-                                border-bottom: 2px solid #f1f5f9; 
+                                border: 1px solid #cbd5e1; 
                                 color: #64748b; 
-                                font-size: 13px; 
-                                font-weight: 700;
+                                font-family: 'Khmer OS Moul Light', 'Moul', sans-serif !important;
+                                font-size: 12px; 
+                                font-weight: normal;
                                 text-transform: uppercase;
                                 letter-spacing: 0.025em;
+                                white-space: nowrap;
                             }
                             #cosmeticsTable td { 
+                                text-align: center;
                                 padding: 16px 12px; 
-                                border-bottom: 1px solid #f1f5f9; 
+                                border: 1px solid #cbd5e1; 
                                 font-size: 15px;
                                 color: #1e293b;
                                 transition: background-color 0.2s ease;
@@ -1542,24 +1537,39 @@
                         <table id="cosmeticsTable">
                             <thead>
                                 <tr>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" id="selectAllProducts" onchange="toggleAllProducts(this)">
+                                    </th>
                                     <th style="width: 60px;">ល.រ</th>
+                                    <th style="width: 70px;">រូបភាព</th>
                                     <th>ឈ្មោះផលិតផល</th>
                                     <th>ប្រភេទទំនិញ</th>
                                     <th>ស្តុក</th>
                                     <th>តម្លៃ</th>
                                     <th>ស្ថានភាព</th>
-                                    <th style="text-align: center;">សកម្មភាព</th>
+                                    <th>សកម្មភាព</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in products %}
-                                <tr>
+                                <tr id="product-row-{{ item.id }}">
+                                    <td style="text-align: center;">
+                                        <input type="checkbox" class="product-checkbox" value="{{ item.id }}" onchange="updateBulkDeleteBtn()">
+                                    </td>
                                     <td style="text-align: center; font-weight: 600; color: #64748b;">{{ loop.index }}</td>
+                                    <td style="text-align: center;">
+                                        {% set img_val = item.image if item.image else 'default.jpg' %}
+                                        {% if img_val.startswith('http') or img_val.startswith('data:') %}
+                                            <img src="{{ img_val }}" alt="{{ item.name }}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0;" onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}';">
+                                        {% else %}
+                                            <img src="{{ url_for('static', filename='images/' + img_val) }}" alt="{{ item.name }}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0;" onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}';">
+                                        {% endif %}
+                                    </td>
                                     <td style="font-weight: 600;">{{ item.name }}</td>
                                     <td style="color: #64748b;">{{ item.category|capitalize if item.category else 'N/A' }}</td>
-                                    <td style="font-weight: 700;">{{ item.stock_quantity }}</td>
-                                    <td style="color: #059669; font-weight: 700;">${{ "{:,.2f}".format(item.price) }}</td>
-                                    <td>
+                                    <td style="font-weight: 700; text-align: center;">{{ item.stock_quantity }}</td>
+                                    <td style="color: #059669; font-weight: 700; text-align: right;">${{ "{:,.2f}".format(item.price) }}</td>
+                                    <td style="text-align: center;">
                                         {% set low_stock = item.low_stock_level if item.low_stock_level is defined else 5 %}
                                         {% if item.stock_quantity > low_stock %}
                                             <span class="status-badge status-in-stock">
@@ -1569,7 +1579,7 @@
                                         {% elif item.stock_quantity > 0 %}
                                             <span class="status-badge status-low">
                                                 <span class="stock-indicator bg-low"></span>
-                                                ស្តុកតិច
+                                                ជិតអស់ស្តុក
                                             </span>
                                         {% else %}
                                             <span class="status-badge status-out">
@@ -1588,6 +1598,9 @@
                                             </a>
                                             <button onclick="viewStockHistory('{{ item.id }}', '{{ item.name }}')" class="btn-edit-small" title="View History" style="color: #3b82f6;">
                                                 <i data-lucide="history" style="width: 18px; height: 18px;"></i>
+                                            </button>
+                                            <button onclick="deleteProduct('{{ item.id }}', '{{ item.name }}')" class="btn-edit-small" title="Delete Product" style="color: #ef4444; background: #fee2e2;">
+                                                <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
                                             </button>
                                         </div>
                                     </td>
@@ -1888,43 +1901,59 @@
 
         <!-- START Add Product View -->
         <div id="addProductView" class="view-container">
-            <div class="dashboard-header" style="margin-bottom: 20px;">
-                <h1 style="font-size: 24px; font-weight: 700; color: #1e293b; margin: 0; display: flex; align-items: center; gap: 10px;">
+            <div class="dashboard-header" style="margin-bottom: 20px; text-align: center;">
+                <h1 style="font-size: 24px; font-weight: 700; color: #1e293b; margin: 0; display: inline-flex; align-items: center; gap: 10px;">
                     <i data-lucide="plus-circle" style="color: #d81b60; width: 28px; height: 28px;"></i>
                     បន្ថែមផលិតផលថ្មី (Add New Product)
                 </h1>
             </div>
-            <div class="dashboard-card" style="background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); max-width: 800px; margin: 0 auto;">
-                <form action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data">
+            <div class="dashboard-card" style="background: #ffffff; border-radius: 16px; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 900px; width: 90%; margin: 0 auto;">
+                <form id="mainAddProductForm" action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">ឈ្មោះផលិតផល *</label>
-                            <input type="text" name="product_name" required style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">១. ឈ្មោះទំនិញ (Product Name) *</label>
+                            <input type="text" name="product_name" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #1e293b;">
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">ម៉ាក/ប្រភេទ *</label>
-                            <input type="text" name="category" required style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">២. ប្រភេទ (Category) *</label>
+                            <select name="category" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; background-color: #f8fafc; color: #1e293b;" onchange="handleCategoryChange(this)">
+                                <option value="" disabled selected>-- សូមជ្រើសរើសប្រភេទ (Select Category) --</option>
+                                {% for cat in categories %}
+                                    <option value="{{ cat }}">{{ cat }}</option>
+                                {% endfor %}
+                                <option value="__NEW__" style="color: #ff2a6d; font-weight: bold;">+ បង្កើតប្រភេទថ្មី (Create New Category)</option>
+                            </select>
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">តម្លៃលក់ ($) *</label>
-                            <input type="number" name="price" step="0.01" required style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">៣. តម្លៃ (Price in Riel ៛) *</label>
+                            <input type="number" name="price" step="1" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #1e293b;" oninput="updateMainUsdPrice(this.value)">
+                            <div id="main-usd-equivalent" style="color: #0bc2e4; font-weight: bold; margin-top: 5px; font-size: 13px;">ស្មើនឹង (Equals): $ 0.00</div>
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">ចំនួនស្តុក *</label>
-                            <input type="number" name="stock_quantity" required style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">៤. ចំនួនក្នុងស្តុក (Initial Stock) *</label>
+                            <input type="number" name="stock_quantity" value="0" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #1e293b;">
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">បាកូដ (ទុកទទេដើម្បីបង្កើតស្វ័យប្រវត្តិ)</label>
-                            <input type="text" name="barcode" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">៥. បាកូដ (Barcode)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="mainBarcodeInput" name="barcode" style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #1e293b;">
+                                <button type="button" onclick="openMainScanner()" style="padding: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                                    <i data-lucide="camera" style="width: 20px; height: 20px; color: #64748b;"></i>
+                                </button>
+                            </div>
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">រូបភាពផលិតផល</label>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">៦. ថ្ងៃផុតកំណត់ (Expiration Date)</label>
+                            <input type="date" name="expiry_date" style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #1e293b;">
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">៧. រូបភាព (Image)</label>
                             <input type="file" name="image" accept="image/*" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
                         </div>
                     </div>
                     <div style="text-align: right;">
-                        <button type="submit" style="background: #10b981; color: white; border: none; border-radius: 8px; padding: 12px 24px; font-weight: 600; cursor: pointer;">រក្សាទុកផលិតផល</button>
+                        <button type="submit" style="background: #10b981; color: white; border: none; border-radius: 8px; padding: 12px 24px; font-weight: 600; cursor: pointer;">៨. រក្សាទុក (Save Product)</button>
                     </div>
                 </form>
             </div>
@@ -2099,6 +2128,57 @@
         font-size: 12px;
         z-index: 10;
     }
+    /* Sidebar Active State & Hover Fix */
+       
+        .sidebar a.active, 
+        .sidebar .nav-item.active,
+        .sidebar button.active {
+            background-color: var(--primary-color, #d81b60) !important;
+            color: #ffffff !important;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(255, 255, 255, 0.245);
+        }
+
+        .sidebar a:hover, 
+        .sidebar .nav-item:hover,
+        .sidebar button:hover {
+            background-color: rgba(255, 255, 255, 0.412) !important;
+            color: #f70606 !important;
+        }
+        /* Pull Content Area tightly attached to Header and Sidebar */
+        .main-content, .content-wrapper, .container-fluid, .content-body {
+            margin-top: 0 !important;
+            padding-top: 6px !important;
+        }
+
+        /* Adjust wrapper layout to close gaps */
+        .dashboard-container, .app-body {
+            padding-left: 0 !important;
+            margin-left: 0 !important;
+        }
+        /* Fix Product Cards Animation & Overlapping with Header */
+        .cosmetic-card, .product-card, .card {
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+            z-index: 1;
+        }
+
+        /* ពេល Hover ឱ្យវាអណ្តែតពីលើដាច់ច្បាស់ និងមិនបុក Header */
+        .cosmetic-card:hover, .product-card:hover, .card:hover {
+            transform: translateY(-8px) !important;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15) !important;
+            z-index: 10 !important;
+        }
+
+        /*Margin ផ្នែកខាងលើនៃ Grid ផ្ទុកកាត ដើម្បីកុំឱ្យជិត Header ពេក */
+        .product-grid, .cosmetic-grid, .row {
+            margin-top: 15px !important;
+            padding-top: 10px !important;
+        }
+        /* Fix Cart Panel alignment and gap with Header */
+        .cart-panel, .billing-panel, .pos-cart-container {
+            margin-top: 17px !important;
+        }
 </style>
 
 <audio id="alertSound" src="https://s3.amazonaws.com/freecodecamp/simonSound1.mp3" preload="auto"></audio>
@@ -3951,7 +4031,7 @@
                             badgeStyle = 'background: #fef9c3; color: #854d0e;';
                         }
                         
-                        const hasReceipt = order.has_receipt || (['paid', 'completed'].includes(statusLower));
+                        const hasReceipt = ['paid', 'completed'].includes(statusLower);
                         
                         html += `<tr>
                             <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
@@ -3973,7 +4053,7 @@
                                 <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; ${badgeStyle}">${status}</span>
                             </td>
                             <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                ${hasReceipt ? `<a href="${pdfUrl}" target="_blank" style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block;">View PDF</a>` : `<span style="color: #6c757d; font-size: 11px;">No Receipt</span>`}
+                                ${hasReceipt ? `<button onclick="viewReceipt('${tranId || orderId}')" style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block; cursor: pointer;">View PDF</button>` : `<span style="color: #6c757d; font-size: 11px;">No Receipt</span>`}
                             </td>
                             <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                 <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
@@ -4151,6 +4231,30 @@
         });
     }
 
+    function viewReceipt(tranId) {
+        Swal.fire({
+            title: 'កំពុងរៀបចំវិក្កយបត្រ... | Preparing receipt...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch(`/api/receipt/download/${tranId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    Swal.close();
+                    window.open(data.url, '_blank');
+                } else {
+                    Swal.fire('Error', data.message || 'Failed to load receipt', 'error');
+                }
+            })
+            .catch(err => {
+                Swal.fire('Error', 'Network error: ' + err.message, 'error');
+            });
+    }
+
     function downloadReport(pdfUrl, filename) {
         const fullUrl = window.location.origin + pdfUrl;
         fetch(fullUrl, { credentials: 'same-origin' })
@@ -4175,8 +4279,222 @@
             });
     }
 
+    function updateMainUsdPrice(rielValue) {
+        const usdPreview = document.getElementById('main-usd-equivalent');
+        if (!rielValue || isNaN(rielValue)) {
+            usdPreview.textContent = 'ស្មើនឹង (Equals): $ 0.00';
+            return;
+        }
+        
+        // Use the global RIEL_RATE from Jinja
+        const rielRate = {{ RIEL_RATE }};
+        const usdValue = parseFloat(rielValue) / rielRate;
+        usdPreview.textContent = `ស្មើនឹង (Equals): $ ${usdValue.toFixed(2)}`;
+    }
+
+    function openMainScanner() {
+        // Reuse the existing scanner modal logic
+        openModalScanner();
+        
+        // Override the success callback to fill the main form's barcode input
+        window.onScanSuccess = function(decodedText, decodedResult) {
+            document.getElementById('mainBarcodeInput').value = decodedText;
+            closeScanner();
+            
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: 'ស្កេនបាកូដជោគជ័យ',
+                showConfirmButton: false,
+                timer: 1500
+            });
+        };
+    }
+
     // Initialize top products data from server
     window.currentTopProducts = {{ top_products_json|tojson }};
+
+    // Handle main Add Product form submission via AJAX
+    document.addEventListener('DOMContentLoaded', function() {
+        const mainAddProductForm = document.getElementById('mainAddProductForm');
+        if (mainAddProductForm) {
+            mainAddProductForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'រក្សាទុកជោគជ័យ / Product saved successfully',
+                            showConfirmButton: false,
+                            timer: 3000,
+                            timerProgressBar: true
+                        });
+                        
+                        // Reset form and USD equivalent text
+                        mainAddProductForm.reset();
+                        document.getElementById('main-usd-equivalent').textContent = 'ស្មើនឹង (Equals): $ 0.00';
+                    } else {
+                        Swal.fire('Error', data.message || 'Failed to save product', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire('Error', 'An error occurred while saving the product.', 'error');
+                });
+            });
+        }
+    });
+
+    // --- Delete Product Logic ---
+    function deleteProduct(productId, productName) {
+        Swal.fire({
+            title: 'តើអ្នកពិតជាចង់លុបផលិតផលនេះមែនទេ? | Are you sure?',
+            text: `អ្នកកំពុងលុបផលិតផល: ${productName}`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'លុប | Yes, delete it',
+            cancelButtonText: 'បោះបង់ | Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch(`/delete_product/${productId}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'លុបជោគជ័យ / Deleted successfully',
+                            showConfirmButton: false,
+                            timer: 2000
+                        });
+                        // Remove the row from the table without reloading
+                        const row = document.getElementById(`product-row-${productId}`);
+                        if (row) {
+                            row.remove();
+                        }
+                    } else {
+                        Swal.fire('Error', data.message || 'Failed to delete product', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire('Error', 'An error occurred while deleting the product.', 'error');
+                });
+            }
+        });
+    }
+
+    // --- Bulk Delete Products Logic ---
+    function toggleAllProducts(source) {
+        const checkboxes = document.querySelectorAll('.product-checkbox');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+        updateBulkDeleteBtn();
+    }
+
+    function updateBulkDeleteBtn() {
+        const checkedCount = document.querySelectorAll('.product-checkbox:checked').length;
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.style.display = checkedCount > 0 ? 'flex' : 'none';
+        }
+        
+        // Update "Select All" checkbox state
+        const selectAllCheckbox = document.getElementById('selectAllProducts');
+        if (selectAllCheckbox) {
+            const allCheckboxes = document.querySelectorAll('.product-checkbox');
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && checkedCount === allCheckboxes.length;
+        }
+    }
+
+    function deleteSelectedProducts() {
+        const selectedCheckboxes = document.querySelectorAll('.product-checkbox:checked');
+        const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+        
+        if (selectedIds.length === 0) return;
+        
+        Swal.fire({
+            title: 'តើអ្នកពិតជាចង់លុបផលិតផលទាំងនេះមែនទេ?',
+            text: `អ្នកកំពុងលុបផលិតផលចំនួន ${selectedIds.length}`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'លុបទាំងអស់ | Delete All',
+            cancelButtonText: 'បោះបង់ | Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch('/api/delete-multiple-products', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ ids: selectedIds })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'លុបជោគជ័យ / Deleted successfully',
+                            showConfirmButton: false,
+                            timer: 2000
+                        });
+                        
+                        // Remove deleted rows from the table
+                        selectedIds.forEach(id => {
+                            const row = document.getElementById(`product-row-${id}`);
+                            if (row) row.remove();
+                        });
+                        
+                        // Reset checkboxes and button
+                        document.getElementById('selectAllProducts').checked = false;
+                        updateBulkDeleteBtn();
+                    } else {
+                        Swal.fire('Error', data.message || 'Failed to delete products', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire('Error', 'An error occurred while deleting products.', 'error');
+                });
+            }
+        });
+    }
 
     // --- Bulk Print Logic ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -4401,8 +4719,10 @@ function openAddStaffModal() {
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+        border: none !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+        background: #ffffff !important;
+        border-radius: 16px !important;
     }
 
     #addProductModal .modal-body {
@@ -4429,25 +4749,25 @@ function openAddStaffModal() {
     }
 </style>
 <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable max-w-xl">
-        <div class="modal-content bg-[#222] text-white rounded-2xl shadow-2xl border border-gray-800" style="max-height: 90vh; display: flex; flex-direction: column;">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 850px; width: 90%;">
+        <div class="modal-content" style="background: #ffffff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); max-height: 90vh; display: flex; flex-direction: column; border: none;">
             
-            <div class="modal-header border-b border-gray-700 p-4 flex-shrink-0">
-                <h5 class="modal-title text-white text-xl font-bold" id="addProductModalLabel">បន្ថែមទំនិញថ្មី (Add New Product)</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header border-b border-gray-200 p-4 flex-shrink-0">
+                <h5 class="modal-title text-xl font-bold" id="addProductModalLabel" style="color: #1e293b;">បន្ថែមទំនិញថ្មី (Add New Product)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
             <div class="modal-body p-6 flex-grow" style="overflow-y: auto !important; -webkit-overflow-scrolling: touch;">
-                <form id="addProductForm" action="/add_product" method="POST" enctype="multipart/form-data" class="product-form-dark space-y-4 pb-4">
+                <form id="addProductForm" action="/add_product" method="POST" enctype="multipart/form-data" class="space-y-4 pb-4">
                     <!-- SECURITY: CSRF token for form submission -->
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group mb-3">
-                        <label for="modalProductName" class="form-label text-gray-300">១. ឈ្មោះទំនិញ (Product Name)</label>
-                        <input type="text" id="modalProductName" name="product_name" class="form-control bg-dark text-white border-secondary" required>
+                        <label for="modalProductName" class="form-label" style="color: #475569; font-weight: 600;">១. ឈ្មោះទំនិញ (Product Name)</label>
+                        <input type="text" id="modalProductName" name="product_name" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;" required>
                     </div>
                     <div class="form-group mb-3">
-                        <label for="modalCategory" class="form-label text-gray-300">២. ប្រភេទ (Category)</label>
-                        <select id="modalCategory" name="category" class="form-select bg-dark text-white border-secondary" onchange="handleCategoryChange(this)" required>
+                        <label for="modalCategory" class="form-label" style="color: #475569; font-weight: 600;">២. ប្រភេទ (Category)</label>
+                        <select id="modalCategory" name="category" class="form-select" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;" onchange="handleCategoryChange(this)" required>
                             <option value="" disabled selected>-- សូមជ្រើសរើសប្រភេទ (Select Category) --</option>
                             {% for cat in categories %}
                                 <option value="{{ cat }}">{{ cat }}</option>
@@ -4456,27 +4776,27 @@ function openAddStaffModal() {
                         </select>
                     </div>
                     <div class="form-group mb-3">
-                        <label for="modalRielInput" class="form-label text-gray-300">៣. តម្លៃ (Price in Riel ៛)</label>
-                        <input type="number" id="modalRielInput" name="price" step="1" placeholder="ឧទាហរណ៍: 25000" class="form-control bg-dark text-white border-secondary" required oninput="updateUsdPrice(this.value)">
-                        <div id="modalUsdPreview" class="text-info small mt-1">ស្មើនឹង (Equals): $ 0.00</div>
+                        <label for="modalRielInput" class="form-label" style="color: #475569; font-weight: 600;">៣. តម្លៃ (Price in Riel ៛)</label>
+                        <input type="number" id="modalRielInput" name="price" step="1" placeholder="ឧទាហរណ៍: 25000" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;" required oninput="updateUsdPrice(this.value)">
+                        <div id="modalUsdPreview" class="text-info small mt-1" style="font-weight: bold;">ស្មើនឹង (Equals): $ 0.00</div>
                     </div>
                     <div class="form-group mb-3">
-                        <label for="modalStockQuantity" class="form-label text-gray-300">៤. ចំនួនក្នុងស្តុក (Initial Stock)</label>
-                        <input type="number" id="modalStockQuantity" name="stock_quantity" value="0" class="form-control bg-dark text-white border-secondary" required>
+                        <label for="modalStockQuantity" class="form-label" style="color: #475569; font-weight: 600;">៤. ចំនួនក្នុងស្តុក (Initial Stock)</label>
+                        <input type="number" id="modalStockQuantity" name="stock_quantity" value="0" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;" required>
                     </div>
                     <div class="form-group mb-3">
-                        <label for="modalBarcodeInput" class="form-label text-gray-300">៥. បាកូដ (Barcode)</label>
+                        <label for="modalBarcodeInput" class="form-label" style="color: #475569; font-weight: 600;">៥. បាកូដ (Barcode)</label>
                         <div class="input-group">
-                            <input type="text" id="modalBarcodeInput" name="barcode" class="form-control bg-dark text-white border-secondary">
-                            <button type="button" onclick="openModalScanner()" class="btn btn-outline-secondary"><i data-lucide="camera" style="width: 20px; height: 20px;"></i></button>
+                            <input type="text" id="modalBarcodeInput" name="barcode" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;">
+                            <button type="button" onclick="openModalScanner()" class="btn btn-outline-secondary" style="background: #f1f5f9; border-color: #cbd5e1;"><i data-lucide="camera" style="width: 20px; height: 20px; color: #64748b;"></i></button>
                         </div>
                     </div>
                     <div class="form-group mb-3">
-                        <label for="expiry_date" class="form-label text-gray-300">៦. ថ្ងៃផុតកំណត់ (Expiration Date)</label>
-                        <input type="date" id="expiry_date" name="expiry_date" class="form-control bg-dark text-white border-secondary">
+                        <label for="expiry_date" class="form-label" style="color: #475569; font-weight: 600;">៦. ថ្ងៃផុតកំណត់ (Expiration Date)</label>
+                        <input type="date" id="expiry_date" name="expiry_date" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;">
                     </div>
                     <div class="form-group mb-4">
-                        <label for="modalProductImage" class="form-label text-gray-300">៧. រូបភាព (Image)</label>
+                        <label for="modalProductImage" class="form-label" style="color: #475569; font-weight: 600;">៧. រូបភាព (Image)</label>
                         <div class="image-upload-wrapper text-center">
                             <img id="modalImagePreview" src="/static/images/default.jpg" class="preview-img mb-2 rounded mx-auto d-block" style="max-height: 150px; max-width: 100%;">
                             <input type="file" id="modalProductImage" accept="image/*" class="form-control form-control-sm bg-transparent border-0 text-muted" onchange="previewModalProductImage(this)">
