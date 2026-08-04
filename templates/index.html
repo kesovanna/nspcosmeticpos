@@ -49,7 +49,7 @@
             font-family: 'Siemreap', 'Battambang', cursive !important;
         }
 
-        #searchInput, #searchInput::placeholder, .btn-clear-all, .btn-order { font-family: 'Battambang', sans-serif !important; }
+        #unifiedSearchInput, #unifiedSearchInput::placeholder, .btn-clear-all, .btn-order { font-family: 'Battambang', sans-serif !important; }
 
         [data-theme="dark"] {
             --card-bg: rgba(30, 30, 35, 0.65);
@@ -1017,9 +1017,9 @@
         </div>
         <div class="top-row">
             <button class="menu-toggle" onclick="toggleSidebar()"><i data-lucide="menu"></i></button>
-            <div class="search-container">
+            <div class="search-container" id="globalSearchContainer">
                 <i data-lucide="search"></i>
-                <input type="text" id="searchInput" placeholder="ស្វែងរកផលិតផល..." oninput="applySmartFilter()">
+                <input type="text" id="unifiedSearchInput" placeholder="ស្វែងរកផលិតផល..." oninput="applySmartFilter()" autocomplete="off">
             </div>
 
         <div class="info-container d-flex flex-row align-items-center gap-3">
@@ -1297,7 +1297,7 @@
                 <!-- ប្រអប់ Wrapper នេះសំខាន់ខ្លាំងណាស់ (ហាមបាត់) សម្រាប់ការពារ Scrollbar -->
                 <div class="table-responsive-custom" id="reportTableContainer">
                     <!-- បន្ថែម margin-bottom: 30px ដើម្បីកុំឱ្យ Scrollbar ផ្តេក បាំងទិន្នន័យបាតតារាង -->
-                    <table class="table-custom-secure" style="width: 100%; min-width: 1450px; border-collapse: separate; border-spacing: 0; background: white; margin-bottom: 30px;">
+                    <table id="salesReportTable" class="table-custom-secure" style="width: 100%; min-width: 1450px; border-collapse: separate; border-spacing: 0; background: white; margin-bottom: 30px;">
                         <thead style="position: sticky; top: 0; z-index: 10; background: #f8fafc;">
                             <tr style="background: #f8fafc;">
                                 <th style="width: 45px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 8px; vertical-align: middle; text-align: center; white-space: nowrap !important;"><input type="checkbox" id="selectAllReports"></th>
@@ -1322,7 +1322,7 @@
                                 {% set items = order.get('items', []) %}
                                 {% if items %}
                                     <!-- Row (First Item and Order Details) -->
-                                    <tr>
+                                    <tr data-group-id="{{ order.tran_id or order.local_id }}">
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                             <input type="checkbox" class="report-row-checkbox" value="{{ order.id or order.local_id }}">
                                         </td>
@@ -1368,15 +1368,18 @@
                                         <!-- Actions -->
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                             <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
-                                                <button class="btn-action" onclick="editReport('{{ order.tran_id or order.local_id }}')" title="កែប្រែ" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #3b82f6; color: white; cursor: pointer; transition: all 0.2s ease;">
+                                                <button class="btn-action" onclick="editReport('{{ order.tran_id or order.local_id }}', this)" title="កែប្រែ" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #3b82f6; color: white; cursor: pointer; transition: all 0.2s ease;">
                                                     <i data-lucide="pencil" style="width:14px;height:14px;"></i>
                                                 </button>
-                                                <button class="btn-action" onclick="deleteReport('{{ order.tran_id or order.local_id }}')" title="លុប" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #ef4444; color: white; cursor: pointer; transition: all 0.2s ease;">
+                                                <button class="btn-action" onclick="deleteReport('{{ order.tran_id or order.local_id }}', this)" title="លុប" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #ef4444; color: white; cursor: pointer; transition: all 0.2s ease;">
                                                     <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
                                                 </button>
                                                 {% set pdf_url = '/reports/view/' + filename %}
                                                 <button class="btn-action" onclick="shareReport('{{ pdf_url }}', '{{ order.tran_id or order.local_id }}')" title="ចែករំលែក" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #8b5cf6; color: white; cursor: pointer; transition: all 0.2s ease;">
                                                     <i data-lucide="share-2" style="width:14px;height:14px;"></i>
+                                                </button>
+                                                <button class="btn-action" onclick="downloadReport('{{ pdf_url }}', '{{ filename }}')" title="ទាញយក" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #0d9488; color: white; cursor: pointer; transition: all 0.2s ease;">
+                                                    <i data-lucide="download" style="width:14px;height:14px;"></i>
                                                 </button>
                                             </div>
                                         </td>
@@ -1384,7 +1387,7 @@
                                     
                                     <!-- Child Rows: Remaining Items -->
                                     {% for item in items[1:] %}
-                                    <tr>
+                                    <tr data-group-id="{{ order.tran_id or order.local_id }}">
                                         <td style="background: #ffffff; text-align: center !important; font-weight: 500 !important; color: #1e293b !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">{{ item.name }}</td>
                                         <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">{{ item.qty or item.quantity }}</td>
                                         <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ {{ "{:,.2f}".format(item.price) }}</td>
@@ -1804,7 +1807,7 @@
                         </button>
                     </div>
                     <div class="table-responsive" style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                        <table id="barcodeProductTable" style="width: 100%; border-collapse: separate; border-spacing: 0;">
                             <thead>
                                 <tr>
                                     <th style="text-align: left; padding: 16px 12px; border-bottom: 2px solid #f1f5f9;"><input type="checkbox" id="selectAllBarcodes" onclick="document.querySelectorAll('.barcode-checkbox').forEach(cb => cb.checked = this.checked)"></th>
@@ -2150,7 +2153,7 @@
                     timer: 2000,
                     showConfirmButton: false
                 }).then(() => {
-                    window.location.reload(); 
+                    // Removed window.location.reload() - stay on page after exchange rate update
                 });
             } else {
                 throw new Error(result.message || "Failed to update database records.");
@@ -2508,7 +2511,10 @@
     function setCategory(cat) { currentCategory = cat; applySmartFilter(); }
 
     function applySmartFilter() {
-        const text = document.getElementById('searchInput').value.toLowerCase();
+        // Unified search: only filters POS product cards when the POS view is active.
+        const posViewEl = document.getElementById('posView');
+        if (!posViewEl || !posViewEl.classList.contains('active-view')) return;
+        const text = document.getElementById('unifiedSearchInput').value.toLowerCase();
         const productCards = document.querySelectorAll('.pos-product-item');
         
         // Normalize all active barcodes in the cart into a clean string array
@@ -2531,6 +2537,57 @@
             } else {
                 card.style.setProperty('display', 'none', 'important');
             }
+        });
+    }
+
+    /* ============================================================
+       UNIFIED SEARCH BAR — filtering functions per active view
+       (called by #unifiedSearchInput, switched via showView())
+       ============================================================ */
+
+    // 1. POS checkout: filter product cards (default oninput in HTML)
+    //    handled by applySmartFilter() above.
+
+    // 2. Quick Actions / Inventory table (#cosmeticsTable)
+    function filterInventoryTable() {
+        const input = document.getElementById('unifiedSearchInput');
+        const filter = (input ? input.value : '').toLowerCase();
+        document.querySelectorAll('#cosmeticsTable tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
+        });
+    }
+
+    // 3. Sales Reports table (#salesReportTable) — filters whole order groups
+    //    (rows share rowspan, so we show/hide all rows with the same data-group-id)
+    function filterSalesTable() {
+        const input = document.getElementById('unifiedSearchInput');
+        const filter = (input ? input.value : '').toLowerCase();
+        const groups = {};
+        document.querySelectorAll('#salesReportTable tbody tr[data-group-id]').forEach(row => {
+            const gid = row.getAttribute('data-group-id');
+            (groups[gid] = groups[gid] || []).push(row);
+        });
+        Object.values(groups).forEach(groupRows => {
+            const match = groupRows.some(r => r.textContent.toLowerCase().includes(filter));
+            groupRows.forEach(r => { r.style.display = match ? '' : 'none'; });
+        });
+    }
+
+    // 4. Staff / Users table (#staffTable)
+    function filterUsersTable() {
+        const input = document.getElementById('unifiedSearchInput');
+        const filter = (input ? input.value : '').toLowerCase();
+        document.querySelectorAll('#staffTable tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
+        });
+    }
+
+    // 5. Barcode printing table (#barcodeProductTable)
+    function filterBarcodeTable() {
+        const input = document.getElementById('unifiedSearchInput');
+        const filter = (input ? input.value : '').toLowerCase();
+        document.querySelectorAll('#barcodeProductTable tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
         });
     }
 
@@ -3050,7 +3107,7 @@
                 if (e.target.tagName === 'INPUT') return;
 
                 // If any other element inside the red zone was clicked, safely reload
-                window.location.reload();
+                // window.location.reload();
             });
         }
     });
@@ -3198,10 +3255,7 @@
                 e.preventDefault();
                 markAlertsAsAcknowledged();
                 closeInventoryModal();
-                // Programmatically navigate to ensure lifecycle isn't hijacked
-                setTimeout(() => {
-                    window.location.href = '/cosmets';
-                }, 50);
+                // Removed programmatic navigation to /cosmets (no page reload)
             });
         }
     });
@@ -3271,7 +3325,10 @@
                 const item = document.createElement('div');
                 item.className = 'notif-feed-item';
                 item.onclick = () => {
-                    if (notif.id.startsWith('inv-')) window.location.href = '/manager';
+                    // Open the inventory alert detail inline instead of navigating away
+                    if (notif.id.startsWith('inv-')) {
+                        openSystemNotificationDialog({ target: item, stopPropagation: () => {} });
+                    }
                 };
 
                 item.innerHTML = `
@@ -3437,7 +3494,7 @@
                     timer: 1500,
                     showConfirmButton: false
                 }).then(() => {
-                    location.reload();
+                    // Removed window.location.reload() - stay on page after restock
                 });
             } else if (result.isConfirmed) {
                 Swal.fire('Error', result.value.error || 'Failed to restock', 'error');
@@ -3792,13 +3849,175 @@
         });
     }
 
+    function updateSummaryCards() {
+        // Determine current report type based on active tab
+        const activeTab = document.querySelector('.report-tab-btn.active');
+        let type = 'daily';
+        if (activeTab) {
+            if (activeTab.textContent.includes('ខែ')) type = 'monthly';
+            else if (activeTab.textContent.includes('ឆ្នាំ')) type = 'annually';
+        }
+        
+        let apiUrl = '';
+        if (type === 'daily') {
+            const dateInput = document.getElementById('reportDatePickerHome');
+            const date = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
+            apiUrl = '/api/reports/daily?date=' + date;
+        } else if (type === 'monthly') {
+            // For monthly, we might need to extract the month from the header or use current month
+            const now = new Date();
+            const year = now.getFullYear();
+            const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+            apiUrl = '/api/reports/monthly?month=' + year + '-' + monthStr;
+        } else if (type === 'annually') {
+            const year = new Date().getFullYear();
+            apiUrl = '/api/reports/annually?year=' + year;
+        }
+
+        if (apiUrl) {
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const stats = data.data;
+                        const revenueUSD = stats.revenue || 0;
+                        const revenueRiel = revenueUSD * 4000;
+                        const orderCount = stats.order_count || 0;
+                        const topProductName = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].name : 'N/A';
+                        const topProductQty = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].qty : 'N/A';
+                        
+                        const statCards = document.querySelectorAll('.stat-card .value');
+                        if (statCards.length >= 3) {
+                            statCards[0].innerHTML = '៛ ' + revenueRiel.toLocaleString('en-US', {maximumFractionDigits: 0}) + '<br><span style="font-size: 20px; display: block; margin-top: 8px;">$ ' + revenueUSD.toLocaleString('en-US', {maximumFractionDigits: 2}) + '</span>';
+                            statCards[1].innerHTML = orderCount + ' ការកុម្ម៉ង់ទិញ';
+                            statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' មុខទំនិញ)</span>' : 'N/A';
+                        }
+                        window.currentTopProducts = stats.top_products || [];
+                    }
+                })
+                .catch(error => console.error('Error updating summary cards:', error));
+        }
+    }
+
     function changeReportDateHome(date) {
         const urlParams = new URLSearchParams(window.location.search);
         urlParams.set('date', date);
-        window.location.href = window.location.pathname + '?' + urlParams.toString();
+        // Removed window.location.href navigation - update the table dynamically instead
+        // Re-fetch the daily report for the selected date and update summary cards
+        updateSummaryCards();
+
+        // Dynamically re-render the orders table for the selected date without page reload
+        fetch('/api/reports/daily?date=' + encodeURIComponent(date))
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.data) {
+                    const orders = data.data.orders || [];
+                    const tbody = document.querySelector('#reportTableContainer tbody');
+                    if (!tbody) return;
+
+                    if (orders.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="14" style="background: #ffffff; text-align: center !important; color: #9ca3af !important; padding: 50px !important; border: 1px solid #cbd5e1; vertical-align: middle; white-space: nowrap !important;">មិនទាន់មានទិន្នន័យលក់នៅឡើយទេ</td></tr>';
+                        return;
+                    }
+
+                    let html = '';
+                    let count = 1;
+                    orders.forEach((order) => {
+                        const items = order.items ? (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) : [];
+                        if (items.length === 0) return;
+                        
+                        // Parse items into consistent format
+                        const parsedItems = items.map(item => ({
+                            name: item.name || 'Unknown',
+                            qty: item.qty || item.quantity || 0,
+                            price: item.price || 0
+                        }));
+                        
+                        const firstItem = parsedItems[0];
+                        const total = order.total || 0;
+                        const discount = order.discount || 0;
+                        const status = order.status || 'pending';
+                        const statusLower = status.toLowerCase();
+                        const tranId = order.tran_id || (order.id ? order.id.slice(0, 8) : '');
+                        const orderId = order.id || order.local_id || tranId;
+                        const filename = 'invoice_' + (tranId || orderId) + '.pdf';
+                        const pdfUrl = '/reports/view/' + filename;
+                        
+                        // Status badge styling
+                        let badgeStyle = 'background: #fee2e2; color: #991b1b;';
+                        if (['paid', 'completed'].includes(statusLower)) {
+                            badgeStyle = 'background: #dcfce7; color: #166534;';
+                        } else if (statusLower === 'pending') {
+                            badgeStyle = 'background: #fef9c3; color: #854d0e;';
+                        }
+                        
+                        const hasReceipt = order.has_receipt || (['paid', 'completed'].includes(statusLower));
+                        
+                        html += `<tr>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                                <input type="checkbox" class="report-row-checkbox" value="${orderId}">
+                            </td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${count}</td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${order.display_time || ''}</td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                                <span style="background: #d81b60; color: white; padding: 6px 10px; border-radius: 4px; display: inline-block; font-family: monospace; font-size: 11px; font-weight: 700; word-break: break-all;">${tranId}</span>
+                            </td>
+                            <td style="background: #ffffff; text-align: center !important; font-weight: 500 !important; color: #1e293b !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${firstItem.name}</td>
+                            <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${firstItem.qty}</td>
+                            <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(firstItem.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                            <td style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(firstItem.qty * firstItem.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; color: #dc2626 !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(discount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; font-size: 14px !important; color: #0f172a !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(total).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; color: #16a34a !important; font-size: 14px !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">៛ ${Number(total * 4000).toLocaleString('en-US', {maximumFractionDigits: 0})}</td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                                <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; ${badgeStyle}">${status}</span>
+                            </td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                                ${hasReceipt ? `<a href="${pdfUrl}" target="_blank" style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block;">View PDF</a>` : `<span style="color: #6c757d; font-size: 11px;">No Receipt</span>`}
+                            </td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
+                                    <button class="btn-action" onclick="editReport('${tranId || orderId}', this)" title="កែប្រែ" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #3b82f6; color: white; cursor: pointer; transition: all 0.2s ease;">
+                                        <i data-lucide="pencil" style="width:14px;height:14px;"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="deleteReport('${tranId || orderId}', this)" title="លុប" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #ef4444; color: white; cursor: pointer; transition: all 0.2s ease;">
+                                        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="shareReport('${pdfUrl}', '${tranId || orderId}')" title="ចែករំលែក" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #8b5cf6; color: white; cursor: pointer; transition: all 0.2s ease;">
+                                        <i data-lucide="share-2" style="width:14px;height:14px;"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="downloadReport('${pdfUrl}', '${filename}')" title="ទាញយក" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #0d9488; color: white; cursor: pointer; transition: all 0.2s ease;">
+                                        <i data-lucide="download" style="width:14px;height:14px;"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>`;
+                        
+                        // Child rows for remaining items
+                        for (let i = 1; i < parsedItems.length; i++) {
+                            const item = parsedItems[i];
+                            html += `<tr>
+                                <td style="background: #ffffff; text-align: center !important; font-weight: 500 !important; color: #1e293b !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${item.name}</td>
+                                <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${item.qty}</td>
+                                <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(item.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                <td style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(item.qty * item.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                            </tr>`;
+                        }
+                        count++;
+                    });
+                    
+                    tbody.innerHTML = html;
+                    
+                    // Re-initialize lucide icons for the new buttons
+                    if (window.lucide) {
+                        window.lucide.createIcons();
+                    }
+                }
+            })
+            .catch(error => console.error('Error loading daily report:', error));
     }
 
-    function editReport(reportId) {
+    function editReport(reportId, btnElement) {
         Swal.fire({
             title: 'Edit Report Status',
             input: 'select',
@@ -3822,11 +4041,46 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
-                        Swal.fire('Updated!', 'Report status has been updated.', 'success')
-                        .then(() => location.reload());
+                    if (data.status === 'success' || data.success) {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'Report status updated',
+                            showConfirmButton: false,
+                            timer: 3000
+                        });
+                        
+                        // Dynamically update the UI
+                        if (btnElement) {
+                            const row = btnElement.closest('tr');
+                            if (row) {
+                                // Find the status span in this row
+                                const statusSpan = row.querySelector('td:nth-last-child(3) span');
+                                if (statusSpan) {
+                                    const newStatus = result.value.toLowerCase();
+                                    statusSpan.textContent = result.value;
+                                    // Update colors based on status
+                                    if (['paid', 'completed'].includes(newStatus)) {
+                                        statusSpan.style.background = '#dcfce7';
+                                        statusSpan.style.color = '#166534';
+                                    } else if (newStatus === 'pending') {
+                                        statusSpan.style.background = '#fef9c3';
+                                        statusSpan.style.color = '#854d0e';
+                                    } else {
+                                        statusSpan.style.background = '#fee2e2';
+                                        statusSpan.style.color = '#991b1b';
+                                    }
+                                }
+                            }
+                        }
+
+                        // Update summary cards dynamically
+                        if (typeof updateSummaryCards === 'function') {
+                            updateSummaryCards();
+                        }
                     } else {
-                        Swal.fire('Error!', data.error || 'Failed to update report.', 'error');
+                        Swal.fire('Error!', data.error || data.message || 'Failed to update report.', 'error');
                     }
                 })
                 .catch(error => {
@@ -3837,7 +4091,7 @@
         });
     }
 
-    function deleteReport(reportId) {
+    function deleteReport(reportId, btnElement) {
         Swal.fire({
             title: 'Are you sure?',
             text: "You won't be able to revert this!",
@@ -3853,11 +4107,40 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
-                        Swal.fire('Deleted!', 'Report has been deleted.', 'success')
-                        .then(() => location.reload());
+                    if (data.status === 'success' || data.success) {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'Report deleted',
+                            showConfirmButton: false,
+                            timer: 3000
+                        });
+                        
+                        // Dynamically remove the row(s) from the UI
+                        if (btnElement) {
+                            const row = btnElement.closest('tr');
+                            if (row) {
+                                // Check if there are child rows (rowspan)
+                                const rowspanCell = row.querySelector('td[rowspan]');
+                                const rowspan = rowspanCell ? parseInt(rowspanCell.getAttribute('rowspan')) : 1;
+                                
+                                let currentRow = row;
+                                for (let i = 0; i < rowspan; i++) {
+                                    if (!currentRow) break;
+                                    const nextRow = currentRow.nextElementSibling;
+                                    currentRow.remove();
+                                    currentRow = nextRow;
+                                }
+                            }
+                        }
+                        
+                        // Update summary cards dynamically
+                        if (typeof updateSummaryCards === 'function') {
+                            updateSummaryCards();
+                        }
                     } else {
-                        Swal.fire('Error!', data.error || 'Failed to delete report.', 'error');
+                        Swal.fire('Error!', data.error || data.message || 'Failed to delete report.', 'error');
                     }
                 })
                 .catch(error => {
@@ -3868,19 +4151,28 @@
         });
     }
 
-    function shareReport(pdfUrl, tranId) {
-        if (navigator.share) {
-            navigator.share({
-                title: `Invoice ${tranId}`,
-                text: `Here is the invoice for transaction ${tranId}`,
-                url: pdfUrl
-            }).catch(console.error);
-        } else {
-            // Fallback to copy to clipboard
-            navigator.clipboard.writeText(window.location.origin + pdfUrl)
-                .then(() => Swal.fire('Copied!', 'Invoice link copied to clipboard', 'success'))
-                .catch(() => Swal.fire('Error', 'Failed to copy link', 'error'));
-        }
+    function downloadReport(pdfUrl, filename) {
+        const fullUrl = window.location.origin + pdfUrl;
+        fetch(fullUrl, { credentials: 'same-origin' })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename || 'invoice.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(err => {
+                Swal.fire('Error', 'Failed to download the receipt: ' + err.message, 'error');
+            });
     }
 
     // Initialize top products data from server
@@ -4199,108 +4491,7 @@ function openAddStaffModal() {
     </div>
 </div>
 <script>
-    // ប្រើ window ដើម្បីធានាថាកូដទាំងនេះនឹងគ្របពីលើ (Override) កូដចាស់ៗនៅក្នុង app.js
-    window.editReport = function(reportId) {
-        Swal.fire({
-            title: 'កែប្រែស្ថានភាពរបាយការណ៍',
-            html: `
-                <div style="margin-top: 15px;">
-                    <label style="display: block; text-align: left; margin-bottom: 8px; font-weight: bold;">ស្ថានភាពថ្មី (New Status):</label>
-                    <select id="editStatus" class="swal2-select" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #d1d5db;">
-                        <option value="paid">Paid (បានទូទាត់)</option>
-                        <option value="pending">Pending (រង់ចាំ)</option>
-                        <option value="canceled">Canceled (បោះបង់)</option>
-                    </select>
-                </div>
-            `,
-            icon: 'info',
-            showCancelButton: true,
-            confirmButtonColor: '#3b82f6',
-            cancelButtonColor: '#6b7280',
-            confirmButtonText: 'រក្សាទុក',
-            cancelButtonText: 'បោះបង់',
-            preConfirm: () => {
-                const status = document.getElementById('editStatus').value;
-                return { status: status };
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const cleanReportId = String(reportId).trim();
-                const requestBody = JSON.stringify(result.value);
-                
-                // បញ្ជាក់៖ សូមឆែកមើល Route ក្នុង Python របស់អ្នក ថាវាប្រើសញ្ញាដក (-) ឬសញ្ញាគូសក្រោម (_)
-                fetch(`/api/edit-report/${cleanReportId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: requestBody
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        Swal.fire(
-                            'ជោគជ័យ!',
-                            'របាយការណ៍ត្រូវបានកែប្រែដោយជោគជ័យ។',
-                            'success'
-                        ).then(() => {
-                            window.location.reload();
-                        });
-                    } else {
-                        Swal.fire('បរាជ័យ', data.message || 'មានបញ្ហាក្នុងការកែប្រែរបាយការណ៍។', 'error');
-                    }
-                })
-                .catch(error => {
-                    Swal.fire('បរាជ័យ', 'មានបញ្ហាក្នុងការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេ។ បញ្ហា: ' + error.message, 'error');
-                });
-            }
-        });
-    };
-
-    window.deleteReport = function(reportId) {
-        Swal.fire({
-            title: 'តើអ្នកប្រាកដទេ?',
-            text: `អ្នកនឹងមិនអាចយករបាយការណ៍លេខ ${reportId} មកវិញបានទេ!`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#6b7280',
-            confirmButtonText: 'បាទ/ចាស លុបវា!',
-            cancelButtonText: 'បោះបង់'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const cleanReportId = String(reportId).trim();
-                
-                // បញ្ជាក់៖ សូមឆែកមើល Route ក្នុង Python របស់អ្នក ថាវាប្រើសញ្ញាដក (-) ឬសញ្ញាគូសក្រោម (_)
-                fetch(`/api/delete-report/${cleanReportId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        Swal.fire(
-                            'បានលុប!',
-                            'របាយការណ៍ត្រូវបានលុបដោយជោគជ័យ។',
-                            'success'
-                        ).then(() => {
-                            window.location.reload();
-                        });
-                    } else {
-                        Swal.fire('បរាជ័យ', data.message || 'មានបញ្ហាក្នុងការលុបរបាយការណ៍។', 'error');
-                    }
-                })
-                .catch(error => {
-                    Swal.fire('បរាជ័យ', 'មានបញ្ហាក្នុងការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេ។ មូលហេតុ: ' + error.message, 'error');
-                });
-            }
-        });
-    };
-
+    // Share invoice via native share API or copy link (no page reload)
     window.shareReport = function(pdfUrl, tranId) {
         const fullUrl = window.location.origin + pdfUrl;
         

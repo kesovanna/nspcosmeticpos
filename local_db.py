@@ -776,30 +776,33 @@ def add_product_stock(product_id, added_quantity):
 def get_daily_sales_report(target_date):
     """
     Get revenue, total orders, and top products for a specific date (YYYY-MM-DD).
+    Also returns all orders for the table display.
     """
     conn = get_connection()
     # Find orders for that date. Store uses ISO string for created_at.
     # We use LIKE 'target_date%' to match the date part.
     orders = conn.execute(
-        "SELECT * FROM orders WHERE created_at LIKE ? AND status IN ('paid', 'completed')",
+        "SELECT * FROM orders WHERE created_at LIKE ?",
         (f"{target_date}%",)
     ).fetchall()
     conn.close()
 
     total_revenue = 0
-    total_orders = len(orders)
+    total_orders = 0
     item_summary = {}
 
     for o in orders:
-        total_revenue += float(o['total'] or 0)
-        items = json.loads(o['items'])
-        for item in items:
-            name = item.get('name', 'Unknown')
-            qty = int(item.get('quantity', 0) or item.get('qty', 0))
-            if name in item_summary:
-                item_summary[name] += qty
-            else:
-                item_summary[name] = qty
+        if o['status'] in ('paid', 'completed'):
+            total_revenue += float(o['total'] or 0)
+            total_orders += 1
+            items = json.loads(o['items'])
+            for item in items:
+                name = item.get('name', 'Unknown')
+                qty = int(item.get('quantity', 0) or item.get('qty', 0))
+                if name in item_summary:
+                    item_summary[name] += qty
+                else:
+                    item_summary[name] = qty
 
     # Sort items by quantity and get top 10
     sorted_items = sorted(item_summary.items(), key=lambda x: x[1], reverse=True)
@@ -808,34 +811,38 @@ def get_daily_sales_report(target_date):
     return {
         "revenue": total_revenue,
         "order_count": total_orders,
-        "top_products": top_items
+        "top_products": top_items,
+        "orders": [dict(o) for o in orders]
     }
 
 def get_monthly_sales_report(target_month):
     """
     Get revenue, total orders, and top products for a specific month (YYYY-MM).
+    Also returns all orders for the table display.
     """
     conn = get_connection()
     orders = conn.execute(
-        "SELECT * FROM orders WHERE created_at LIKE ? AND status IN ('paid', 'completed')",
+        "SELECT * FROM orders WHERE created_at LIKE ?",
         (f"{target_month}%",)
     ).fetchall()
     conn.close()
 
     total_revenue = 0
-    total_orders = len(orders)
+    total_orders = 0
     item_summary = {}
 
     for o in orders:
-        total_revenue += float(o['total'] or 0)
-        items = json.loads(o['items'])
-        for item in items:
-            name = item.get('name', 'Unknown')
-            qty = int(item.get('quantity', 0) or item.get('qty', 0))
-            if name in item_summary:
-                item_summary[name] += qty
-            else:
-                item_summary[name] = qty
+        if o['status'] in ('paid', 'completed'):
+            total_revenue += float(o['total'] or 0)
+            total_orders += 1
+            items = json.loads(o['items'])
+            for item in items:
+                name = item.get('name', 'Unknown')
+                qty = int(item.get('quantity', 0) or item.get('qty', 0))
+                if name in item_summary:
+                    item_summary[name] += qty
+                else:
+                    item_summary[name] = qty
 
     sorted_items = sorted(item_summary.items(), key=lambda x: x[1], reverse=True)
     top_10 = [{"name": name, "qty": qty} for name, qty in sorted_items[:10]]
@@ -843,34 +850,38 @@ def get_monthly_sales_report(target_month):
     return {
         "revenue": total_revenue,
         "order_count": total_orders,
-        "top_products": top_10
+        "top_products": top_10,
+        "orders": [dict(o) for o in orders]
     }
 
 def get_annual_sales_report(target_year):
     """
     Get revenue, total orders, and top products for a specific year (YYYY).
+    Also returns all orders for the table display.
     """
     conn = get_connection()
     orders = conn.execute(
-        "SELECT * FROM orders WHERE created_at LIKE ? AND status IN ('paid', 'completed')",
+        "SELECT * FROM orders WHERE created_at LIKE ?",
         (f"{target_year}%",)
     ).fetchall()
     conn.close()
 
     total_revenue = 0
-    total_orders = len(orders)
+    total_orders = 0
     item_summary = {}
 
     for o in orders:
-        total_revenue += float(o['total'] or 0)
-        items = json.loads(o['items'])
-        for item in items:
-            name = item.get('name', 'Unknown')
-            qty = int(item.get('quantity', 0) or item.get('qty', 0))
-            if name in item_summary:
-                item_summary[name] += qty
-            else:
-                item_summary[name] = qty
+        if o['status'] in ('paid', 'completed'):
+            total_revenue += float(o['total'] or 0)
+            total_orders += 1
+            items = json.loads(o['items'])
+            for item in items:
+                name = item.get('name', 'Unknown')
+                qty = int(item.get('quantity', 0) or item.get('qty', 0))
+                if name in item_summary:
+                    item_summary[name] += qty
+                else:
+                    item_summary[name] = qty
 
     sorted_items = sorted(item_summary.items(), key=lambda x: x[1], reverse=True)
     top_items = [{"name": name, "qty": qty} for name, qty in sorted_items[:10]]
@@ -878,7 +889,8 @@ def get_annual_sales_report(target_year):
     return {
         "revenue": total_revenue,
         "order_count": total_orders,
-        "top_products": top_items
+        "top_products": top_items,
+        "orders": [dict(o) for o in orders]
     }
 
 def get_activities(limit=20):

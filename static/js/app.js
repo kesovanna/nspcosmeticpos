@@ -196,7 +196,29 @@ window.showView = function(viewId, element) {
         if (typeof lucide !== 'undefined') {
             setTimeout(lucide.createIcons, 50);
         }
-        
+
+        // ៦. UNIFIED SEARCH BAR — កំណត់ placeholder និងមុខងារតម្រៀបតាម View សកម្ម
+        var unifiedSearch = document.getElementById('unifiedSearchInput');
+        if (unifiedSearch) {
+            var searchConfig = {
+                'posView':       { placeholder: 'ស្វែងរកផលិតផល...', filter: 'applySmartFilter' },
+                'reportsView':   { placeholder: 'ស្វែងរកក្នុងបញ្ជីលក់ (Search sales)...', filter: 'filterSalesTable' },
+                'inventoryView': { placeholder: 'ស្វែងរកក្នុងតារាងនេះ (Search this table)...', filter: 'filterInventoryTable' },
+                'barcodeView':   { placeholder: 'ស្វែងរកផលិតផល (Search products)...', filter: 'filterBarcodeTable' },
+                'usersView':     { placeholder: 'ស្វែងរកបុគ្គលិក (Search staff)...', filter: 'filterUsersTable' }
+            };
+            var cfg = searchConfig[viewId] || { placeholder: 'ស្វែងរកផលិតផល...', filter: 'applySmartFilter' };
+            unifiedSearch.value = '';
+            unifiedSearch.placeholder = cfg.placeholder;
+            unifiedSearch.setAttribute('oninput', cfg.filter + '()');
+        }
+
+        // ៧. បង្ហាញប្រអប់ស្វែងរកសកលជានិច្ច (Global Search Bar មិនត្រូវលាក់ទេ)
+        var globalSearchContainer = document.getElementById('globalSearchContainer');
+        if (globalSearchContainer) {
+            globalSearchContainer.style.display = 'flex';
+        }
+
     } catch (error) {
         console.error('VIEW SWITCH ERROR:', error);
     }

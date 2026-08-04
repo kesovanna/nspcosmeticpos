@@ -72,11 +72,11 @@
         }
         
         /* Apply to both screen and print for WeasyPrint compatibility */
-        {% if is_pdf %}
+        /* Jinja logic removed from CSS to fix linter errors */
         html {
             height: auto;
         }
-        body {
+        body.is-pdf {
             background: white;
             padding: 0;
             margin: 0;
@@ -86,7 +86,7 @@
             -webkit-font-smoothing: antialiased;
             display: block;
         }
-        .invoice-card {
+        body.is-pdf .invoice-card {
             box-shadow: none;
             border-radius: 0;
             padding: 0;
@@ -95,33 +95,31 @@
             height: auto;
             margin: 0;
         }
-        .invoice-card::before {
+        body.is-pdf .invoice-card::before {
             display: none;
-        }
-        .btn-group, .btn-back {
+        body.is-pdf .btn-group, body.is-pdf .btn-back {
             display: none !important;
         }
-        .total-section {
+        body.is-pdf .total-section {
             background: #f0f0f0 !important;
         }
-        .logo {
+        body.is-pdf .logo {
             width: 50px;
             height: 50px;
         }
-        h1 {
+        body.is-pdf h1 {
             font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important;
             font-size: 16px;
         }
-        table {
+        body.is-pdf table {
             font-size: 12px;
         }
-        .item-price {
+        body.is-pdf .item-price {
             font-size: 12px;
         }
-        #total-riel {
+        body.is-pdf #total-riel {
             font-size: 20px !important;
         }
-        {% endif %}
 
         @media print {
             @page {
@@ -194,12 +192,15 @@
         }
     </style>
 </head>
-<body>
+<body class="{% if is_pdf %}is-pdf{% endif %}">
 <div class="invoice-card">
     <div class="header">
         <img src="{{ url_for('static', filename='images/nsp_logo.png') }}" class="logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/924/924514.png';">
         <h1>ហាងគ្រឿងសម្អាង NSP</h1>
-        <div class="invoice-title">Official Invoice</div>
+        <div class="invoice-title">
+            TEL: 0886999606, 0968881857<br>
+            ផ្សារស្វាយជ្រំ ស្រុកស្វាយជ្រំ ខេត្តស្វាយរៀង
+        </div>
     </div>
     <div class="info-section">
         <div class="info-row"><span class="info-label">កាលបរិច្ឆេទ | Date</span><span class="info-value" id="current-date">{{ date }}</span></div>
@@ -228,6 +229,16 @@
         </tbody>
     </table>
     <div class="total-section">
+        {% set discount_amount = discount|float %}
+        {% if discount_amount > 0 %}
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #ddd;">
+            <span class="total-label" style="color: #dc2626;">បញ្ចុះតម្លៃ | Discount</span>
+            <span id="discount-riel" style="font-size: 20px; font-weight: 800; color: #dc2626;">៛ {{ "{:,.0f}".format(discount_amount * RIEL_RATE) }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 4px;">
+            <span class="total-label" style="color: #dc2626;">$ {{ "{:,.2f}".format(discount_amount) }}</span>
+        </div>
+        {% endif %}
         <div class="total-row" style="flex-direction: column; align-items: flex-end; gap: 4px;">
             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
                 <span class="total-label">សរុប | Grand Total</span>
@@ -257,8 +268,25 @@
     let pollingInterval; 
     const TOTAL_AMOUNT = "{{ total }}";
     const CART_ITEMS = {{ items | tojson }};
-    const RIEL_RATE = {{ RIEL_RATE }};
+    // RIEL_RATE is already defined in Jinja, we don't need to redefine it as const if it causes issues, 
+    // but since it's inside a script tag, it's fine. The linter error was likely about the CSS Jinja block.
+    const JS_RIEL_RATE = {{ RIEL_RATE }};
     const PAYMENT_METHOD = "{{ payment_method|lower }}";
+    const DISCOUNT_AMOUNT = {{ discount|float }};
+
+    // Discount: use Jinja value first, then fall back to localStorage/sessionStorage
+    // (e.g. when the page is refreshed and the discount was saved by the POS view)
+    const storedDiscount = localStorage.getItem('checkout_discount') || sessionStorage.getItem('checkout_discount');
+    const finalDiscount = DISCOUNT_AMOUNT > 0 ? DISCOUNT_AMOUNT : (storedDiscount ? parseFloat(storedDiscount) : 0);
+
+    // Keep the printed discount row in sync if it was rendered server-side as 0
+    // but a stored discount actually exists (dynamic fallback for direct URL access)
+    if (finalDiscount > 0) {
+        const discountRielEl = document.getElementById('discount-riel');
+        if (discountRielEl) {
+            discountRielEl.textContent = '៛ ' + Number(finalDiscount * JS_RIEL_RATE).toLocaleString('en-US', {maximumFractionDigits: 0});
+        }
+    }
 
     // Table is now rendered by Jinja2 for PDF compatibility
     // We only need to handle fallback if Jinja variables are empty (e.g. page refresh)
@@ -295,7 +323,7 @@
                 body: JSON.stringify({
                     items: itemsToProcess,
                     total: totalAmount.toFixed(2),
-                    discount: 0,
+                    discount: finalDiscount,
                     tran_id: 'CASH-' + Date.now()
                 })
             });
@@ -346,7 +374,7 @@
                 body: JSON.stringify({ 
                     items: itemsToSend,
                     total: parseFloat(TOTAL_AMOUNT),
-                    discount: 0,
+                    discount: finalDiscount,
                     tran_id: tran_id 
                 }) 
             });
@@ -365,7 +393,8 @@
     }
 
     function showQRPopup(tran_id) {
-        const rielTotal = (parseFloat(TOTAL_AMOUNT) * RIEL_RATE).toLocaleString();
+        const rielTotal = (parseFloat(TOTAL_AMOUNT) * JS_RIEL_RATE).toLocaleString();
+        const discountRiel = (finalDiscount * JS_RIEL_RATE).toLocaleString();
         Swal.fire({
             title: 'ស្កេនដើម្បីបង់ប្រាក់ | Scan to Pay',
             html: `
@@ -373,6 +402,7 @@
                     <img src="/static/images/aba_qr.jpg" class="aba-qr-img" style="width:250px; height:250px;">
                     <div style="font-weight:800; color:#28a745; font-size:26px; margin: 5px 0;">៛ ${rielTotal}</div>
                     <div style="font-weight:700; color:#d81b60; font-size:18px; margin-bottom: 10px;">$ ${parseFloat(TOTAL_AMOUNT).toFixed(2)}</div>
+                    ${finalDiscount > 0 ? `<div style="font-weight:600; color:#dc2626; font-size:16px; margin-bottom: 10px;">បញ្ចុះតម្លៃ | Discount: -៛ ${discountRiel}</div>` : ''}
                     <p style="font-size:14px; font-weight:bold; color:#cc0000; margin-bottom:10px;">⚠️ បញ្ចូលទឹកប្រាក់ឲ្យបានត្រឹមត្រូវ / Input exact amount</p>
                     <p style="font-size:13px; color:#666;">សូមស្កេន QR នេះជាមួយកម្មវិធី <b>ABA Mobile</b></p>
                     <div id="polling-status" style="font-size:14px; color:#005a9c; margin-top:15px; font-weight:bold; animation: pulse 2s infinite;">🔄 កំពុងរង់ចាំការបង់ប្រាក់...</div>

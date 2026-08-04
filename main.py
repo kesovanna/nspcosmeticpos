@@ -783,8 +783,10 @@ def home():
                             item_summary[name]['total'] += (qty * price)
                         else:
                             item_summary[name] = {'qty': qty, 'total': (qty * price)}
-                    data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
-                    filtered_orders.append(data)
+                
+                # Add all orders to the filtered list for the table display
+                data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
+                filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
 
@@ -1269,8 +1271,10 @@ def reports():
                             item_summary[name]['total'] += (qty * price)
                         else:
                             item_summary[name] = {'qty': qty, 'total': (qty * price)}
-                    data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
-                    filtered_orders.append(data)
+                
+                # Add all orders to the filtered list for the table display
+                data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
+                filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
         
@@ -1662,12 +1666,12 @@ def checkout_endpoint():
         discount = data.get('discount', 0)
         tran_id = data.get('tran_id') or f"CASH-{int(datetime.now().timestamp())}"
 
-        # 1. Deduct Stock Locally
+        # 1. Deduct Stock Locally (Synchronous - fast operation)
         success, msg = local_db.validate_and_deduct_stock_local(items)
         if not success:
             return jsonify({'status': 'error', 'message': msg}), 400
 
-        # 2. Save to local database with 'paid' status
+        # 2. Save to local database with 'paid' status (Synchronous - fast operation)
         order_data = {
             'items': items,
             'total': total,
@@ -1680,54 +1684,69 @@ def checkout_endpoint():
 
         local_id = local_db.add_order(order_data)
 
-        # 3. Generate and archive PDF receipt immediately (same as QR flow)
-        try:
-            # Get currency rate for PDF
-            riel_rate = get_riel_rate()
-            
-            # Fetch the order from the database
-            order = local_db.get_order(tran_id)
-            if order is None:
-                order = local_db.get_order(local_id)
-            
-            if order:
-                # Render the invoice template as a string with order data and PDF flag
-                html_content = render_template('invoice.html', 
-                                             items=order.get('items', []),
-                                             total=order.get('total', 0),
-                                             discount=order.get('discount', 0),
-                                             date=datetime.fromisoformat(order.get('created_at', datetime.now().isoformat())).strftime("%d/%m/%Y %H:%M:%S"),
-                                             payment_method='cash',
-                                             RIEL_RATE=riel_rate,
-                                             is_pdf=True)
+        # 3. Trigger background tasks for non-critical operations
+        # PDF Generation - Move to background thread to avoid blocking
+        def generate_pdf_background(tran_id, local_id):
+            try:
+                # Get currency rate for PDF
+                riel_rate = get_riel_rate()
                 
-                # Convert HTML to PDF using weasyprint (supports CTL for Khmer text)
-                pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
+                # Fetch the order from the database
+                order = local_db.get_order(tran_id)
+                if order is None:
+                    order = local_db.get_order(local_id)
                 
-                # SECURITY: Ensure reports directory exists with absolute path
-                reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
-                if not os.path.exists(reports_dir):
-                    os.makedirs(reports_dir)
-                
-                # SECURITY: Strict filename validation to prevent path traversal
-                pdf_filename = secure_filename(f"invoice_{tran_id}.pdf")
-                if pdf_filename and pdf_filename.endswith('.pdf'):
-                    # SECURITY: Ensure final path is within reports directory
-                    pdf_filepath = os.path.abspath(os.path.join(reports_dir, pdf_filename))
-                    if pdf_filepath.startswith(reports_dir):
-                        with open(pdf_filepath, 'wb') as f:
-                            f.write(pdf_bytes)
-                        
-                        # Update database to mark receipt as archived
-                        local_db.update_order_receipt_status(tran_id, 1)
-                        print(f"✅ PDF receipt generated for cash order: {tran_id}")
-        except Exception as pdf_error:
-            print(f"⚠️ PDF generation warning for {tran_id}: {str(pdf_error)}")
-            # Don't fail the checkout if PDF generation fails, just log the warning
+                if order:
+                    # Render the invoice template as a string with order data and PDF flag
+                    html_content = render_template('invoice.html', 
+                                                 items=order.get('items', []),
+                                                 total=order.get('total', 0),
+                                                 discount=order.get('discount', 0),
+                                                 date=datetime.fromisoformat(order.get('created_at', datetime.now().isoformat())).strftime("%d/%m/%Y %H:%M:%S"),
+                                                 payment_method='cash',
+                                                 RIEL_RATE=riel_rate,
+                                                 is_pdf=True)
+                    
+                    # Convert HTML to PDF using weasyprint (supports CTL for Khmer text)
+                    pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
+                    
+                    # SECURITY: Ensure reports directory exists with absolute path
+                    reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
+                    if not os.path.exists(reports_dir):
+                        os.makedirs(reports_dir)
+                    
+                    # SECURITY: Strict filename validation to prevent path traversal
+                    pdf_filename = secure_filename(f"invoice_{tran_id}.pdf")
+                    if pdf_filename and pdf_filename.endswith('.pdf'):
+                        # SECURITY: Ensure final path is within reports directory
+                        pdf_filepath = os.path.abspath(os.path.join(reports_dir, pdf_filename))
+                        if pdf_filepath.startswith(reports_dir):
+                            with open(pdf_filepath, 'wb') as f:
+                                f.write(pdf_bytes)
+                            
+                            # Update database to mark receipt as archived
+                            local_db.update_order_receipt_status(tran_id, 1)
+                            print(f"✅ PDF receipt generated for cash order: {tran_id}")
+            except Exception as pdf_error:
+                print(f"⚠️ PDF generation warning for {tran_id}: {str(pdf_error)}")
+                # Don't fail the checkout if PDF generation fails, just log the warning
 
-        # 4. Trigger Auto-Sync
-        sync.trigger_auto_sync(delay=5)
+        # 4. Trigger Auto-Sync in background (non-blocking)
+        def sync_background():
+            try:
+                sync.trigger_auto_sync(delay=5)
+            except Exception as sync_error:
+                print(f"⚠️ Background sync warning: {str(sync_error)}")
 
+        # Start background tasks
+        import threading
+        pdf_thread = threading.Thread(target=generate_pdf_background, args=(tran_id, local_id), daemon=True)
+        sync_thread = threading.Thread(target=sync_background, daemon=True)
+        
+        pdf_thread.start()
+        sync_thread.start()
+
+        # Return immediate response - UI can continue while background tasks run
         return jsonify({
             'status': 'success',
             'message': 'Checkout successful',
