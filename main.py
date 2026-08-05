@@ -103,6 +103,7 @@ def get_db():
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # --- CSRF PROTECTION ---
 csrf = CSRFProtect(app)
@@ -787,6 +788,10 @@ def home():
                 
                 # Add all orders to the filtered list for the table display
                 data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
+                # Exact timestamp (date + time with seconds + AM/PM) for the Time & Date column
+                data['display_datetime'] = created_at.strftime('%d/%m/%Y %I:%M:%S %p')
+                # Keep the raw ISO timestamp for the JS side (safe fallback rendering)
+                data['created_at_raw'] = data.get('created_at', '')
                 filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
@@ -1298,6 +1303,10 @@ def reports():
                 
                 # Add all orders to the filtered list for the table display
                 data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
+                # Exact timestamp (date + time with seconds + AM/PM) for the Time & Date column
+                data['display_datetime'] = created_at.strftime('%d/%m/%Y %I:%M:%S %p')
+                # Keep the raw ISO timestamp for the JS side (safe fallback rendering)
+                data['created_at_raw'] = data.get('created_at', '')
                 filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
@@ -1690,6 +1699,19 @@ def daily_report_api():
     try:
         target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
         report_data = local_db.get_daily_sales_report(target_date)
+        
+        # Enrich orders with display_datetime for the JS table
+        for order in report_data.get('orders', []):
+            try:
+                dt = datetime.fromisoformat(order.get('created_at', ''))
+                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
+                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
+                order['created_at_raw'] = order.get('created_at', '')
+            except:
+                order['display_time'] = ''
+                order['display_datetime'] = ''
+                order['created_at_raw'] = ''
+                
         return jsonify({
             "status": "success",
             "date": target_date,
@@ -1705,6 +1727,19 @@ def monthly_report_api():
     try:
         target_month = request.args.get('month', datetime.now().strftime('%Y-%m'))
         report_data = local_db.get_monthly_sales_report(target_month)
+        
+        # Enrich orders with display_datetime for the JS table
+        for order in report_data.get('orders', []):
+            try:
+                dt = datetime.fromisoformat(order.get('created_at', ''))
+                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
+                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
+                order['created_at_raw'] = order.get('created_at', '')
+            except:
+                order['display_time'] = ''
+                order['display_datetime'] = ''
+                order['created_at_raw'] = ''
+                
         return jsonify({
             "status": "success",
             "month": target_month,
@@ -1720,6 +1755,19 @@ def annually_report_api():
     try:
         target_year = request.args.get('year', datetime.now().strftime('%Y'))
         report_data = local_db.get_annual_sales_report(target_year)
+        
+        # Enrich orders with display_datetime for the JS table
+        for order in report_data.get('orders', []):
+            try:
+                dt = datetime.fromisoformat(order.get('created_at', ''))
+                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
+                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
+                order['created_at_raw'] = order.get('created_at', '')
+            except:
+                order['display_time'] = ''
+                order['display_datetime'] = ''
+                order['created_at_raw'] = ''
+                
         return jsonify({
             "status": "success",
             "year": target_year,
@@ -2001,9 +2049,9 @@ if __name__ == '__main__':
     # Wait 1.5 seconds for the server to start, then open the browser
     Timer(1.5, open_browser).start()
     
-    # Start the server (debug=False is best for your final .exe)
+    # Start the server (debug=True enables auto-reload of templates)
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
 # --- FIREBASE CLOUD FUNCTIONS WRAPPER ---
 from firebase_functions import https_fn
 from firebase_admin import initialize_app

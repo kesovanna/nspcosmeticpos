@@ -170,7 +170,6 @@ window.showView = function(viewId, element) {
             if (viewId === 'posView') {
                 target.style.cssText = 'display: flex !important; flex-direction: row !important; width: 100% !important; height: 100% !important; opacity: 1 !important; visibility: visible !important; position: relative !important; z-index: 100 !important; gap: 20px !important; background: transparent !important;';
             } else {
-                // បន្ថែមពណ៌ស (#ffffff) ដើម្បីកុំឱ្យវាថ្លាមើលធ្លុះដល់ផ្ទៃខាងក្រោយ
                 target.style.cssText = 'display: flex !important; flex-direction: column !important; width: 100% !important; height: 100% !important; opacity: 1 !important; visibility: visible !important; position: relative !important; z-index: 100 !important; background-color: #ffffff !important; padding: 20px !important; overflow-y: auto !important; box-sizing: border-box !important; min-height: 100vh !important;';
             }
         } else {
@@ -405,6 +404,9 @@ async function checkout() {
 
 window.checkout = checkout;
 
+/**
+ * Fetches and renders all staff members securely.
+ */
 async function fetchStaffMembers() {
     const container = document.getElementById('userList') || document.getElementById('staffTableBody');
     if (!container) return;
@@ -415,30 +417,51 @@ async function fetchStaffMembers() {
         const result = await response.json();
 
         if (result.status === 'success' && Array.isArray(result.data)) {
-            if (typeof renderStaffTable === 'function') {
-                renderStaffTable(result.data);
-            } else {
-                container.innerHTML = result.data.map(user => `
-                    <tr>
-                        <td>${user.username}</td>
-                        <td>${user.role}</td>
-                    </tr>
-                `).join('');
-            }
-        } else {
-            throw new Error(result.message || 'Invalid data format received');
+            container.innerHTML = result.data.map((member, index) => `
+                <tr style="border-bottom: 1px solid #e2e8f0; text-align: left;">
+                    <td style="padding: 12px 15px;">${index + 1}</td>
+                    <td style="padding: 12px 15px; font-weight: 500;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <img src="${member.profile_image || '/static/images/default.jpg'}" 
+                                 style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"
+                                 onerror="this.src='/static/images/default.jpg'">
+                            <span>${member.display_name || member.username}</span>
+                        </div>
+                    </td>
+                    <td style="padding: 12px 15px; color: #64748b;">${member.username}</td>
+                    <td style="padding: 12px 15px;">
+                        <span style="background: ${member.role === 'admin' ? '#e0e7ff' : '#f1f5f9'}; color: ${member.role === 'admin' ? '#4338ca' : '#475569'}; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                            ${member.role.toUpperCase()}
+                        </span>
+                    </td>
+                    <td style="padding: 12px 15px;">
+                        <span style="background: ${member.status === 'active' ? '#dcfce7' : '#fee2e2'}; color: ${member.status === 'active' ? '#166534' : '#991b1b'}; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                            ${member.status === 'active' ? 'សកម្ម' : 'រង់ចាំ'}
+                        </span>
+                    </td>
+                    <td style="padding: 12px 15px; text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 5px;">
+                            <button onclick="openEditStaffModal('${member.username}', '${member.role}')" 
+                                    class="btn-qa edit-user-btn" style="padding: 5px 10px; font-size: 12px; border: 1px solid #10b981; color: #10b981; background: transparent; border-radius: 4px; cursor: pointer;" title="កែប្រែ">
+                                <i data-lucide="edit" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button onclick="changeRole('${member.username}', '${member.role === 'admin' ? 'user' : 'admin'}')" 
+                                    class="btn-qa" style="padding: 5px 10px; font-size: 12px; border: 1px solid #3b82f6; color: #3b82f6; background: transparent; border-radius: 4px; cursor: pointer;" title="ប្តូរតួនាទី">
+                                <i data-lucide="shield-alert" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button onclick="deleteStaff('${member.username}')" 
+                                    class="btn-qa" style="padding: 5px 10px; font-size: 12px; border: 1px solid #dc2626; background: #fee2e2; color: #dc2626; border-radius: 4px; cursor: pointer;" title="លុប">
+                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     } catch (error) {
-        console.error("Staff load error:", error);
-        if (container) {
-            container.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center py-4 text-danger">
-                        <p>បរាជ័យក្នុងការទាញយកទិន្នន័យបុគ្គលិក (Error loading users)</p>
-                        <button onclick="fetchStaffMembers()" class="btn btn-sm btn-outline-primary mt-2">Retry</button>
-                    </td>
-                </tr>`;
-        }
+        console.error("Error fetching staff:", error);
     }
 }
 

@@ -2,33 +2,320 @@
 
 {% set active_page = 'terminology' %}
 
-{% block title %}Terminology - NSP POS{% endblock %}
+{% block title %}Guide Book - NSP POS{% endblock %}
 
-{% block page_title %}វចនានុក្រមពាក្យបច្ចេកទេស (Terminology){% endblock %}
+{% block page_title %}អំពីការប្រើប្រាស់ប្រព័ន្ធ (Guide Book){% endblock %}
 
 {% block extra_css %}
 <style>
-    .terminology-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-    .term-card { background: white; padding: 20px; border-radius: 15px; border: 1px solid var(--border-color); border-left: 4px solid var(--primary-color); box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
-    .term-card h3 { margin: 0 0 10px 0; color: var(--primary-color); font-size: 18px; }
-    .term-card p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text-muted); }
-    .term-card .sub-text { font-size: 12px; color: var(--text-muted); font-weight: normal; }
+    /* Luxury UI Theme Integration for Guide Book */
+    .guide-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        animation: fadeIn 0.5s ease-out;
+    }
+    
+    .guide-header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding: 30px;
+        background: linear-gradient(135deg, var(--rose-500, #f43f5e), var(--rose-700, #be123c));
+        border-radius: 16px;
+        color: white;
+        box-shadow: 0 10px 25px rgba(244, 63, 94, 0.2);
+    }
+    
+    .guide-header h1 {
+        font-family: 'Moul', cursive;
+        font-size: 28px;
+        margin: 0 0 10px 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .guide-header p {
+        font-size: 16px;
+        margin: 0;
+        opacity: 0.9;
+    }
+
+    .guide-section {
+        margin-bottom: 40px;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: 'Kantumruy Pro', sans-serif;
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-color, #1e293b);
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--border-color, #e2e8f0);
+    }
+
+    .section-title i {
+        color: var(--rose-500, #f43f5e);
+        background: var(--rose-50, #fff1f2);
+        padding: 8px;
+        border-radius: 10px;
+    }
+
+    .guide-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 24px;
+    }
+
+    .guide-card {
+        background: var(--card-bg, #ffffff);
+        border-radius: 16px;
+        padding: 24px;
+        border: 1px solid var(--border-color, #e2e8f0);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .guide-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 25px rgba(0,0,0,0.08);
+        border-color: var(--rose-200, #fecdd3);
+    }
+
+    .guide-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--rose-500, #f43f5e);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .guide-card:hover::before {
+        opacity: 1;
+    }
+
+    .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: var(--rose-100, #ffe4e6);
+        color: var(--rose-600, #e11d48);
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 14px;
+        margin-right: 10px;
+    }
+
+    .guide-card h3 {
+        display: flex;
+        align-items: center;
+        margin: 0 0 15px 0;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-color, #1e293b);
+    }
+
+    .guide-card p {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-muted, #64748b);
+    }
+
+    .guide-card ul {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 14px;
+        color: var(--text-muted, #64748b);
+        line-height: 1.6;
+    }
+
+    .guide-card li {
+        margin-bottom: 8px;
+    }
+
+    .guide-card li::marker {
+        color: var(--rose-400, #fb7185);
+    }
+
+    .highlight-box {
+        background: var(--rose-50, #fff1f2);
+        border: 1px solid var(--rose-100, #ffe4e6);
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 15px;
+        font-size: 13px;
+        color: var(--rose-700, #be123c);
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .highlight-box i {
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="terminology-grid">
-    <div class="term-card">
-        <h3>POS <span class="sub-text">(Point of Sale)</span></h3>
-        <p>ប្រព័ន្ធគ្រប់គ្រងការលក់ និងទូទាត់ប្រាក់នៅបញ្ជរ។ វាជួយកត់ត្រាការលក់ ដកស្តុក និងគណនាប្រាក់ចំណូលដោយស្វ័យប្រវត្តិ។</p>
+<div class="guide-container">
+    
+    <div class="guide-header">
+        <h1>សៀវភៅណែនាំការប្រើប្រាស់</h1>
+        <p>មគ្គុទ្ទេសក៍ពេញលេញសម្រាប់ការប្រើប្រាស់ប្រព័ន្ធ NSP Cosmetic POS</p>
     </div>
-    <div class="term-card">
-        <h3>SKU <span class="sub-text">(Stock Keeping Unit)</span></h3>
-        <p>លេខកូដសម្គាល់ផលិតផលនីមួយៗ ដែលប្រើសម្រាប់តាមដាន និងគ្រប់គ្រងស្តុកទំនិញក្នុងហាង។</p>
+
+    <!-- 1. Getting Started -->
+    <div class="guide-section">
+        <h2 class="section-title">
+            <i data-lucide="rocket"></i> 1. ការចាប់ផ្តើមប្រើប្រាស់ (Getting Started)
+        </h2>
+        <div class="guide-grid">
+            <div class="guide-card">
+                <h3><span class="step-number">1</span> ការចូលប្រព័ន្ធ (Login)</h3>
+                <p>ដើម្បីចូលប្រើប្រាស់ប្រព័ន្ធ សូមអនុវត្តតាមជំហានខាងក្រោម៖</p>
+                <ul>
+                    <li>បញ្ចូល <strong>ឈ្មោះអ្នកប្រើប្រាស់ (Username)</strong> របស់អ្នក។</li>
+                    <li>បញ្ចូល <strong>លេខសម្ងាត់ (Password)</strong> ឱ្យបានត្រឹមត្រូវ។</li>
+                    <li>ចុចប៊ូតុង <strong>"ចូលប្រព័ន្ធ"</strong>។</li>
+                </ul>
+                <div class="highlight-box">
+                    <i data-lucide="info" style="width: 16px; height: 16px;"></i>
+                    <span>ប្រសិនបើភ្លេចលេខសម្ងាត់ សូមទាក់ទងទៅកាន់អ្នកគ្រប់គ្រង (Admin) ដើម្បីធ្វើការផ្លាស់ប្តូរថ្មី។</span>
+                </div>
+            </div>
+            <div class="guide-card">
+                <h3><span class="step-number">2</span> ផ្ទាំងគ្រប់គ្រង (Dashboard)</h3>
+                <p>ផ្ទាំងដើម (POS Home) គឺជាកន្លែងដែលអ្នកធ្វើប្រតិបត្តិការលក់ប្រចាំថ្ងៃ៖</p>
+                <ul>
+                    <li><strong>ផ្នែកខាងឆ្វេង៖</strong> បញ្ជីទំនិញទាំងអស់ ដែលអាចស្វែងរក ឬចម្រោះតាមប្រភេទ។</li>
+                    <li><strong>ផ្នែកខាងស្តាំ៖</strong> កន្ត្រកទំនិញ (Cart) សម្រាប់គណនាប្រាក់ និងទូទាត់។</li>
+                    <li><strong>របារខាងលើ៖</strong> បង្ហាញអត្រាប្តូរប្រាក់ (រៀល/ដុល្លារ) និងប៊ូតុងស្កេនកូដ។</li>
+                </ul>
+            </div>
+        </div>
     </div>
-    <div class="term-card">
-        <h3>Inventory <span class="sub-text">(បញ្ជីសារពើភណ្ឌ)</span></h3>
-        <p>ចំនួនផលិតផលសរុបទាំងអស់ដែលមាននៅក្នុងហាង និងក្នុងឃ្លាំង ដែលត្រៀមសម្រាប់លក់។</p>
+
+    <!-- 2. Sales & Checkout Process -->
+    <div class="guide-section">
+        <h2 class="section-title">
+            <i data-lucide="shopping-cart"></i> 2. ដំណើរការលក់ និងទូទាត់ (Sales & Checkout)
+        </h2>
+        <div class="guide-grid">
+            <div class="guide-card">
+                <h3><span class="step-number">1</span> ការស្កេន និងជ្រើសរើសទំនិញ</h3>
+                <p>អ្នកអាចបញ្ចូលទំនិញទៅក្នុងកន្ត្រកបាន ២ របៀប៖</p>
+                <ul>
+                    <li><strong>ប្រើម៉ាស៊ីនស្កេន (Barcode Scanner)៖</strong> គ្រាន់តែស្កេនកូដលើទំនិញ ប្រព័ន្ធនឹងបញ្ចូលទៅកន្ត្រកដោយស្វ័យប្រវត្តិ។</li>
+                    <li><strong>ជ្រើសរើសដោយដៃ៖</strong> ចុចលើរូបភាពទំនិញនៅលើអេក្រង់ ឬស្វែងរកតាមឈ្មោះ។</li>
+                </ul>
+            </div>
+            <div class="guide-card">
+                <h3><span class="step-number">2</span> ការបញ្ចុះតម្លៃ (Discounts)</h3>
+                <p>មុនពេលទូទាត់ អ្នកអាចផ្តល់ការបញ្ចុះតម្លៃជូនអតិថិជន៖</p>
+                <ul>
+                    <li>ចុចលើប៊ូតុង <strong>"បញ្ចុះតម្លៃ"</strong> នៅក្នុងកន្ត្រក។</li>
+                    <li>បញ្ចូលចំនួនទឹកប្រាក់ដែលចង់បញ្ចុះ (គិតជាដុល្លារ)។</li>
+                    <li>ប្រព័ន្ធនឹងគណនាប្រាក់សរុបថ្មីដោយស្វ័យប្រវត្តិ។</li>
+                </ul>
+            </div>
+            <div class="guide-card">
+                <h3><span class="step-number">3</span> ការទូទាត់ប្រាក់ (Payment)</h3>
+                <p>បញ្ចប់ការលក់ដោយភាពងាយស្រួល៖</p>
+                <ul>
+                    <li>ពិនិត្យមើលចំនួនទឹកប្រាក់សរុប (ទាំងដុល្លារ និងរៀល)។</li>
+                    <li>ចុចប៊ូតុង <strong>"ទូទាត់ប្រាក់ (Checkout)"</strong>។</li>
+                    <li>ប្រព័ន្ធនឹងកាត់ស្តុកដោយស្វ័យប្រវត្តិ និងបង្កើតវិក្កយបត្រ។</li>
+                </ul>
+                <div class="highlight-box">
+                    <i data-lucide="check-circle" style="width: 16px; height: 16px;"></i>
+                    <span>វិក្កយបត្រ PDF នឹងត្រូវបានបង្កើតភ្លាមៗ ដែលអ្នកអាចបោះពុម្ព ឬចែករំលែកបាន។</span>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- 3. Sales Reports -->
+    <div class="guide-section">
+        <h2 class="section-title">
+            <i data-lucide="bar-chart-3"></i> 3. របាយការណ៍លក់ (Sales Reports)
+        </h2>
+        <div class="guide-grid">
+            <div class="guide-card">
+                <h3><span class="step-number">1</span> ការមើលរបាយការណ៍</h3>
+                <p>ចូលទៅកាន់ម៉ឺនុយ <strong>"Sales Reports"</strong> ដើម្បីតាមដានការលក់៖</p>
+                <ul>
+                    <li><strong>ចម្រោះតាមកាលបរិច្ឆេទ៖</strong> ជ្រើសរើសថ្ងៃ ខែ ឬឆ្នាំ ដើម្បីមើលទិន្នន័យជាក់លាក់។</li>
+                    <li><strong>តារាងប្រតិបត្តិការ៖</strong> បង្ហាញរាល់ការលក់ ពេលវេលាពិតប្រាកដ (ម៉ោង & កាលបរិច្ឆេទ) និងស្ថានភាព។</li>
+                </ul>
+            </div>
+            <div class="guide-card">
+                <h3><span class="step-number">2</span> ការគ្រប់គ្រងវិក្កយបត្រ</h3>
+                <p>សកម្មភាពដែលអ្នកអាចធ្វើបានលើប្រតិបត្តិការនីមួយៗ៖</p>
+                <ul>
+                    <li><strong>View PDF៖</strong> មើល និងបោះពុម្ពវិក្កយបត្រឡើងវិញ។</li>
+                    <li><strong>ចែករំលែក (Share)៖</strong> ផ្ញើវិក្កយបត្រទៅកាន់អតិថិជនតាម Telegram ឬបណ្តាញផ្សេងៗ។</li>
+                    <li><strong>កែប្រែ/លុប៖</strong> (សម្រាប់តែ Admin) អាចកែប្រែស្ថានភាព ឬលុបប្រតិបត្តិការដែលខុស។</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Inventory & Product Management -->
+    <div class="guide-section">
+        <h2 class="section-title">
+            <i data-lucide="package"></i> 4. ការគ្រប់គ្រងស្តុក និងទំនិញ (Inventory)
+        </h2>
+        <div class="guide-grid">
+            <div class="guide-card">
+                <h3><span class="step-number">1</span> ការត្រួតពិនិត្យស្តុក</h3>
+                <p>ចូលទៅកាន់ម៉ឺនុយ <strong>"Inventory"</strong> ដើម្បីគ្រប់គ្រងទំនិញ៖</p>
+                <ul>
+                    <li>តាមដានចំនួនស្តុកដែលនៅសល់ក្នុងហាង។</li>
+                    <li>ប្រព័ន្ធនឹងលោតពណ៌ក្រហម (Low Stock) ពេលទំនិញជិតអស់។</li>
+                    <li>អាចបន្ថែមចំនួនស្តុកថ្មី (Add Stock) ចូលទៅក្នុងប្រព័ន្ធ។</li>
+                </ul>
+            </div>
+            <div class="guide-card">
+                <h3><span class="step-number">2</span> ការបន្ថែមទំនិញថ្មី</h3>
+                <p>ដើម្បីបញ្ចូលផលិតផលថ្មីទៅក្នុងប្រព័ន្ធ៖</p>
+                <ul>
+                    <li>ចុចប៊ូតុង <strong>"បន្ថែមទំនិញថ្មី (Add Product)"</strong>។</li>
+                    <li>បញ្ចូលព័ត៌មាន៖ ឈ្មោះ, លេខកូដ (Barcode), តម្លៃ, ចំនួនស្តុក និងរូបភាព។</li>
+                    <li>ចុចរក្សាទុក ទំនិញនោះនឹងបង្ហាញនៅលើផ្ទាំងលក់ភ្លាមៗ។</li>
+                </ul>
+                <div class="highlight-box">
+                    <i data-lucide="printer" style="width: 16px; height: 16px;"></i>
+                    <span>អ្នកក៏អាចចូលទៅកាន់ម៉ឺនុយ "Print Barcodes" ដើម្បីបោះពុម្ពស្ទីគ័រកូដបាកូដបិទលើទំនិញផងដែរ។</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
+
+<script>
+    // Initialize Lucide icons for the new content
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    });
+</script>
 {% endblock %}
