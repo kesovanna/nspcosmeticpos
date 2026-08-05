@@ -1233,16 +1233,18 @@
                         display: flex !important;
                         flex-direction: column !important;
                         flex: 1 1 0% !important;
-                        height: 100% !important;
-                        overflow: hidden !important; 
+                        min-height: 0 !important;
+                        overflow: visible !important; /* allow container to grow freely */
                         padding-bottom: 15px; /* ទុកចន្លោះបាតអេក្រង់បន្តិចឱ្យស្រឡះល្អ */
                     }
 
                     /* ប្រអប់រុំតារាង ដែលបញ្ជា Scrollbar X & Y ដោយស្វ័យប្រវត្តិ */
                     #reportTableContainer {
                         width: 100%;
-                        flex: 1 1 0% !important; /* ពង្រីកយកកម្ពស់សល់ពីកាតខាងលើទាំងអស់ */
-                        min-height: 0 !important; /* សោរការពារកុំឱ្យតារាងរុញទម្លុះបាតអេក្រង់ */
+                        /* Large explicit height so many rows are visible before scrolling */
+                        min-height: 680px;
+                        height: calc(100vh - 320px);
+                        max-height: 1200px;
                         overflow-y: auto !important; /* Scroll បញ្ឈរ */
                         overflow-x: auto !important; /* Scroll ផ្តេក */
                         background: white;
@@ -1288,7 +1290,7 @@
                             <tr style="background: #f8fafc;">
                                 <th style="width: 45px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 8px; vertical-align: middle; text-align: center; white-space: nowrap !important;"><input type="checkbox" id="selectAllReports"></th>
                                 <th style="width: 50px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 8px; vertical-align: middle; text-align: center; white-space: nowrap !important;">ល.រ</th>
-                                <th style="width: 140px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 8px; vertical-align: middle; text-align: center; white-space: nowrap !important;">ម៉ោង</th>
+                                <th style="width: 180px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 8px; vertical-align: middle; text-align: center; white-space: nowrap !important;">ម៉ោង & កាលបរិច្ឆេទ</th>
                                 <th style="width: 180px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 8px; vertical-align: middle; text-align: center; white-space: nowrap !important;">លេខប្រតិបត្តិការ</th>
                                 <th style="background: #f8fafc; text-align: center !important; border: 1px solid #cbd5e1; padding: 10px 8px; vertical-align: middle; white-space: nowrap !important;">ឈ្មោះទំនិញ</th>
                                 <th style="width: 70px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 8px; vertical-align: middle; text-align: center; white-space: nowrap !important;">ចំនួន</th>
@@ -1313,7 +1315,12 @@
                                             <input type="checkbox" class="report-row-checkbox" value="{{ order.id or order.local_id }}">
                                         </td>
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">{{ count.value }}</td>
-                                        <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">{{ order.display_time }}</td>
+                                        <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
+                                                <span style="font-weight: 600; color: #1e293b;">{{ order.display_datetime.split(' ')[1] if order.display_datetime else order.display_time.split(' ')[1] if order.display_time else '' }} {{ order.display_datetime.split(' ')[2] if order.display_datetime and order.display_datetime.split(' ')|length > 2 else '' }}</span>
+                                                <span style="font-size: 11px; color: #64748b;">{{ order.display_datetime.split(' ')[0] if order.display_datetime else order.display_time.split(' ')[0] if order.display_time else '' }}</span>
+                                            </div>
+                                        </td>
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                             <span style="background: #d81b60; color: white; padding: 6px 10px; border-radius: 4px; display: inline-block; font-family: monospace; font-size: 11px; font-weight: 700; word-break: break-all;">
                                                 {{ order.tran_id or order.id[:8] }}
@@ -3860,7 +3867,7 @@
                     if (statCards.length >= 3) {
                         statCards[0].innerHTML = '៛ ' + revenueRiel.toLocaleString('en-US', {maximumFractionDigits: 0}) + '<br><span style="font-size: 20px; display: block; margin-top: 8px;">$ ' + revenueUSD.toLocaleString('en-US', {maximumFractionDigits: 2}) + '</span>';
                         statCards[1].innerHTML = orderCount + ' ការកុម្ម៉ង់ទិញ';
-                        statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' មុខទំនិញ)</span>' : 'N/A';
+                        statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' ឯកតា)</span>' : 'N/A';
                         
                         // Update revenue label for monthly report with specific month name
                         if (statLabels.length >= 1) {
@@ -3970,7 +3977,7 @@
                         if (statCards.length >= 3) {
                             statCards[0].innerHTML = '៛ ' + revenueRiel.toLocaleString('en-US', {maximumFractionDigits: 0}) + '<br><span style="font-size: 20px; display: block; margin-top: 8px;">$ ' + revenueUSD.toLocaleString('en-US', {maximumFractionDigits: 2}) + '</span>';
                             statCards[1].innerHTML = orderCount + ' ការកុម្ម៉ង់ទិញ';
-                            statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' មុខទំនិញ)</span>' : 'N/A';
+                            statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' ឯកតា)</span>' : 'N/A';
                         }
                         window.currentTopProducts = stats.top_products || [];
                     }
@@ -4033,12 +4040,24 @@
                         
                         const hasReceipt = ['paid', 'completed'].includes(statusLower);
                         
+                        // Format Time & Date
+                        const dtStr = order.display_datetime || order.display_time || '';
+                        const dtParts = dtStr.split(' ');
+                        const datePart = dtParts[0] || '';
+                        const timePart = dtParts[1] || '';
+                        const ampmPart = dtParts[2] || '';
+                        
                         html += `<tr>
                             <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                 <input type="checkbox" class="report-row-checkbox" value="${orderId}">
                             </td>
                             <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${count}</td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${order.display_time || ''}</td>
+                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
+                                    <span style="font-weight: 600; color: #1e293b;">${timePart} ${ampmPart}</span>
+                                    <span style="font-size: 11px; color: #64748b;">${datePart}</span>
+                                </div>
+                            </td>
                             <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                 <span style="background: #d81b60; color: white; padding: 6px 10px; border-radius: 4px; display: inline-block; font-family: monospace; font-size: 11px; font-weight: 700; word-break: break-all;">${tranId}</span>
                             </td>

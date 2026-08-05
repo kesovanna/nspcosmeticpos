@@ -168,7 +168,7 @@
         <!-- Exact Column Widths to Prevent Crushing -->
         <colgroup>
             <col style="width: 50px;">  <!-- ល.រ -->
-            <col style="width: 140px;"> <!-- ម៉ោង -->
+            <col style="width: 180px;"> <!-- ម៉ោង & កាលបរិច្ឆេទ -->
             <col style="width: 190px;"> <!-- លេខប្រតិបត្តិការ -->
             <col style="width: 220px;"> <!-- ឈ្មោះទំនិញ -->
             <col style="width: 70px;">  <!-- ចំនួន -->
@@ -185,7 +185,7 @@
         <thead>
             <tr>
                 <th style="white-space: nowrap !important; text-align: center !important;">ល.រ</th>
-                <th style="white-space: nowrap !important; text-align: center !important;">ម៉ោង</th>
+                <th style="white-space: nowrap !important; text-align: center !important;">ម៉ោង & កាលបរិច្ឆេទ</th>
                 <th style="white-space: nowrap !important; text-align: center !important;">លេខប្រតិបត្តិការ</th>
                 <th style="white-space: nowrap !important; text-align: center !important;">ឈ្មោះទំនិញ</th>
                 <th style="white-space: nowrap !important; text-align: center !important;">ចំនួន</th>
@@ -207,7 +207,12 @@
                     <!-- Parent Row: First Item and Order Details -->
                     <tr>
                         <td rowspan="{{ items|length }}" style="text-align: center !important; font-weight: 700 !important; white-space: nowrap !important;">{{ count.value }}</td>
-                        <td rowspan="{{ items|length }}" style="text-align: center !important; white-space: nowrap !important;">{{ order.display_time }}</td>
+                        <td rowspan="{{ items|length }}" style="text-align: center !important; white-space: nowrap !important;">
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
+                                <span style="font-weight: 600; color: #1e293b;">{{ order.display_datetime.split(' ')[1] if order.display_datetime else order.display_time.split(' ')[1] if order.display_time else '' }} {{ order.display_datetime.split(' ')[2] if order.display_datetime and order.display_datetime.split(' ')|length > 2 else '' }}</span>
+                                <span style="font-size: 11px; color: #64748b;">{{ order.display_datetime.split(' ')[0] if order.display_datetime else order.display_time.split(' ')[0] if order.display_time else '' }}</span>
+                            </div>
+                        </td>
                         <td rowspan="{{ items|length }}" style="text-align: center !important; white-space: nowrap !important;">
                             <span style="background: #d81b60; color: white; padding: 6px 10px; border-radius: 4px; display: inline-block; font-family: monospace; font-size: 11px; font-weight: 700; word-break: break-all;">
                                 {{ order.tran_id or order.id[:8] }}

@@ -787,6 +787,10 @@ def home():
                 
                 # Add all orders to the filtered list for the table display
                 data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
+                # Exact timestamp (date + time with seconds + AM/PM) for the Time & Date column
+                data['display_datetime'] = created_at.strftime('%d/%m/%Y %I:%M:%S %p')
+                # Keep the raw ISO timestamp for the JS side (safe fallback rendering)
+                data['created_at_raw'] = data.get('created_at', '')
                 filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
@@ -1298,6 +1302,10 @@ def reports():
                 
                 # Add all orders to the filtered list for the table display
                 data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
+                # Exact timestamp (date + time with seconds + AM/PM) for the Time & Date column
+                data['display_datetime'] = created_at.strftime('%d/%m/%Y %I:%M:%S %p')
+                # Keep the raw ISO timestamp for the JS side (safe fallback rendering)
+                data['created_at_raw'] = data.get('created_at', '')
                 filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
@@ -1690,6 +1698,19 @@ def daily_report_api():
     try:
         target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
         report_data = local_db.get_daily_sales_report(target_date)
+        
+        # Enrich orders with display_datetime for the JS table
+        for order in report_data.get('orders', []):
+            try:
+                dt = datetime.fromisoformat(order.get('created_at', ''))
+                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
+                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
+                order['created_at_raw'] = order.get('created_at', '')
+            except:
+                order['display_time'] = ''
+                order['display_datetime'] = ''
+                order['created_at_raw'] = ''
+                
         return jsonify({
             "status": "success",
             "date": target_date,
@@ -1705,6 +1726,19 @@ def monthly_report_api():
     try:
         target_month = request.args.get('month', datetime.now().strftime('%Y-%m'))
         report_data = local_db.get_monthly_sales_report(target_month)
+        
+        # Enrich orders with display_datetime for the JS table
+        for order in report_data.get('orders', []):
+            try:
+                dt = datetime.fromisoformat(order.get('created_at', ''))
+                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
+                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
+                order['created_at_raw'] = order.get('created_at', '')
+            except:
+                order['display_time'] = ''
+                order['display_datetime'] = ''
+                order['created_at_raw'] = ''
+                
         return jsonify({
             "status": "success",
             "month": target_month,
@@ -1720,6 +1754,19 @@ def annually_report_api():
     try:
         target_year = request.args.get('year', datetime.now().strftime('%Y'))
         report_data = local_db.get_annual_sales_report(target_year)
+        
+        # Enrich orders with display_datetime for the JS table
+        for order in report_data.get('orders', []):
+            try:
+                dt = datetime.fromisoformat(order.get('created_at', ''))
+                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
+                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
+                order['created_at_raw'] = order.get('created_at', '')
+            except:
+                order['display_time'] = ''
+                order['display_datetime'] = ''
+                order['created_at_raw'] = ''
+                
         return jsonify({
             "status": "success",
             "year": target_year,
