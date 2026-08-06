@@ -296,6 +296,16 @@ def get_all_users():
     conn.close()
     return [dict(u) for u in users]
 
+def delete_user_local(username):
+    """Delete a user from local SQLite. Returns True if a row was removed."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM users WHERE username = ?', (username,))
+    conn.commit()
+    deleted = cursor.rowcount > 0
+    conn.close()
+    return deleted
+
 def update_user_images(username, profile_image=None, cover_image=None):
     conn = get_connection()
     cursor = conn.cursor()

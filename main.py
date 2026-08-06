@@ -550,6 +550,7 @@ def delete_user(username):
         db.collection('users').document(username).delete()
         # Sync locally
         sync.pull_from_firestore()
+        local_db.delete_user_local(username)
         return jsonify({"status": "success", "message": f"គណនី {username} ត្រូវបានលុប (Account deleted)"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -625,15 +626,26 @@ def upload_user_image():
         data = request.get_json()
         image_data = data.get('image_data')
         user_type = data.get('type') # 'profile' or 'cover'
+        target_username = (data.get('username') or '').strip() or current_user.username
         
         if not image_data or not user_type:
             return jsonify({'status': 'error', 'message': 'Missing data'}), 400
 
+        # SECURITY: Only admins may change another user's photo
+        if target_username != current_user.username and current_user.role != 'admin':
+            return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+        # SECURITY: Prevent users from modifying another user's images
+        if target_username != current_user.username:
+            existing = local_db.get_user(target_username)
+            if not existing:
+                return jsonify({'status': 'error', 'message': 'User not found'}), 404
+
         # Update local database
         if user_type == 'profile':
-            local_db.update_user_images(current_user.username, profile_image=image_data)
+            local_db.update_user_images(target_username, profile_image=image_data)
         elif user_type == 'cover':
-            local_db.update_user_images(current_user.username, cover_image=image_data)
+            local_db.update_user_images(target_username, cover_image=image_data)
         else:
             return jsonify({'status': 'error', 'message': 'Invalid type'}), 400
         
@@ -644,6 +656,70 @@ def upload_user_image():
     except Exception as e:
         print(f"Error in upload: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/users/update', methods=['POST'])
+@csrf.exempt  # SECURITY: API endpoint
+@login_required
+def update_user():
+    if current_user.role != 'admin':
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json()
+        old_username = (data.get('old_username') or '').strip()
+        username = (data.get('username') or '').strip()
+        role = data.get('role', 'user')
+        password = data.get('password')
+
+        # SECURITY: Validate inputs
+        if not old_username or not username:
+            return jsonify({"status": "error", "message": "Missing username"}), 400
+        if len(username) < 3 or len(username) > 50:
+            return jsonify({"status": "error", "message": "Username must be 3-50 characters"}), 400
+        if not all(c.isalnum() or c in '_.-' for c in username):
+            return jsonify({"status": "error", "message": "Username contains invalid characters"}), 400
+        if role not in ['admin', 'user']:
+            return jsonify({"status": "error", "message": "Invalid role"}), 400
+
+        # SECURITY: Prevent demoting/deleting yourself
+        if old_username == current_user.username and role != 'admin':
+            return jsonify({"status": "error", "message": "អ្នកមិនអាចប្តូរតួនាទីខ្លួនឯងបានទេ (You cannot change your own role)"}), 400
+
+        db = get_db()
+
+        # Rename document if username changed
+        if old_username != username:
+            old_doc = db.collection('users').document(old_username).get()
+            if not old_doc.exists:
+                return jsonify({"status": "error", "message": "User not found"}), 404
+            # Check target doesn't already exist
+            if db.collection('users').document(username).get().exists:
+                return jsonify({"status": "error", "message": "ឈ្មោះអ្នកប្រើប្រាស់នេះមានរួចហើយ (Username already exists)"}), 400
+
+            new_data = dict(old_doc.to_dict())
+            new_data['username'] = username
+            if role != new_data.get('role'):
+                new_data['role'] = role
+            if password:
+                new_data['password'] = generate_password_hash(password)
+            db.collection('users').document(username).set(new_data)
+            db.collection('users').document(old_username).delete()
+        else:
+            update_data = {}
+            if role:
+                update_data['role'] = role
+            if password:
+                update_data['password'] = generate_password_hash(password)
+            if update_data:
+                db.collection('users').document(username).update(update_data)
+
+        # Sync locally to update SQLite
+        sync.pull_from_firestore()
+
+        return jsonify({"status": "success", "message": "ព័ត៌មានបុគ្គលិកត្រូវបានកែប្រែ (Staff updated successfully)"})
+    except Exception as e:
+        print(f"Update user error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/user-covers', methods=['GET'])
 @login_required

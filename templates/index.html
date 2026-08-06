@@ -1777,7 +1777,14 @@
                                 {% for user in staff %}
                                 <tr style="border-bottom: 1px solid #e2e8f0;">
                                     <td style="padding: 12px 15px;">{{ loop.index }}</td>
-                                    <td style="padding: 12px 15px; font-weight: 500;">{{ user.name|default(user.username) }}</td>
+                                    <td style="padding: 12px 15px; font-weight: 500;">
+                                        <div style="display: flex; align-items: center; gap: 10px;">
+                                            <img src="{{ user.profile_image or '/static/images/default.jpg' }}"
+                                                 style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"
+                                                 onerror="this.src='/static/images/default.jpg'">
+                                            <span>{{ user.name or user.username }}</span>
+                                        </div>
+                                    </td>
                                     <td style="padding: 12px 15px; color: #64748b;">{{ user.username }}</td>
                                     <td style="padding: 12px 15px;">
                                         <span style="background: {{ '#e0e7ff' if user.role == 'admin' else '#f1f5f9' }}; color: {{ '#4338ca' if user.role == 'admin' else '#475569' }}; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;">
@@ -1790,7 +1797,16 @@
                                         </span>
                                     </td>
                                     <td style="padding: 12px 15px; text-align: right;">
-                                        <button class="btn btn-sm btn-outline-primary" style="padding: 4px 8px; font-size: 12px; border-radius: 4px; border: 1px solid #3b82f6; color: #3b82f6; background: transparent; cursor: pointer;">Edit</button>
+                                        <div style="display: flex; justify-content: flex-end; gap: 5px;">
+                                            <button onclick="openEditStaffModal('{{ user.username }}', '{{ user.role }}')"
+                                                    class="btn-qa edit-user-btn" style="padding: 5px 10px; font-size: 12px; border: 1px solid #10b981; color: #10b981; background: transparent; border-radius: 4px; cursor: pointer;" title="កែប្រែ">
+                                                <i data-lucide="edit" style="width: 16px; height: 16px;"></i>
+                                            </button>
+                                            <button onclick="deleteStaff('{{ user.username }}')"
+                                                    class="btn-qa" style="padding: 5px 10px; font-size: 12px; border: 1px solid #dc2626; background: #fee2e2; color: #dc2626; border-radius: 4px; cursor: pointer;" title="លុប">
+                                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -1828,12 +1844,27 @@
                         <label style="display: block; margin-bottom: 5px; font-weight: 500;">លេខសម្ងាត់ (Password)</label>
                         <input type="password" id="new_password" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                     </div>
-                    <div style="text-align: left; margin-bottom: 20px;">
+                    <div style="text-align: left; margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 5px; font-weight: 500;">តួនាទី (Role)</label>
                         <select id="new_role" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                             <option value="user">User (Staff)</option>
                             <option value="admin">Admin</option>
                         </select>
+                    </div>
+                    <!-- Staff Profile Photo Upload -->
+                    <div style="text-align: left; margin-bottom: 20px; display: flex; align-items: center; gap: 15px;">
+                        <img id="new_profile_preview" src="/static/images/default.jpg"
+                             onerror="this.src='/static/images/default.jpg'"
+                             style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid #e2e8f0; background: white;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500;">រូបថត (Profile Photo)</label>
+                            <button type="button" onclick="document.getElementById('new_profile_input').click()"
+                                    class="btn-qa" style="padding: 8px 14px; font-size: 13px; border: 1px solid #d81b60; color: #d81b60; background: transparent; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="camera" style="width: 16px; height: 16px;"></i> ជ្រើសរូបថត
+                            </button>
+                            <input type="file" id="new_profile_input" style="display: none;" accept="image/*" onchange="previewStaffPhoto(this, 'new_profile_preview')">
+                            <small style="display: block; color: #94a3b8; margin-top: 4px;">ជ្រើសរើសរូបថតមុនបង្កើតគណនី (Optional)</small>
+                        </div>
                     </div>
                     
                     <div class="modal-actions">
@@ -1863,12 +1894,27 @@
                         <label style="display: block; margin-bottom: 5px; font-weight: 500;">លេខសម្ងាត់ថ្មី (New Password)</label>
                         <input type="password" id="edit_password" placeholder="ទុកទទេបើមិនចង់ប្តូរ" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                     </div>
-                    <div style="text-align: left; margin-bottom: 20px;">
+                    <div style="text-align: left; margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 5px; font-weight: 500;">តួនាទី (Role)</label>
                         <select id="edit_role" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                             <option value="user">User (Staff)</option>
                             <option value="admin">Admin</option>
                         </select>
+                    </div>
+                    <!-- Staff Profile Photo Upload -->
+                    <div style="text-align: left; margin-bottom: 20px; display: flex; align-items: center; gap: 15px;">
+                        <img id="edit_profile_preview" src="/static/images/default.jpg"
+                             onerror="this.src='/static/images/default.jpg'"
+                             style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid #e2e8f0; background: white;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500;">រូបថត (Profile Photo)</label>
+                            <button type="button" onclick="document.getElementById('edit_profile_input').click()"
+                                    class="btn-qa" style="padding: 8px 14px; font-size: 13px; border: 1px solid #d81b60; color: #d81b60; background: transparent; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="camera" style="width: 16px; height: 16px;"></i> ជ្រើសរូបថតថ្មី
+                            </button>
+                            <input type="file" id="edit_profile_input" style="display: none;" accept="image/*" onchange="previewStaffPhoto(this, 'edit_profile_preview')">
+                            <small style="display: block; color: #94a3b8; margin-top: 4px;">ជ្រើសរើសរូបថតថ្មីដើម្បីប្តូរ (Optional)</small>
+                        </div>
                     </div>
                     
                     <div class="modal-actions">
@@ -3371,6 +3417,85 @@
         }
     }
 
+    // --- STAFF PROFILE PHOTO UPLOAD UTILITIES ---
+    function previewStaffPhoto(input, previewId) {
+        if (!input.files || !input.files[0]) return;
+        
+        const file = input.files[0];
+        if (!file.type.match('image.*')) {
+            Swal.fire('បរាជ័យ (Failed)', 'សូមជ្រើសរើសឯកសាររូបភាព (JPG, PNG).', 'error');
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const targetWidth = 200;
+                    const targetHeight = 200;
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = "white"; 
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    const imgRatio = img.width / img.height;
+                    const targetRatio = targetWidth / targetHeight;
+                    let sourceWidth = img.width, sourceHeight = img.height, sourceX = 0, sourceY = 0;
+                    
+                    if (imgRatio > targetRatio) { 
+                        sourceWidth = img.height * targetRatio; 
+                        sourceX = (img.width - sourceWidth) / 2; 
+                    } else { 
+                        sourceHeight = img.width / targetRatio; 
+                        sourceY = (img.height - sourceHeight) / 2; 
+                    }
+                    ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+                    
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    document.getElementById(previewId).src = compressedBase64;
+                    
+                    // Store the compressed image data for form submission
+                    input.dataset.profileImage = compressedBase64;
+                } catch (err) {
+                    Swal.fire('បរាជ័យ', 'Canvas Error: ' + err.message, 'error');
+                }
+            };
+            img.onerror = () => {
+                Swal.fire('បរាជ័យ (Failed)', 'រូបភាពខូច ឬ Format មិនត្រឹមត្រូវ', 'error');
+            };
+            img.src = e.target.result;
+        };
+        reader.onerror = () => {
+            Swal.fire('បរាជ័យ (Failed)', 'មិនអាចអានឯកសារបានទេ', 'error');
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    async function uploadStaffProfileImage(username, imageData) {
+        if (!imageData) return null;
+        
+        try {
+            const response = await fetch('/api/upload-user-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    image_data: imageData, 
+                    type: 'profile',
+                    username: username
+                })
+            });
+            const data = await response.json();
+            return data.status === 'success' ? data : null;
+        } catch (error) {
+            console.error('Profile upload error:', error);
+            return null;
+        }
+    }
+
     // --- SIDEBAR PROFILE HEADER LOGIC (FIXED) ---
     document.addEventListener('DOMContentLoaded', () => {
         const refreshZone = document.getElementById('refresh-zone');
@@ -4867,6 +4992,7 @@ function closeAddStaffModal() {
     }
 }
 
+// Cache of staff members (declared in app.js) is used to look up profile photos when editing
 function openEditStaffModal(username, role) {
     const modal = document.getElementById('editStaffModal');
     if (modal) {
@@ -4874,6 +5000,18 @@ function openEditStaffModal(username, role) {
         document.getElementById('edit_username').value = username;
         document.getElementById('edit_role').value = role;
         document.getElementById('edit_password').value = ''; // Clear password field
+        // Look up the existing profile photo from the cached staff list
+        const cachedMember = (typeof staffCache !== 'undefined' ? staffCache : []).find(m => m.username === username);
+        const profileImage = cachedMember ? (cachedMember.profile_image || null) : null;
+        const preview = document.getElementById('edit_profile_preview');
+        if (preview) {
+            preview.src = profileImage || '/static/images/default.jpg';
+        }
+        const profileInput = document.getElementById('edit_profile_input');
+        if (profileInput) {
+            delete profileInput.dataset.profileImage;
+            profileInput.value = '';
+        }
         modal.classList.add('active');
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -4889,6 +5027,9 @@ function closeEditStaffModal() {
 function renderStaffTable(staff) {
     const tableBody = document.getElementById('userList');
     if (!tableBody) return;
+    
+    // Keep a cached copy so openEditStaffModal can look up profile photos
+    if (Array.isArray(staff)) staffCache = staff;
     
     if (!staff || staff.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4">មិនមានទិន្នន័យបុគ្គលិកទេ</td></tr>`;
@@ -5005,7 +5146,7 @@ async function deleteStaff(username) {
             Swal.fire('បរាជ័យ', 'មានបញ្ហាក្នុងការលុបគណនី', 'error');
         }
     }
-});
+}
 document.addEventListener('DOMContentLoaded', () => {
     const addStaffForm = document.getElementById('addStaffForm');
     if (addStaffForm) {
@@ -5014,6 +5155,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const username = document.getElementById('new_username').value;
             const password = document.getElementById('new_password').value;
             const role = document.getElementById('new_role').value;
+            const profileInput = document.getElementById('new_profile_input');
+            const profileImage = profileInput ? profileInput.dataset.profileImage || null : null;
             
             try {
                 const response = await fetch('/api/users/create', {
@@ -5024,10 +5167,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const result = await response.json();
                 if (result.status === 'success') {
+                    // Upload profile photo after account creation if one was chosen
+                    if (profileImage) {
+                        const uploadResult = await uploadStaffProfileImage(username, profileImage);
+                        if (!uploadResult) {
+                            Swal.fire('ការព្រមាន', 'គណនីត្រូវបានបង្កើតរួច ប៉ុន្តែមិនអាចរក្សាទុករូបថតបានទេ', 'warning');
+                        }
+                    }
                     Swal.fire('ជោគជ័យ', result.message, 'success');
                     closeAddStaffModal();
                     fetchStaffMembers();
                     addStaffForm.reset();
+                    if (profileInput) delete profileInput.dataset.profileImage;
                 } else {
                     Swal.fire('កំហុស', result.message, 'error');
                 }
@@ -5046,6 +5197,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const newUsername = document.getElementById('edit_username').value;
         const password = document.getElementById('edit_password').value;
         const role = document.getElementById('edit_role').value;
+        const profileInput = document.getElementById('edit_profile_input');
+        const profileImage = profileInput ? profileInput.dataset.profileImage || null : null;
         
         const payload = { 
             old_username: originalUsername,
@@ -5065,6 +5218,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const result = await response.json();
             if (result.status === 'success') {
+                // Upload new profile photo if one was chosen
+                if (profileImage) {
+                    const uploadResult = await uploadStaffProfileImage(newUsername, profileImage);
+                    if (!uploadResult) {
+                        Swal.fire('ការព្រមាន', 'ព័ត៌មានត្រូវបានកែប្រែ ប៉ុន្តែមិនអាចរក្សាទុករូបថតបានទេ', 'warning');
+                    }
+                }
                 Swal.fire('ជោគជ័យ', 'ព័ត៌មានបុគ្គលិកត្រូវបានកែប្រែ', 'success');
                 closeEditStaffModal();
                 if (typeof fetchStaffMembers === 'function') fetchStaffMembers();

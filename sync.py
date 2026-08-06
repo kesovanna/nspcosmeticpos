@@ -67,6 +67,13 @@ def pull_from_firestore():
             users_list.append(u)
         local_db.save_users(users_list)
 
+        # 2b. Prune local users that no longer exist in Firestore
+        # (Prevents deleted accounts from resurrecting in the local DB)
+        firestore_usernames = {u['username'] for u in users_list}
+        local_usernames = {u['username'] for u in local_db.get_all_users()}
+        for username in (local_usernames - firestore_usernames):
+            local_db.delete_user_local(username)
+
         return True, "Successfully pulled data from Firestore"
     except Exception as e:
         print(f"Error in pull_from_firestore: {e}")

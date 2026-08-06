@@ -1,6 +1,8 @@
 // Global variable to track the active category select element
 let activeCategorySelect = null;
 let previousCategoryValue = '';
+// Shared cache of staff members (kept in sync with the users table renderer)
+let staffCache = [];
 
 /**
  * Handles the change event for Category select dropdowns.
@@ -417,6 +419,9 @@ async function fetchStaffMembers() {
         const result = await response.json();
 
         if (result.status === 'success' && Array.isArray(result.data)) {
+            // Keep the shared staff cache in sync so openEditStaffModal can look up photos
+            if (typeof staffCache !== 'undefined') staffCache = result.data;
+
             container.innerHTML = result.data.map((member, index) => `
                 <tr style="border-bottom: 1px solid #e2e8f0; text-align: left;">
                     <td style="padding: 12px 15px;">${index + 1}</td>
