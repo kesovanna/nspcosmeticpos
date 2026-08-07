@@ -2,7 +2,8 @@ import sqlite3
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 # --- PORTABLE PATH LOGIC ---
 def get_resource_path(relative_path):
@@ -1117,6 +1118,188 @@ def get_activities(limit=20):
     except Exception as e:
         print(f"Error fetching activities: {e}")
         return []
+
+# --- EXECUTIVE DASHBOARD HELPERS (managerView / /api/dashboard-stats) ---
+
+def get_dashboard_stats(riel_rate=4000):
+    """
+    Aggregate executive-dashboard metrics in a single optimized pass.
+
+    Returns a dict with:
+      - today_revenue_usd / today_revenue_riel
+      - today_gross_profit_usd / today_gross_profit_riel
+      - today_order_count
+      - low_stock_count
+      - revenue_7d            : [{date, label, usd, riel}, ...] oldest -> newest
+      - top_categories        : [{category, qty, revenue_usd}, ...] top 5
+      - recent_orders         : top 5 paid/completed orders
+      - recent_stock_movements: top 5 stock_history entries w/ product name
+
+    Gross profit is computed per sold item as:
+        qty * (item_price - products.cost_price)
+    The order items JSON stores selling price + qty, while cost_price
+    lives on the products table (joined at query time).
+    """
+    today_start = datetime.now().strftime('%Y-%m-%d') + 'T00:00:00'
+    week_ago = (datetime.now() - timedelta(days=6)).strftime('%Y-%m-%d') + 'T00:00:00'
+
+    # 1. Today's paid/completed orders (raw, for revenue + profit)
+    conn = get_connection()
+    today_rows = conn.execute(
+        "SELECT * FROM orders WHERE created_at >= ? AND status IN ('paid', 'completed')",
+        (today_start,)
+    ).fetchall()
+
+    # 2. Product cost lookup (single query, reused across all orders)
+    cost_map = {}
+    prod_rows = conn.execute(
+        "SELECT id, cost_price FROM products WHERE cost_price IS NOT NULL"
+    ).fetchall()
+    for row in prod_rows:
+        cost_map[row['id']] = float(row['cost_price'] or 0.0)
+
+    # 3. Low stock count (stock_quantity <= 5 per requirement)
+    low_stock = conn.execute(
+        "SELECT COUNT(*) AS c FROM products WHERE stock_quantity <= ?", (5,)
+    ).fetchone()
+
+    # 4. 7-day revenue series (sum total of paid/completed orders per calendar day)
+    revenue_rows = conn.execute(
+        """SELECT substr(created_at, 1, 10) AS day, SUM(total) AS usd
+           FROM orders
+           WHERE created_at >= ? AND status IN ('paid', 'completed')
+           GROUP BY substr(created_at, 1, 10)
+           ORDER BY day ASC""",
+        (week_ago,)
+    ).fetchall()
+    revenue_by_day = {row['day']: float(row['usd'] or 0.0) for row in revenue_rows}
+
+    # 5. Top selling categories (qty + revenue from paid/completed orders in last 7 days)
+    cat_rows = conn.execute(
+        """SELECT substr(created_at, 1, 10) AS day, items
+           FROM orders
+           WHERE created_at >= ? AND status IN ('paid', 'completed')""",
+        (week_ago,)
+    ).fetchall()
+    cat_agg = {}
+    for row in cat_rows:
+        try:
+            item_list = json.loads(row['items'] or '[]')
+        except (json.JSONDecodeError, TypeError):
+            item_list = []
+        for item in item_list:
+            qty = int(item.get('quantity', 0) or item.get('qty', 0))
+            price = float(item.get('price', 0) or 0)
+            cat = item.get('category') or 'other'
+            entry = cat_agg.setdefault(cat, {'qty': 0, 'revenue': 0.0})
+            entry['qty'] += qty
+            entry['revenue'] += qty * price
+    top_categories = sorted(
+        cat_agg.items(), key=lambda kv: kv[1]['qty'], reverse=True
+    )[:5]
+    top_categories = [
+        {'category': cat, 'qty': agg['qty'], 'revenue_usd': round(agg['revenue'], 2)}
+        for cat, agg in top_categories
+    ]
+
+    # 6. Recent invoices (top 5 paid/completed by created_at desc)
+    recent_rows = conn.execute(
+        """SELECT tran_id, local_id, total, user, status, created_at
+           FROM orders
+           WHERE status IN ('paid', 'completed')
+           ORDER BY created_at DESC
+           LIMIT 5"""
+    ).fetchall()
+
+    # 7. Recent stock movements (top 5 by created_at desc, join product name)
+    stock_rows = conn.execute(
+        """SELECT sh.product_id, sh.change_amount, sh.reason, sh.created_at, p.name AS product_name
+           FROM stock_history sh
+           LEFT JOIN products p ON sh.product_id = p.id
+           ORDER BY sh.created_at DESC
+           LIMIT 5"""
+    ).fetchall()
+
+    conn.close()
+
+    # --- Compute today's revenue + gross profit from today_rows ---
+    today_revenue = 0.0
+    today_profit = 0.0
+    today_orders = 0
+    for o in today_rows:
+        today_revenue += float(o['total'] or 0)
+        today_orders += 1
+        try:
+            item_list = json.loads(o['items'] or '[]')
+        except (json.JSONDecodeError, TypeError):
+            item_list = []
+        for item in item_list:
+            qty = int(item.get('quantity', 0) or item.get('qty', 0))
+            price = float(item.get('price', 0) or 0)
+            cost = cost_map.get(item.get('id'), 0.0)
+            today_profit += qty * (price - cost)
+
+    # --- Build the 7-day series (fill missing days with 0) ---
+    revenue_7d = []
+    for i in range(6, -1, -1):
+        day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+        usd = revenue_by_day.get(day, 0.0)
+        revenue_7d.append({
+            'date': day,
+            'label': day[5:],  # MM-DD
+            'usd': round(usd, 2),
+            'riel': round(usd * riel_rate)
+        })
+
+    # --- Recent orders (already sorted desc, keep top 5) ---
+    recent_orders = []
+    for r in recent_rows:
+        recent_orders.append({
+            'tran_id': r['tran_id'] or f"LOCAL-{r['local_id']}",
+            'total_usd': round(float(r['total'] or 0), 2),
+            'total_riel': round(float(r['total'] or 0) * riel_rate),
+            'user': r['user'] or 'guest',
+            'status': r['status'],
+            'created_at': r['created_at']
+        })
+
+    # --- Recent stock movements (delta type: Sale vs Restock) ---
+    recent_stock = []
+    for s in stock_rows:
+        delta = int(s['change_amount'] or 0)
+        recent_stock.append({
+            'product_name': s['product_name'] or 'Unknown',
+            'product_id': s['product_id'],
+            'delta': delta,
+            'delta_type': 'Restock' if delta > 0 else 'Sale',
+            'quantity': abs(delta),
+            'reason': s['reason'] or '',
+            'created_at': s['created_at']
+        })
+
+    return {
+        'today_revenue_usd': round(today_revenue, 2),
+        'today_revenue_riel': round(today_revenue * riel_rate),
+        'today_gross_profit_usd': round(today_profit, 2),
+        'today_gross_profit_riel': round(today_profit * riel_rate),
+        'today_order_count': today_orders,
+        'low_stock_count': int(low_stock['c'] if low_stock else 0),
+        'revenue_7d': revenue_7d,
+        'top_categories': top_categories,
+        'recent_orders': recent_orders,
+        'recent_stock_movements': recent_stock
+    }
+
+
+def get_recent_orders(limit=5):
+    """Return the most recent paid/completed orders (used by dashboard tables)."""
+    return get_dashboard_stats().get('recent_orders', [])[:limit]
+
+
+def get_recent_stock_movements(limit=5):
+    """Return the most recent stock history entries (used by dashboard tables)."""
+    return get_dashboard_stats().get('recent_stock_movements', [])[:limit]
+
 
 # Initialize DB on import
 init_db()

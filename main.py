@@ -1032,6 +1032,32 @@ def manager():
     items_list = local_db.get_products()
     return render_template('manager.html', items=items_list)
 
+@app.route('/api/dashboard-stats', methods=['GET'])
+@login_required
+@admin_required
+def api_dashboard_stats():
+    """
+    Executive dashboard JSON endpoint for the SPA managerView.
+    Aggregates today's revenue/profit, low-stock count, 7-day revenue
+    series, top categories, recent invoices and recent stock movements.
+    """
+    try:
+        riel_rate = get_riel_rate() or 4000
+        stats = local_db.get_dashboard_stats(riel_rate=riel_rate)
+        stats.update({
+            'riel_rate': riel_rate,
+            'status': 'success',
+            'timestamp': datetime.now().isoformat()
+        })
+        return jsonify(stats)
+    except Exception as e:
+        print(f"[dashboard-stats] Error: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 @app.route('/add_product', methods=['GET', 'POST'])
 @login_required
 @admin_required
