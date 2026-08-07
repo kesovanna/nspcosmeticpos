@@ -1,0 +1,23 @@
+{
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  },
+  "name": "nsp_cosmetic_pos",
+  "version": "1.0.0",
+  "description": "A custom-built Point of Sale (POS) application designed specifically to streamline daily retail operations, inventory management, and sales processing for NSP Cosmetic Store.",
+  "main": "tailwind.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kesovanna/nspcosmeticpos.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kesovanna/nspcosmeticpos/issues"
+  },
+  "homepage": "https://github.com/kesovanna/nspcosmeticpos#readme"
+}

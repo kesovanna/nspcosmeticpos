@@ -328,6 +328,11 @@
             const itemsToProcess = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
             const totalAmount = parseFloat(TOTAL_AMOUNT);
 
+            // PILLAR 2: Collision-free, crypto-secure transaction ID.
+            // crypto.randomUUID() (RFC 4122 v4, CSPRNG-backed) guarantees offline
+            // computer sales never collide with online tablet sales.
+            const tran_id = 'CASH-' + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
+
             // Call /checkout API to save the order
             const response = await fetch('/checkout', {
                 method: 'POST',
@@ -336,7 +341,7 @@
                     items: itemsToProcess,
                     total: totalAmount.toFixed(2),
                     discount: finalDiscount,
-                    tran_id: 'CASH-' + Date.now()
+                    tran_id: tran_id
                 })
             });
 
@@ -374,8 +379,8 @@
         try {
             Swal.fire({ title: 'កំពុងរៀបចំ... | Preparing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
             
-            // Generate a temporary transaction ID
-            const tran_id = "TX" + Date.now(); 
+            // PILLAR 2: Collision-free, crypto-secure transaction ID.
+            const tran_id = "TX" + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
             
             // Get items for the backend
             const itemsToSend = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");

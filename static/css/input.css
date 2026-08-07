@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* ======================================================= */
+/* TAILWIND V4 SOURCE SCANNING (required: v4 ignores      */
+/* tailwind.config.js content globs unless @config used)   */
+/* ======================================================= */
+@source "C:/Users/REAM KESOVANNA/Desktop/NSP_POS_29072026/NSP_Cosmetic_POS/templates";
+@source "C:/Users/REAM KESOVANNA/Desktop/NSP_POS_29072026/NSP_Cosmetic_POS/static/js";
+
+/* ======================================================= */
+/* PRODUCTION OVERRIDES: TAILWIND V4 & BOOTSTRAP 5 FIXES   */
+/* ======================================================= */
+
+/* ១. កែសម្រួលទំហំអក្សរឈ្មោះផលិតផលនៅលើកាត */
+.card-title, 
+.product-name,
+div[class*="text-xl"] {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    line-height: 1.4 !important;
+}
+
+/* ២. រៀបចំក្បាលតារាងគ្រប់គ្រងស្តុកឱ្យត្រង់ជួរ */
+.table-responsive table thead th {
+    font-family: 'Kantumruy Pro', 'Khmer OS Battambang', system-ui, -apple-system, sans-serif !important;
+    font-size: 0.85rem !important;       /* ទំហំតូចល្មមសមរម្យ */
+    font-weight: 700 !important;          /* ប្រើត្រឹម font bold ធម្មតា មិនមែន Muol ទេ */
+    padding: 10px 6px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
+    letter-spacing: 0.3px !important;
+    background-color: #f8fafc !important;
+    color: #334155 !important;            /* ពណ៌អក្សរ Slate រលោងស្អាត */
+}
+
+/* តម្រង់ទិន្នន័យក្នុងតារាងស្តុកឱ្យចំកណ្តាល */
+.table-responsive table tbody td {
+    text-align: center !important;
+    vertical-align: middle !important;
+}

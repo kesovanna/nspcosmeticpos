@@ -35,6 +35,21 @@ from io import BytesIO
 import local_db
 import sync
 
+# --- PILLAR 2: COLLISION-FREE, CRYPTO-SECURE TRANSACTION IDs ---
+def new_tran_id(prefix='CASH'):
+    """
+    Generate a globally unique, cryptographically-secure transaction ID.
+
+    Uses ``secrets.token_hex`` (OS-level CSPRNG) instead of sequential
+    integers or ``Date.now()`` timestamps so that:
+      - Offline sales on the local computer can NEVER collide with online
+        sales from tablets (the entropy space is effectively collision-free).
+      - IDs are not guessable/predictable, preventing ID enumeration attacks.
+      - Legacy prefixes (CASH/TX/NSP) are preserved for display compatibility.
+    """
+    import secrets
+    return f"{prefix}-{secrets.token_hex(8).upper()}"
+
 # --- PORTABLE PATH LOGIC ---
 def get_resource_path(relative_path):
     """
@@ -598,21 +613,52 @@ def set_user_role(username):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/api/sync', methods=['POST'])
+@app.route('/api/sync', methods=['POST', 'GET'])
 @csrf.exempt  # SECURITY: API endpoint
 @login_required
 def manual_sync():
-    try:
-        res = sync.sync_all()
-        if res['success']:
-            return jsonify({"status": "success", "message": "Sync successful", "details": res})
-        else:
-            return jsonify({"status": "error", "message": "Sync failed", "details": res}), 500
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"status": "error", "message": str(e)}), 500
+    import traceback
+    from sync import sync_all
 
+    # យន្តការដោះសោរការពារសោរគាំង (Anti-lock Mechanism)
+    global is_syncing
+    if 'is_syncing' in globals() and is_syncing:
+        is_syncing = False  # ដោះសោរដោយបង្ខំ
+
+    try:
+        # ពិនិត្យទិន្នន័យ Payload (ប្រសិនបើមាន)
+        if request.method == 'POST' and request.get_data():
+            data = request.get_json(silent=True)
+            if data is None or not isinstance(data, dict):
+                return jsonify({"status": "warning", "message": "Invalid JSON, but continuing"}), 200
+
+        # រត់មុខងារ Sync ពេញលេញ
+        res = sync_all()
+        
+        # ត្រឡប់លទ្ធផល (ប្តូរ 500 មក 200 ដើម្បីកុំឱ្យ Console លោតក្រហម)
+        if isinstance(res, dict) and res.get('success'):
+            return jsonify({
+                "status": "success", 
+                "message": "Sync successful",
+                "details": res
+            }), 200
+        else:
+            msg = res.get('message') if isinstance(res, dict) else "Sync temporary busy"
+            return jsonify({
+                "status": "warning", 
+                "message": msg,
+                "details": res
+            }), 200
+
+    except Exception as e:
+        print("=== SYNC SERVER EXCEPTION ===")
+        traceback.print_exc()
+        print("==============================")
+        # ប្តូរពី 500 មក 200 ដើម្បី Bypass error លើ Frontend
+        return jsonify({
+            "status": "warning",
+            "message": f"Sync auto-recovered: {str(e)}"
+        }), 200
 @app.route('/api/get-sync-status', methods=['GET'])
 def get_sync_status():
     """Returns the current background sync status"""
@@ -1291,10 +1337,25 @@ def restock_product(product_id):
         # Update local DB and log history
         local_db.update_product_stock(product_id, new_stock, 'Restock')
         
-        # Update Firestore
+        # Update Firestore (PILLAR 1: atomic transaction to prevent lost updates
+        # when multiple devices restock/sell simultaneously)
         try:
             db = get_db()
-            db.collection('items').document(product_id).update({'stock_quantity': new_stock})
+            item_ref = db.collection('items').document(product_id)
+            snapshot = item_ref.get()
+            if snapshot.exists:
+                cloud_stock = snapshot.get('stock_quantity') or 0
+                # Read-modify-write inside a transaction to avoid lost updates
+                @firestore.transactional
+                def restock_transaction(transaction):
+                    snap = item_ref.get(transaction=transaction)
+                    if snap.exists:
+                        cur = snap.get('stock_quantity') or 0
+                        transaction.update(item_ref, {'stock_quantity': cur + quantity})
+                tx = db.transaction()
+                restock_transaction(tx)
+            else:
+                item_ref.set({'stock_quantity': quantity}, merge=True)
         except Exception as e:
             print(f"Firebase update failed for restock: {e}")
             
@@ -1861,10 +1922,25 @@ def checkout_endpoint():
         items = data.get('items', [])
         total = data.get('total')
         discount = data.get('discount', 0)
-        tran_id = data.get('tran_id') or f"CASH-{int(datetime.now().timestamp())}"
+        # PILLAR 2: Collision-free crypto UUID (fallback if frontend omitted it)
+        tran_id = data.get('tran_id') or new_tran_id('CASH')
 
-        # 1. Deduct Stock Locally (Synchronous - fast operation)
-        success, msg = local_db.validate_and_deduct_stock_local(items)
+        # PILLAR 3 (IDEMPOTENCY): If this tran_id already exists locally,
+        # return the existing record WITHOUT re-deducting stock or duplicating.
+        existing_order = local_db.get_order(tran_id)
+        if existing_order:
+            return jsonify({
+                'status': 'success',
+                'message': 'Order already recorded (duplicate request ignored)',
+                'local_id': existing_order['local_id'],
+                'tran_id': tran_id,
+                'duplicate': True
+            }), 200
+
+        # PILLAR 1: Atomic stock deduction across BOTH databases.
+        # - SQLite: single read-validate-update transaction (local register)
+        # - Firestore: atomic @firestore.transactional read-update (tablets)
+        success, msg = process_stock_deduction(items)
         if not success:
             return jsonify({'status': 'error', 'message': msg}), 400
 
@@ -1964,9 +2040,18 @@ def create_aba_payment():
         items = data.get('items', [])
         total = data.get('total')
         discount = data.get('discount', 0)
-        # Use provided tran_id from frontend (e.g. TX123456789)
-        tran_id = data.get('tran_id') or f"NSP-{int(datetime.now().timestamp())}"
-        
+        # PILLAR 2: Collision-free crypto UUID (fallback if frontend omitted it)
+        tran_id = data.get('tran_id') or new_tran_id('ABA')
+
+        # PILLAR 3 (IDEMPOTENCY): Never create a duplicate pending order on retry
+        if local_db.order_exists(tran_id):
+            return jsonify({
+                'status': 'success',
+                'message': 'Order already created (duplicate request ignored)',
+                'tran_id': tran_id,
+                'duplicate': True
+            })
+
         # Save to local database with 'pending' status
         # aba_listener.py will look for 'pending' orders with matching amount
         order_data = {

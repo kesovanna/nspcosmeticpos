@@ -26,6 +26,75 @@ def get_firestore_db():
         traceback.print_exc()
         return None
 
+# --- PILLAR 1 + 2 + 3: EXACTLY-ONCE TRANSACTIONAL ORDER PUSH ---
+def push_order_transactionally(db, order_data):
+    """
+    Push one order to Firestore with EXACTLY-ONCE semantics.
+
+    - PILLAR 2: The Firestore document ID is the ``tran_id`` (UUID) itself, so
+      offline and online devices can never collide, and retries overwrite the
+      same document instead of duplicating.
+    - PILLAR 1: Creating the order document and deducting cloud stock happen in
+      ONE atomic Firestore transaction. If the transaction aborts, neither
+      happened; if it commits, both happened exactly once.
+    - PILLAR 3: If the document already exists with a confirmed status
+      (paid/completed), stock was already deducted — we only merge updates.
+      If it exists as ``pending`` and is now confirmed, we deduct at that
+      transition point (exactly once).
+    """
+    tran_id = order_data.get('tran_id')
+    if not tran_id:
+        return False, "Order has no tran_id; cannot push idempotently"
+
+    doc_ref = db.collection('orders').document(tran_id)
+    items = order_data.get('items', []) or []
+    new_status = order_data.get('status')
+
+    existing = doc_ref.get()
+    if existing.exists:
+        prev_status = existing.get('status')
+        # Already confirmed on cloud -> stock was deducted -> just merge updates
+        if prev_status in ('paid', 'completed') and new_status in ('paid', 'completed'):
+            doc_ref.set(order_data, merge=True)
+            return True, "order already confirmed; metadata merged"
+        # Pending -> confirmed transition: deduct cloud stock now (exactly once)
+        needs_deduction = new_status in ('paid', 'completed')
+    else:
+        # Brand new document: deduct only for confirmed sales
+        needs_deduction = new_status in ('paid', 'completed')
+
+    if not needs_deduction:
+        # Pending/unconfirmed order: store record only, never touch stock
+        doc_ref.set(order_data)
+        return True, "order created (pending, no stock deduction)"
+
+    @firestore.transactional
+    def create_order_and_deduct_stock(transaction):
+        # 1. Create/overwrite the order document inside the transaction
+        transaction.set(doc_ref, order_data)
+        # 2. Atomically read-update stock for every sold item
+        for item in items:
+            prod_id = item.get('id') or item.get('product_id')
+            if not prod_id:
+                continue
+            qty_to_deduct = int(item.get('quantity', 0) or item.get('qty', 0))
+            if qty_to_deduct <= 0:
+                continue
+            item_ref = db.collection('items').document(prod_id)
+            snapshot = item_ref.get(transaction=transaction)
+            if not snapshot.exists:
+                # Product missing on cloud (may have been deleted); skip item
+                continue
+            current_stock = snapshot.get('stock_quantity') or 0
+            # Clamp at 0: never allow negative cloud stock during reconciliation
+            new_stock = max(0, current_stock - qty_to_deduct)
+            if new_stock != current_stock:
+                transaction.update(item_ref, {'stock_quantity': new_stock})
+
+    transaction = db.transaction()
+    create_order_and_deduct_stock(transaction)
+    return True, "order created and cloud stock deducted atomically"
+
 def pull_from_firestore():
     """Pull products and users from Firestore to local SQLite"""
     db = get_firestore_db()
@@ -141,7 +210,7 @@ def push_to_firestore():
             traceback.print_exc()
             return False, f"Error syncing user profile images: {str(e)}"
 
-        # 3. Push Orders
+        # 3. Push Orders (PILLAR 1+2+3: exactly-once, atomic, collision-free)
         unsynced = local_db.get_unsynced_orders()
         for order in unsynced:
             # Prepare data for Firestore
@@ -161,12 +230,15 @@ def push_to_firestore():
             else:
                 order_data['created_at'] = datetime.now()
 
-            # Push to Firestore
-            _, doc_ref = db.collection('orders').add(order_data)
-            
-            # Mark as synced locally
-            local_db.mark_order_synced(order['local_id'], doc_ref.id)
-            count += 1
+            # Exactly-once, transactional push (see push_order_transactionally)
+            pushed_ok, pushed_msg = push_order_transactionally(db, order_data)
+
+            if pushed_ok:
+                # Mark as synced locally; firestore_id == tran_id (UUID doc id)
+                local_db.mark_order_synced(order['local_id'], order['tran_id'])
+                count += 1
+            else:
+                print(f"⚠️ Skipping order {order.get('tran_id')}: {pushed_msg}")
 
         return True, f"Successfully pushed {count} records to Firestore"
     except Exception as e:

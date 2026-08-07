@@ -110,6 +110,22 @@ def init_db():
         cursor.execute('ALTER TABLE orders ADD COLUMN discount REAL DEFAULT 0')
     if 'has_receipt' not in order_columns:
         cursor.execute('ALTER TABLE orders ADD COLUMN has_receipt INTEGER DEFAULT 0')
+
+    # PILLAR 2 + PILLAR 3: Enforce UNIQUE tran_id (collision-free, idempotent retries)
+    # Index name is stable; CREATE UNIQUE INDEX IF NOT EXISTS is a no-op on re-run,
+    # but we must first purge any legacy duplicates so the unique index can be built.
+    # SQLite unique indexes CANNOT contain NULLs, so skip legacy NULL tran_ids.
+    cursor.execute('''
+        DELETE FROM orders
+        WHERE tran_id IS NOT NULL AND rowid NOT IN (
+            SELECT MIN(rowid) FROM orders WHERE tran_id IS NOT NULL GROUP BY tran_id
+        )
+    ''')
+    cursor.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_tran_id
+        ON orders (tran_id)
+        WHERE tran_id IS NOT NULL
+    ''')
     
     # Deletion Log Table (To track what to delete from Firestore during sync)
     cursor.execute('''
@@ -527,33 +543,64 @@ def validate_and_deduct_stock_local(cart_items):
 
 # --- Order Operations ---
 def add_order(order_data):
-    """Save order locally with synced=0"""
+    """Save order locally with synced=0.
+
+    PILLAR 3 (IDEMPOTENCY): If an order with the same ``tran_id`` already
+    exists, we do NOT create a duplicate. We simply return the existing
+    order's ``local_id`` so retried POSTs (e.g. timeout + retry) cannot
+    double-charge or create duplicated records.
+    """
     conn = get_connection()
     cursor = conn.cursor()
-    
-    items_json = json.dumps(order_data.get('items', []))
-    created_at = order_data.get('created_at')
-    if isinstance(created_at, datetime):
-        created_at = created_at.isoformat()
-    elif not created_at:
-        created_at = datetime.now().isoformat()
+    try:
+        tran_id = order_data.get('tran_id')
+        # Strict idempotency guard: dedupe on the same transaction ID
+        if tran_id:
+            cursor.execute("SELECT local_id FROM orders WHERE tran_id = ?", (tran_id,))
+            existing = cursor.fetchone()
+            if existing:
+                conn.close()
+                return existing['local_id']
 
-    cursor.execute('''
-        INSERT INTO orders (items, total, discount, status, created_at, tran_id, user, synced)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-    ''', (
-        items_json,
-        order_data.get('total'),
-        order_data.get('discount', 0),
-        order_data.get('status', 'pending'),
-        created_at,
-        order_data.get('tran_id'),
-        order_data.get('user')
-    ))
-    local_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return local_id
+        items_json = json.dumps(order_data.get('items', []))
+        created_at = order_data.get('created_at')
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
+        elif not created_at:
+            created_at = datetime.now().isoformat()
+
+        cursor.execute('''
+            INSERT INTO orders (items, total, discount, status, created_at, tran_id, user, synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        ''', (
+            items_json,
+            order_data.get('total'),
+            order_data.get('discount', 0),
+            order_data.get('status', 'pending'),
+            created_at,
+            tran_id,
+            order_data.get('user')
+        ))
+        local_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return local_id
+    except sqlite3.IntegrityError:
+        # Unique index on tran_id fired (concurrent duplicate insert)
+        conn.rollback()
+        if tran_id:
+            cursor = conn.cursor()
+            cursor.execute("SELECT local_id FROM orders WHERE tran_id = ?", (tran_id,))
+            existing = cursor.fetchone()
+            conn.close()
+            if existing:
+                return existing['local_id']
+        conn.close()
+        raise
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
 def get_order(tran_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -568,6 +615,23 @@ def get_order(tran_id):
             order['items'] = []
         return order
     return None
+
+def order_exists(tran_id):
+    """PILLAR 3 (IDEMPOTENCY): True if an order with this tran_id already exists.
+
+    Used by the sync layer to make Firestore pushes idempotent —
+    never create a second cloud document for a retried order.
+    """
+    if not tran_id:
+        return False
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM orders WHERE tran_id = ? LIMIT 1", (tran_id,))
+        exists = cursor.fetchone() is not None
+    finally:
+        conn.close()
+    return exists
 
 def get_order_by_local_id(local_id):
     conn = get_connection()

@@ -2,10 +2,10 @@
 <html lang="km">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1200">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NSP Cosmetic Store - POS</title>
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/tailwind.css">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/luxury.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/product_form.css') }}">
@@ -127,6 +127,100 @@
         .search-container input { width: 100%; padding: 8px 15px 8px 40px; border-radius: 25px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color); outline: none; }
         .search-container input::placeholder { color: var(--text-muted) !important; opacity: 0.7; font-family: 'Battambang', 'Siemreap', sans-serif; }
 
+                /* ----------------------------------------- */
+        /* ជួសជុលពណ៌ផ្ទៃខាងក្រោយស្តុក និងតុបតែងប៊ូតុងឱ្យលេចធ្លោ (គ្រប់ Platform) */
+        /* ----------------------------------------- */
+
+        /* 1. ប្តូរផ្ទៃខាងក្រោយនៃកាត និងតារាងទៅជាពណ៌ស (Clean White) */
+        .card, 
+        .table-responsive, 
+        .table-responsive table,
+        div[style*="background: #fce4ec"], 
+        div[style*="background-color: #fce4ec"] {
+            background-color: #ffffff !important; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+        }
+
+        /* 2. ក្បាលតារាង (Table Header) ឱ្យមានពណ៌ប្រផេះស្រាលបន្តិច ដើម្បីងាយចំណាំជួរ */
+        .table-responsive thead th {
+            background-color: #f8fafc !important;
+            color: #475569 !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+            font-weight: 600 !important;
+        }
+
+        /* 3. គូសស៊ុមបន្ទាត់តារាងឱ្យច្បាស់ */
+        .table-responsive td, .table-responsive th {
+            border-color: #f1f5f9 !important;
+        }
+
+        /* ----------------------------------------- */
+        /* ជួសជុលអក្សរស្ថានភាព និងប៊ូតុងទាំង ៤ ក្នុងតារាងស្តុក */
+        /* ----------------------------------------- */
+
+        /* 1. ទប់អក្សរស្ថានភាព (Status) មិនឱ្យធ្លាក់ជួរដាច់ខាត */
+        .table-responsive td {
+            white-space: nowrap !important;
+            vertical-align: middle !important;
+        }
+        .table-responsive td span {
+            white-space: nowrap !important;
+            display: inline-block !important;
+        }
+
+        /* 2. ពង្រីកប្រអប់ជួរឈរខាងចុង (Actions) កុំឱ្យកៀបប៊ូតុង */
+        .table-responsive td:last-child {
+            min-width: 175px !important; 
+            white-space: nowrap !important;
+        }
+
+        /* 3. តុបតែងប្រអប់ប៊ូតុងទាំង ៤ ឱ្យមានរាងការ៉េស្អាត និងមានគម្លាតសមរម្យ */
+        table td button, 
+        .table-responsive td button,
+        .table-responsive td .btn {
+            width: 36px !important;
+            height: 36px !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background-color: #f8fafc !important; /* ផ្ទៃពណ៌ប្រផេះស្រាល */
+            color: #3b82f6 !important; /* ពណ៌ Icon ខៀវលេចធ្លោ */
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 6px !important;
+            margin: 0 3px !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            transition: all 0.2s ease;
+        }
+
+        /* បន្ថែម Hover Effect ពេលយកម៉ៅស៍ដាក់ពីលើ */
+        table td button:hover, 
+        .table-responsive td button:hover {
+            background-color: #e2e8f0 !important;
+            color: #1d4ed8 !important;
+        }
+
+        /* 4. បង្ខំឱ្យរូប Icon ខាងក្នុងលោតចេញមកក្រៅវិញ ១០០% */
+        table td button svg, 
+        .table-responsive td button svg,
+        .table-responsive td .btn svg {
+            width: 18px !important;
+            height: 18px !important;
+            stroke: currentColor !important; /* ចាប់យកពណ៌ខៀវពីខាងលើ */
+            stroke-width: 2 !important;
+            fill: none !important;
+            display: block !important;
+            visibility: visible !important;
+        }
+
+        /* 5. ប្តូរពណ៌ផ្ទៃប៊ូតុងពេលយក Mouse ទៅដាក់ពីលើ (Hover Effect សម្រាប់ Desktop) */
+        table td button:hover, 
+        .table-responsive td button:hover {
+            background-color: #e2e8f0 !important;
+            transform: translateY(-1px);
+        }
         /* Report Type Tabs Styling */
         .report-tabs-container {
             display: flex;
@@ -368,31 +462,57 @@
         }
 
         @media (max-width: 600px) {
-            .top-bar { padding: 10px; }
-            .top-row { flex-wrap: wrap; gap: 8px; }
-            
-            .search-container { flex: 1; min-width: 140px; order: 1; }
-            .search-container input { padding: 8px 12px 8px 35px; font-size: 13px; }
-            
-            .btn-scan { order: 2; padding: 8px 12px; }
-            .btn-scan span { display: none; } 
-            
-            .info-container { 
+            /* ---- HIDE Music & Sync on Phones ---- */
+            #musicToggle { display: none !important; }
+            #syncIndicator { display: none !important; }
+
+            /* ---- TOP BAR: HORIZONTAL SCROLL (no wrapping) ---- */
+            .top-bar { padding: 8px 10px; }
+            .top-row {
                 display: flex !important;
-                order: 3; 
-                width: 100%; 
-                flex-basis: 100%; 
-                flex-direction: row; 
-                justify-content: center; 
-                align-items: center;
-                gap: 15px;
-                background: var(--card-bg);
-                border: 1px solid var(--border-color);
-                padding: 8px;
-                border-radius: 12px;
-                margin-top: 5px;
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                scrollbar-width: none !important; /* Firefox */
+                gap: 16px !important; /* Generous space between elements */
+                padding: 5px 10px !important;
+                align-items: center !important;
             }
-            
+            .top-row::-webkit-scrollbar { display: none !important; } /* Chrome/Safari */
+
+            /* Hamburger: always leftmost, never shrinks */
+            .menu-toggle { display: flex !important; order: 0 !important; flex: 0 0 auto !important; }
+
+            /* Search bar: fixed 200px, never collapses */
+            .search-container {
+                flex: 0 0 200px !important;
+                min-width: 0 !important;
+                order: 1 !important;
+                margin-top: 0 !important;
+            }
+            .search-container input { padding: 8px 12px 8px 35px; font-size: 13px; }
+
+            /* Info container + currency widget: stay inline, never wrap or break */
+            .info-container {
+                flex: 0 0 auto !important;
+                flex-wrap: nowrap !important;
+                order: 2 !important;
+                margin-top: 0 !important;
+                gap: 10px !important;
+            }
+            /* Prevent any child of top-row (incl. exchange rate widget) from wrapping */
+            .top-row > div,
+            .info-container,
+            .info-container * {
+                white-space: nowrap !important;
+                flex-shrink: 0 !important;
+            }
+
+            /* Scan button: icon-only, no text */
+            .btn-scan { flex: 0 0 auto !important; order: 3 !important; padding: 8px 12px; }
+            .btn-scan span { display: none; }
+
+            /* ---- PRODUCT GRID ---- */
             .product-grid { 
                 grid-template-columns: repeat(3, 1fr); 
                 gap: 8px; 
@@ -402,8 +522,7 @@
             .card img { height: 75px; }
             .card .name { font-size: 11px; height: 32px; }
 
-            /* --- HYPER-COMPACT CART UI FOR PHONES --- */
-            /* This forcefully shrinks the buttons/text so the items have room to show! */
+            /* ---- HYPER-COMPACT CART UI FOR PHONES ---- */
             .cart-panel h3 { font-size: 14px !important; }
             .cart-panel .btn-clear-all { padding: 4px 8px !important; font-size: 11px !important; }
             .discount-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px !important; margin-bottom: 5px !important; }
@@ -412,6 +531,262 @@
             #totalPrice { font-size: 12px !important; }
             .cart-panel button[onclick="checkout()"] { padding: 10px !important; font-size: 14px !important; margin-top: 5px; }
             #cartItems { margin-bottom: 5px !important; }
+
+            /* ---- REPORTS HEADER: icon-only print buttons ---- */
+            #reportsView #btnBulkPrint span,
+            #reportsView button[onclick="window.print()"] span { display: none !important; }
+            #reportsView #btnBulkPrint i,
+            #reportsView button[onclick="window.print()"] i { margin: 0 !important; }
+            #reportsView #btnBulkPrint,
+            #reportsView button[onclick="window.print()"] {
+                padding: 8px 10px !important;
+                min-width: 36px !important;
+            }
+            /* ----------------------------------------- */
+            /* នុយក្លេអ៊ែរ: បង្ខំប៊ូតុង Print ឱ្យសល់តែ Icon */
+            /* ----------------------------------------- */
+            /* ----------------------------------------- */
+            /* រៀបចំក្បាលរបាយការណ៍ (បៃតង) ឱ្យនៅបន្ទាត់តែមួយ */
+            /* ----------------------------------------- */
+            /* 1. ប្រអប់បៃតងធំ ក្លាយជាជួរដេកតែមួយ */
+            #reportsView > div[style*="background: #059669"] {
+                display: flex !important;
+                flex-direction: row !important; /* បង្ខំជាជួរដេក */
+                flex-wrap: nowrap !important;   /* ហាមធ្លាក់ជួរដាច់ខាត */
+                align-items: center !important; /* តម្រៀបកណ្តាលបញ្ឈរស្មើគ្នា */
+                justify-content: space-between !important; /* ទាញឱ្យឃ្លាតឆ្វេងស្តាំស្អាត */
+                padding: 10px 12px !important;
+                gap: 8px !important;
+                overflow-x: auto !important; /* បើចង្អៀតពេក ឱ្យអូសបានបន្តិច កុំឱ្យខូចរាង */
+                scrollbar-width: none !important;
+            }
+            #reportsView > div[style*="background: #059669"]::-webkit-scrollbar {
+                display: none !important;
+            }
+            
+            /* 2. កញ្ចប់ផ្ទុក Date Picker ឱ្យនៅតូចល្មម */
+            #reportsView > div[style*="background: #059669"] > div {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                align-items: center !important;
+                width: auto !important; /* លែងឱ្យលាតពេញ 100% ទៀតហើយ */
+                gap: 8px !important;
+                margin: 0 !important;
+            }
+            
+            /* 3. កញ្ចប់ផ្ទុកប៊ូតុង Print ឱ្យនៅតម្រៀបក្បែរគ្នា */
+            #reportsView > div[style*="background: #059669"] .d-flex {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                gap: 5px !important;
+            }
+
+            /* 4. ប៊ូតុង Print សល់តែ Icon ស្អាតៗ */
+            #reportsView #btnBulkPrint,
+            #reportsView button[onclick*="print"] {
+                font-size: 0 !important; /* លាក់អក្សរ */
+                width: 38px !important;
+                height: 38px !important;
+                padding: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                flex-shrink: 0 !important;
+                border-radius: 8px !important;
+            }
+            #reportsView #btnBulkPrint svg,
+            #reportsView button[onclick*="print"] svg {
+                font-size: 18px !important;
+                width: 18px !important;
+                height: 18px !important;
+                margin: 0 !important;
+            }
+            /* រក្សារូប Icon ឱ្យនៅដដែល */
+            #reportsView button.btn-info svg,
+            #reportsView button.btn-success svg,
+            #reportsView button.btn-info i,
+            #reportsView button.btn-success i,
+            #reportsView button[onclick*="print"] svg {
+                font-size: 20px !important;
+                width: 20px !important;
+                height: 20px !important;
+                margin: 0 !important;
+            }
+            /* ----------------------------------------- */
+            /* ជួសជុលប៊ូតុងសកម្មភាពក្នុងតារាង (មើលមិនឃើញ) */
+            /* ----------------------------------------- */
+            table td button, 
+            table td .btn, 
+            .table-responsive td button {
+                background-color: #3b82f6 !important; /* ដំឡើងពណ៌ខៀវដិត */
+                color: #ffffff !important; /* ពណ៌អក្សរ ឬ Icon ពណ៌ស */
+                border: none !important;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+                opacity: 1 !important; /* លុបភាពថ្លា */
+                visibility: visible !important;
+                margin: 2px !important;
+            }
+            
+            /* ប្រសិនបើវាជាប្រភេទកុងតាក់ (Toggle Switch) */
+            table td input[type="checkbox"],
+            table td .switch,
+            table td .toggle {
+                filter: contrast(1.5) brightness(0.9) !important; /* បន្ថែមភាពច្បាស់ឱ្យងាយមើល */
+                opacity: 1 !important;
+            }
+            /* ----------------------------------------- */
+            /* សង្គ្រោះបន្ទាន់ V2: បង្ខំ Header ឱ្យកឹបជាប់អេក្រង់ (Fixed) */
+            /* ----------------------------------------- */
+            
+            /* 1. បង្ខំ Header ឱ្យអណ្តែតជាប់អេក្រង់ផ្នែកខាងលើជានិច្ច */
+            .top-bar {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                z-index: 99999 !important; /* កម្រិតអណ្តែតខ្ពស់បំផុត */
+                background-color: #ffffff !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+                margin: 0 !important;
+            }
+            
+            /* 2. រុញផ្ទៃខាងក្រោមចុះបន្តិច ដើម្បីកុំឱ្យ Header ថ្មីនេះបាំងបាត់ */
+            .content-wrapper, 
+            .container-fluid {
+                padding-top: 75px !important; 
+            }
+            
+            /* 3. រៀបចំប្រអប់អូសឆ្វេងស្តាំ និងទាញ Menu មកវិញ */
+            .top-row {
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                align-items: center !important;
+                gap: 12px !important;
+                padding: 10px 15px !important;
+                -webkit-overflow-scrolling: touch !important;
+                scrollbar-width: none !important;
+            }
+            .top-row::-webkit-scrollbar {
+                display: none !important;
+            }
+            
+            .menu-toggle {
+                display: flex !important;
+                order: -1 !important; /* លេខរៀងមុនគេ (ឆ្វេងបង្អស់) */
+                flex: 0 0 auto !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+        }
+
+        /* =========================================================
+           TABLET LANDSCAPE (768px – 1200px) — HEADER DECLUTTER
+           ========================================================= */
+        @media (min-width: 768px) and (max-width: 1200px) {
+
+            /* ---- 1. HIDE Cloud Sync + Music (🎵) on tablets/mobiles ---- */
+            /* Sync indicator: the clickable cloud sync widget */
+            #syncIndicator { display: none !important; }
+
+            /* Music button (🎵) — the toggleMusic() element */
+            #musicToggle { display: none !important; }
+
+            /* Dashboard admin link uses .btn-music class too; hide it as well
+               so the header is fully decluttered on compact screens */
+            .top-row .btn-music { display: none !important; }
+
+            /* ---- 2. SEARCH BAR: expand into the freed horizontal space ---- */
+            /* Remove the old 500px cap; let flex grow into the gap */
+            .search-container {
+                max-width: none !important;
+                flex: 1 1 auto !important;
+            }
+            /* Keep the input comfortably padded and readable */
+            .search-container input {
+                width: 100% !important;
+                padding: 10px 15px 10px 40px !important;
+                font-size: 14px !important;
+                border-radius: 25px !important;
+            }
+        }
+
+        /* =========================================================
+           PRODUCT GRID — 3-4 COLUMNS on 768px – 1200px screens
+           ========================================================= */
+        @media (min-width: 768px) and (max-width: 1200px) {
+            #posView .product-grid,
+            #productGrid {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+                gap: 12px !important;
+                padding-right: 5px;
+            }
+        }
+
+        /* =========================================================
+           TABLET PORTRAIT (768px – 992px) — SIDEBAR OFF-CANVAS
+           ========================================================= */
+        @media (min-width: 768px) and (max-width: 992px) {
+
+            /* ---- 1. SIDEBAR: fully hidden off-canvas, hamburger slides it in ---- */
+            .sidebar {
+                position: fixed !important;
+                top: 0;
+                left: 0;
+                width: 280px !important;
+                min-width: 280px !important;
+                height: 100% !important;
+                transform: translateX(-100%) !important;
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                z-index: 4000 !important;
+                box-shadow: none !important;
+            }
+            .sidebar.active {
+                transform: translateX(0) !important;
+                box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5) !important;
+            }
+
+            /* Hamburger ☰: visible & touch-friendly (44px hit area) */
+            .top-bar { position: relative; z-index: 4001; }
+            .menu-toggle {
+                display: flex !important;
+                align-items: center;
+                justify-content: center;
+                width: 40px;
+                height: 40px;
+                padding: 0;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                color: var(--text-color);
+                cursor: pointer;
+                flex-shrink: 0;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            }
+            .menu-toggle:active { transform: scale(0.92); }
+            .menu-toggle svg { width: 22px !important; height: 22px !important; }
+
+            /* Dim backdrop behind the open sidebar (pure CSS, reuses existing toggle) */
+            .sidebar.active ~ .content-wrapper::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.45);
+                z-index: 3900;
+            }
+
+            /* ---- 2. PRODUCT GRID: wrap into 2–3 columns once sidebar is gone ---- */
+            #posView .product-grid,
+            #productGrid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+                gap: 12px !important;
+                padding-right: 5px;
+            }
         }
         /* --- CONTINUOUS BREATHING PROFILE GLOW --- */
         /* --- 3D SPINNING PROFILE WITH DUAL GLOW --- */
@@ -1042,7 +1417,7 @@
                 </button>
             </div>
             {% if current_user.is_authenticated and current_user.role == 'admin' %}
-            <a href="/manager" class="btn-music" title="Dashboard"><i data-lucide="layout-dashboard"></i></a>
+            <a href="javascript:void(0);" class="btn-music" title="Dashboard" onclick="showView('managerView'); closeSidebarMobile();"><i data-lucide="layout-dashboard"></i></a>
             <button type="button" 
                     onclick="openAddProductModal()"
                     class="btn btn-link p-2 text-dark text-decoration-none" 
@@ -1116,7 +1491,7 @@
                     </div>
                     {% endif %}
                     
-                    <h3 class="font-bold text-sm text-gray-800 truncate w-full mb-1">{{ product.name }}</h3>
+                    <div class="font-bold text-base text-gray-800 truncate w-full leading-tight mb-1">{{ product.name }}</div>
                     <p class="text-green-600 font-bold text-sm leading-tight">៛ {{ "{:,.0f}".format(product.price * riel_rate) }}</p>
                     <p class="text-red-500 text-[11px] font-medium mb-3">$ {{ "{:,.2f}".format(product.price) }}</p>
                 </div>
@@ -1316,10 +1691,14 @@
                                         </td>
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">{{ count.value }}</td>
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
-                                                <span style="font-weight: 600; color: #1e293b;">{{ order.display_datetime.split(' ')[1] if order.display_datetime else order.display_time.split(' ')[1] if order.display_time else '' }} {{ order.display_datetime.split(' ')[2] if order.display_datetime and order.display_datetime.split(' ')|length > 2 else '' }}</span>
-                                                <span style="font-size: 11px; color: #64748b;">{{ order.display_datetime.split(' ')[0] if order.display_datetime else order.display_time.split(' ')[0] if order.display_time else '' }}</span>
-                                            </div>
+                                            <div class="auto-khmer-time" data-time="{{ order.display_datetime if order.display_datetime else order.display_time if order.display_time else '' }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
+                                            <span class="time-text" style="font-weight: 600; color: #1e293b;">
+                                                {{ order.display_datetime.split(' ')[1] if order.display_datetime else order.display_time.split(' ')[1] if order.display_time else '' }} {{ order.display_datetime.split(' ')[2] if order.display_datetime and order.display_datetime.split(' ')|length > 2 else '' }}
+                                            </span>
+                                            <span class="date-text" style="font-size: 11px; color: #64748b;">
+                                                {{ order.display_datetime.split(' ')[0] if order.display_datetime else order.display_time.split(' ')[0] if order.display_time else '' }}
+                                            </span>
+                                        </div>
                                         </td>
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                             <span style="background: #d81b60; color: white; padding: 6px 10px; border-radius: 4px; display: inline-block; font-family: monospace; font-size: 11px; font-weight: 700; word-break: break-all;">
@@ -1471,9 +1850,9 @@
                             <button id="bulkDeleteBtn" onclick="deleteSelectedProducts()" class="btn-qa" style="background: #ef4444; color: white; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 600; display: none; align-items: center; gap: 8px; cursor: pointer;">
                                 <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i> លុបដែលបានជ្រើសរើស (Bulk Delete)
                             </button>
-                            <a href="/add_product" class="btn-qa" style="background: #059669; color: white; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; text-decoration: none;">
+                            <button type="button" onclick="openAddProductModal()" class="btn-qa" style="background: #059669; color: white; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                 <i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i> Add New Product
-                            </a>
+                            </button>
                             <button onclick="triggerSync(false)" class="btn-qa" style="background: #3b82f6; color: white; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                 <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> Sync Now
                             </button>
@@ -1488,7 +1867,6 @@
                                 padding: 16px 12px; 
                                 border: 1px solid #cbd5e1; 
                                 color: #64748b; 
-                                font-family: 'Khmer OS Moul Light', 'Moul', sans-serif !important;
                                 font-size: 12px; 
                                 font-weight: normal;
                                 text-transform: uppercase;
@@ -1544,17 +1922,17 @@
                         <table id="cosmeticsTable">
                             <thead>
                                 <tr>
-                                    <th style="width: 40px;">
+                                    <th style="width: 40px;" class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">
                                         <input type="checkbox" id="selectAllProducts" onchange="toggleAllProducts(this)">
                                     </th>
-                                    <th style="width: 60px;">ល.រ</th>
-                                    <th style="width: 70px;">រូបភាព</th>
-                                    <th>ឈ្មោះផលិតផល</th>
-                                    <th>ប្រភេទទំនិញ</th>
-                                    <th>ស្តុក</th>
-                                    <th>តម្លៃ</th>
-                                    <th>ស្ថានភាព</th>
-                                    <th>សកម្មភាព</th>
+                                    <th style="width: 60px;" class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">ល.រ</th>
+                                    <th style="width: 70px;" class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">រូបភាព</th>
+                                    <th class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">ឈ្មោះផលិតផល</th>
+                                    <th class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">ប្រភេទទំនិញ</th>
+                                    <th class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">ស្តុក</th>
+                                    <th class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">តម្លៃ</th>
+                                    <th class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">ស្ថានភាព</th>
+                                    <th class="text-sm font-bold text-center align-middle whitespace-nowrap bg-slate-50 text-slate-800">សកម្មភាព</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2435,6 +2813,37 @@
         /* Fix Cart Panel alignment and gap with Header */
         .cart-panel, .billing-panel, .pos-cart-container {
             margin-top: 17px !important;
+        }
+        /* ======================================================= */
+        /* ជួសជុល CSS Conflict រវាង Tailwind v4 និង Bootstrap 5 */
+        /* ======================================================= */
+
+        /* ១. កែសម្រួលទំហំអក្សរឈ្មោះផលិតផលនៅលើកាត កុំឱ្យធំពេក */
+        .card-title, 
+        .product-name,
+        div[class*="text-xl"] {
+            font-size: 1.05rem !important; /* ទំហំសមរម្យល្មមភ្នែក */
+            font-weight: 600 !important;
+            line-height: 1.4 !important;
+        }
+
+        /* ២. រៀបចំក្បាលតារាងគ្រប់គ្រងស្តុកឱ្យត្រង់ជួរ និងមានរបៀបរៀបរយ */
+        .table-responsive table thead th {
+            font-size: 0.9rem !important;      /* ទំហំអក្សរក្បាលតារាង */
+            font-weight: 700 !important;
+            padding: 12px 8px !important;      /* បន្ថែមគម្លាតប្រអប់ឱ្យស្មើដៃ */
+            text-align: center !important;     /* រុញអក្សរឱ្យនៅកណ្តាលជួរឈរ */
+            vertical-align: middle !important;
+            white-space: nowrap !important;    /* ហាមដាច់ខាតមិនឱ្យធ្លាក់ជួរ */
+            letter-spacing: 0.5px !important;
+            background-color: #f8fafc !important; /* ពណ៌ផ្ទៃខាងក្រោយប្រផេះស្រាល */
+            color: #1e293b !important;         /* ពណ៌អក្សរដិតច្បាស់ */
+        }
+
+        /* តម្រង់ទិន្នន័យក្នុងតារាងស្តុកឱ្យចំកណ្តាលតាមក្បាលតារាង */
+        .table-responsive table tbody td {
+            text-align: center !important;
+            vertical-align: middle !important;
         }
 </style>
 
@@ -4713,6 +5122,188 @@
         }
     });
 
+    // Handle Add Product Modal form submission via AJAX (SPA - no page reload)
+    document.addEventListener('DOMContentLoaded', function() {
+        const modalAddProductForm = document.getElementById('addProductForm');
+        if (modalAddProductForm) {
+            modalAddProductForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const formData = new FormData(this);
+
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'រក្សាទុកជោគជ័យ / Product saved successfully',
+                            showConfirmButton: false,
+                            timer: 3000,
+                            timerProgressBar: true
+                        });
+
+                        // Close modal & reset form
+                        if (typeof closeAddProductModal === 'function') closeAddProductModal();
+                        modalAddProductForm.reset();
+                        const usdPreview = document.getElementById('modalUsdPreview');
+                        if (usdPreview) usdPreview.innerText = 'ស្មើនឹង (Equals): $ 0.00';
+                        const imgPreview = document.getElementById('modalImagePreview');
+                        if (imgPreview) imgPreview.src = '/static/images/default.jpg';
+                        const imgBase64 = document.getElementById('modalImageBase64');
+                        if (imgBase64) imgBase64.value = '';
+
+                        // Refresh UI instantly without reloading the page
+                        const newProduct = {
+                            id: data.product_id,
+                            name: formData.get('product_name') || '',
+                            category: formData.get('category') || 'more',
+                            price_riel: parseFloat(formData.get('price')) || 0,
+                            price: (parseFloat(formData.get('price')) || 0) / (typeof RIEL_RATE !== 'undefined' ? RIEL_RATE : 4000),
+                            stock_quantity: parseInt(formData.get('stock_quantity')) || 0,
+                            barcode: formData.get('barcode') || data.product_id,
+                            expiry_date: formData.get('expiry_date') || 'N/A',
+                            image: formData.get('image_base64') || 'default.jpg'
+                        };
+                        if (typeof appendProductToUI === 'function') {
+                            appendProductToUI(newProduct);
+                        } else {
+                            // Fallback: lightweight page refresh keeps SPA intact
+                            window.location.reload();
+                        }
+                    } else {
+                        Swal.fire('Error', data.message || 'Failed to save product', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire('Error', 'An error occurred while saving the product.', 'error');
+                });
+            });
+        }
+    });
+
+    // Instantly append a newly added product to the POS grid + inventory table (SPA)
+    function appendProductToUI(p) {
+        try {
+            // --- 1. POS product grid card ---
+            const grid = document.getElementById('productGrid');
+            if (grid) {
+                const card = document.createElement('div');
+                card.className = 'card pos-product-item bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-start cursor-pointer transition-all hover:shadow-md h-full';
+                card.dataset.id = p.id;
+                card.dataset.stock = p.stock_quantity;
+                card.dataset.name = (p.name || '').toLowerCase();
+                card.dataset.realName = p.name;
+                card.dataset.price = p.price;
+                card.dataset.barcode = p.barcode || p.id;
+                card.dataset.category = (p.category || 'more').toLowerCase();
+                card.setAttribute('onclick', `addToCart('${(p.name || '').replace(/'/g, "\\'")}', ${p.price}, '${p.id}', ${p.stock_quantity}, false)`);
+
+                const imageSrc = (p.image && String(p.image).startsWith('data:image'))
+                    ? p.image
+                    : '/static/images/default.jpg';
+                card.innerHTML = `
+                    <div class="w-full text-left flex-1 flex flex-col justify-start">
+                        <div class="w-full text-center mb-2">
+                            <img src="${imageSrc}" onerror="this.src='/static/images/default.jpg'" class="w-16 h-16 object-cover mx-auto rounded-lg block">
+                        </div>
+                        <div class="font-bold text-base text-gray-800 truncate w-full leading-tight mb-1">${p.name || ''}</div>
+                        <p class="text-green-600 font-bold text-sm leading-tight">៛ ${(Math.round(p.price_riel)).toLocaleString('en-US')}</p>
+                        <p class="text-red-500 text-[11px] font-medium mb-3">$ ${Number(p.price).toFixed(2)}</p>
+                    </div>
+                    <div class="w-full border-t border-gray-100 pt-2 text-[11px] text-gray-500 space-y-1 bg-gray-50/50 p-2 rounded-lg mt-auto">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Barcode:</span>
+                            <span class="font-mono font-medium text-gray-700">${p.barcode || p.id}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Stock:</span>
+                            <span class="font-medium ${p.stock_quantity == 0 ? 'text-red-500' : (p.stock_quantity <= 5 ? 'text-red-500 font-bold' : (p.stock_quantity <= 10 ? 'text-orange-500 font-bold' : 'text-green-600 font-bold'))}">${p.stock_quantity}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Expiry:</span>
+                            <span class="font-medium text-gray-700">${p.expiry_date || 'N/A'}</span>
+                        </div>
+                    </div>`;
+                grid.appendChild(card);
+            }
+
+            // --- 2. Inventory table row ---
+            const table = document.getElementById('cosmeticsTable');
+            if (table && table.querySelector('tbody')) {
+                const tbody = table.querySelector('tbody');
+                // Remove "no data" placeholder row if present
+                const placeholder = tbody.querySelector('td[colspan]');
+                if (placeholder && placeholder.closest('tr')) placeholder.closest('tr').remove();
+
+                const statusHtml = p.stock_quantity > 5
+                    ? `<span class="status-badge status-in-stock"><span class="stock-indicator bg-in-stock"></span> មានស្តុក</span>`
+                    : (p.stock_quantity > 0
+                        ? `<span class="status-badge status-low"><span class="stock-indicator bg-low"></span> ជិតអស់ស្តុក</span>`
+                        : `<span class="status-badge status-out"><span class="stock-indicator bg-out"></span> អស់ស្តុក</span>`);
+
+                const tr = document.createElement('tr');
+                tr.id = `product-row-${p.id}`;
+                tr.innerHTML = `
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="product-checkbox" value="${p.id}" onchange="updateBulkDeleteBtn()">
+                    </td>
+                    <td style="text-align: center; font-weight: 600; color: #64748b;">${tbody.children.length + 1}</td>
+                    <td style="text-align: center;">
+                        <img src="${imageSrc}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0;" onerror="this.src='/static/images/default.jpg';">
+                    </td>
+                    <td style="font-weight: 600;">${p.name || ''}</td>
+                    <td style="color: #64748b;">${(p.category || 'N/A')}</td>
+                    <td style="font-weight: 700; text-align: center;">${p.stock_quantity}</td>
+                    <td style="color: #059669; font-weight: 700; text-align: right;">$${Number(p.price).toFixed(2)}</td>
+                    <td style="text-align: center;">${statusHtml}</td>
+                    <td style="text-align: center;">
+                        <div style="display: flex; justify-content: center; gap: 8px;">
+                            <button onclick="quickRestock('${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" class="btn-edit-small" title="Quick Restock" style="color: #059669;">
+                                <i data-lucide="package-plus" style="width: 18px; height: 18px;"></i>
+                            </button>
+                            <a href="/edit_product/${p.id}" class="btn-edit-small" title="Edit Product">
+                                <i data-lucide="edit-3" style="width: 18px; height: 18px;"></i>
+                            </a>
+                            <button onclick="viewStockHistory('${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" class="btn-edit-small" title="View History" style="color: #3b82f6;">
+                                <i data-lucide="history" style="width: 18px; height: 18px;"></i>
+                            </button>
+                            <button onclick="deleteProduct('${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" class="btn-edit-small" title="Delete Product" style="color: #ef4444; background: #fee2e2;">
+                                <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
+                            </button>
+                        </div>
+                    </td>`;
+                tbody.appendChild(tr);
+
+                // Update row numbers for all rows
+                tbody.querySelectorAll('tr').forEach((row, idx) => {
+                    const numCell = row.querySelector('td:nth-child(2)');
+                    if (numCell) numCell.textContent = idx + 1;
+                });
+
+                // Refresh lucide icons for the new row
+                if (typeof lucide !== 'undefined') setTimeout(lucide.createIcons, 50);
+            }
+        } catch (err) {
+            console.error('appendProductToUI error:', err);
+        }
+    }
+
     // --- Delete Product Logic ---
     function deleteProduct(productId, productName) {
         Swal.fire({
@@ -5401,6 +5992,38 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
 </div>
 <script>
+document.addEventListener("DOMContentLoaded", function() {
+    // មុខងារឆ្លាតវៃ V3: អូសអេក្រង់ទៅឆ្វេង (Swipe Left) ដើម្បីបិទ Sidebar
+    let touchstartX = 0;
+    let touchendX = 0;
+
+    function handleGesture() {
+        const sidebar = document.querySelector('.sidebar');
+        // បើគម្លាតនៃការអូសពីស្តាំមកឆ្វេង ធំជាង 40px (បញ្ជាក់ថាមានចេតនាអូសពិតប្រាកដ)
+        if (touchstartX - touchendX > 40) {
+            if (sidebar && sidebar.classList.contains('active')) {
+                if (typeof closeSidebarMobile === 'function') {
+                    closeSidebarMobile(); // ហៅកូដបិទចាស់មកប្រើ
+                } else {
+                    sidebar.classList.remove('active'); // បិទដោយបង្ខំ
+                }
+            }
+        }
+    }
+
+    // ចាប់យកទីតាំងម្រាមដៃពេលចាប់ផ្តើមប៉ះ
+    document.addEventListener('touchstart', e => {
+        touchstartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    // ចាប់យកទីតាំងម្រាមដៃពេលលែង
+    document.addEventListener('touchend', e => {
+        touchendX = e.changedTouches[0].screenX;
+        handleGesture();
+    }, { passive: true });
+});
+</script>
+<script>
     // Share invoice via native share API or copy link (no page reload)
     window.shareReport = function(pdfUrl, tranId) {
         const fullUrl = window.location.origin + pdfUrl;
@@ -5427,6 +6050,54 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     };
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // ស្វែងរកគ្រប់ក្រឡាដែលផ្ទុកម៉ោង UTC
+    const timeBlocks = document.querySelectorAll('.auto-khmer-time');
+    
+    timeBlocks.forEach(block => {
+        const timeStr = block.getAttribute('data-time');
+        if(timeStr) {
+            // បំបែកអក្សរម៉ោង (ឧទាហរណ៍: 06/08/2026 08:09:32 AM)
+            const parts = timeStr.split(' ');
+            if(parts.length >= 2) {
+                const dateParts = parts[0].split('/'); 
+                const day = dateParts[0], month = dateParts[1], year = dateParts[2];
+                
+                const timeParts = parts[1].split(':');
+                let hours = parseInt(timeParts[0]);
+                const mins = parseInt(timeParts[1]);
+                const secs = parseInt(timeParts[2] || 0);
+                
+                const ampm = parts[2] ? parts[2].toUpperCase() : '';
+                if(ampm === 'PM' && hours < 12) hours += 12;
+                if(ampm === 'AM' && hours === 12) hours = 0;
+                
+                // បង្កើតកាលបរិច្ឆេទជា UTC រួចបូកថែម ៧ ម៉ោង (ម៉ោងកម្ពុជា)
+                const dateObj = new Date(Date.UTC(year, month - 1, day, hours, mins, secs));
+                dateObj.setUTCHours(dateObj.getUTCHours() + 7);
+                
+                // រៀបចំទម្រង់ម៉ោងថ្មីដើម្បីបង្ហាញ
+                const newDay = String(dateObj.getUTCDate()).padStart(2, '0');
+                const newMonth = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+                const newYear = dateObj.getUTCFullYear();
+                
+                let newHours = dateObj.getUTCHours();
+                const newMins = String(dateObj.getUTCMinutes()).padStart(2, '0');
+                const newSecs = String(dateObj.getUTCSeconds()).padStart(2, '0');
+                const newAmpm = newHours >= 12 ? 'PM' : 'AM';
+                
+                newHours = newHours % 12 || 12;
+                newHours = String(newHours).padStart(2, '0');
+                
+                // បោះម៉ោងដែលត្រូវពិតប្រាកដចូលទៅក្នុង HTML វិញ
+                block.querySelector('.time-text').textContent = `${newHours}:${newMins}:${newSecs} ${newAmpm}`;
+                block.querySelector('.date-text').textContent = `${newDay}/${newMonth}/${newYear}`;
+            }
+        }
+    });
+});
 </script>
 </body>
 </html>
