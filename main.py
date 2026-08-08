@@ -17,9 +17,91 @@ import smtplib
 import urllib.request
 import urllib.parse
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from email.mime.text import MIMEText
+
+# --- Timezone helper: Cambodia ICT = UTC+7 (fixed, no DST) ---
+ICT_TZ = timezone(timedelta(hours=7), name='ICT')
+
+def cambodia_time(dt):
+    """Normalize any datetime (naive or aware, UTC or local) to Cambodia ICT (UTC+7).
+
+    - Naive datetimes are assumed to already be Cambodia local time
+      (legacy rows written by datetime.now().isoformat() on this server).
+    - Aware datetimes (e.g. Firestore Timestamps serialized with +00:00 / Z)
+      are converted to the ICT timezone.
+    Returns the ICT-aware datetime.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # Legacy naive value: treat as already-ICT wall clock
+        return dt.replace(tzinfo=ICT_TZ)
+    return dt.astimezone(ICT_TZ)
+
+def format_ict(dt, fmt):
+    """Format a datetime as ICT string, safe for naive or aware input."""
+    if dt is None:
+        return ''
+    return cambodia_time(dt).strftime(fmt)
+
+def format_ict_str(iso_str, fmt='%d/%m/%Y %I:%M:%S %p'):
+    """Format an ISO datetime string as Cambodia ICT (UTC+7). Safe for any input."""
+    if not iso_str:
+        return ''
+    try:
+        return format_ict(cambodia_time(datetime.fromisoformat(str(iso_str))), fmt)
+    except Exception:
+        return str(iso_str)
+
+def parse_ict_datetime(iso_str):
+    """Parse ANY stored `created_at` value into an ICT-aware datetime (UTC+7).
+
+    Central conversion point for every order-serving route so the sales
+    report table can NEVER display a raw UTC / Firestore timestamp:
+
+    - None / empty / unparseable  -> returns None (caller skips the row).
+    - Naive strings (legacy local rows, e.g. '2026-08-08T12:16:39' written by
+      datetime.now().strftime(...)) are assumed to already BE Cambodia
+      wall-clock and are pinned to ICT (+07:00) with NO hour shift.
+    - Aware strings (e.g. Firestore serialized '2026-08-08T04:16:39+00:00' or
+      '...Z') represent a true UTC instant and are converted with the exact
+      +7h offset to the correct Cambodia wall-clock time.
+
+    Returns the ICT-aware datetime, or None when the input cannot be parsed
+    (so routes can skip bad rows instead of crashing the whole report).
+    """
+    if not iso_str:
+        return None
+    try:
+        return cambodia_time(datetime.fromisoformat(str(iso_str)))
+    except Exception:
+        return None
+
+def enrich_order_display_times(order):
+    """Attach display_time / display_datetime / created_at_raw to an order row.
+
+    Reads `order['created_at']` (raw DB string), converts it with
+    parse_ict_datetime() (fromisoformat + cambodia_time -> ICT), and writes
+    the formatted display fields the report table consumes. A row that fails
+    to parse gets empty display fields instead of a raw UTC leak or a crash.
+    """
+    try:
+        dt = parse_ict_datetime(order.get('created_at', ''))
+        if dt is None:
+            order['display_time'] = ''
+            order['display_datetime'] = ''
+            order['created_at_raw'] = ''
+        else:
+            order['display_time'] = format_ict(dt, '%d/%m/%Y %H:%M')
+            order['display_datetime'] = format_ict(dt, '%d/%m/%Y %I:%M:%S %p')
+            order['created_at_raw'] = order.get('created_at', '')
+    except Exception:
+        order['display_time'] = ''
+        order['display_datetime'] = ''
+        order['created_at_raw'] = ''
+    return order
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -119,6 +201,11 @@ def get_db():
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+# Make ICT timezone helpers available to all templates (Jinja globals)
+app.jinja_env.globals['cambodia_time'] = cambodia_time
+app.jinja_env.globals['format_ict'] = format_ict
+app.jinja_env.globals['format_ict_str'] = format_ict_str
 
 # --- CSRF PROTECTION ---
 csrf = CSRFProtect(app)
@@ -886,6 +973,10 @@ def home():
             
         end_date = start_date + timedelta(days=1)
         
+        # Timezone-safe day boundaries in ICT (UTC+7)
+        start_date_ict = start_date.replace(tzinfo=ICT_TZ)
+        end_date_ict = end_date.replace(tzinfo=ICT_TZ)
+        
         all_orders = local_db.get_all_orders()
         total_revenue = 0
         total_orders = 0
@@ -893,9 +984,11 @@ def home():
         filtered_orders = []
 
         for data in all_orders:
-            created_at = datetime.fromisoformat(data['created_at'])
-            if start_date <= created_at < end_date:
-                if data.get('status') in ['paid', 'completed']:
+            created_at = cambodia_time(datetime.fromisoformat(data['created_at']))
+            if start_date_ict <= created_at < end_date_ict:
+                # Canonical paid set shared with local_db (see PAID_STATUSES):
+                # 'paid by cash' / 'paid by aba' / 'paid by acleda' / 'paid' / 'completed'
+                if str(data.get('status', '')).strip().lower() in ('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed'):
                     total_revenue += float(data.get('total', 0))
                     total_orders += 1
                     for item in data.get('items', []):
@@ -909,11 +1002,8 @@ def home():
                             item_summary[name] = {'qty': qty, 'total': (qty * price)}
                 
                 # Add all orders to the filtered list for the table display
-                data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
-                # Exact timestamp (date + time with seconds + AM/PM) for the Time & Date column
-                data['display_datetime'] = created_at.strftime('%d/%m/%Y %I:%M:%S %p')
-                # Keep the raw ISO timestamp for the JS side (safe fallback rendering)
-                data['created_at_raw'] = data.get('created_at', '')
+                # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
+                enrich_order_display_times(data)
                 filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
@@ -1448,10 +1538,16 @@ def reports():
         else:
             end_date = now + timedelta(days=1)
 
+        # Timezone-safe day/month/year boundaries in ICT (UTC+7)
+        start_date_ict = start_date.replace(tzinfo=ICT_TZ)
+        end_date_ict = end_date.replace(tzinfo=ICT_TZ)
+
         for data in all_orders:
-            created_at = datetime.fromisoformat(data['created_at'])
-            if start_date <= created_at < end_date:
-                if data.get('status') in ['paid', 'completed']:
+            created_at = cambodia_time(datetime.fromisoformat(data['created_at']))
+            if start_date_ict <= created_at < end_date_ict:
+                # Canonical paid set shared with local_db (see PAID_STATUSES):
+                # 'paid by cash' / 'paid by aba' / 'paid by acleda' / 'paid' / 'completed'
+                if str(data.get('status', '')).strip().lower() in ('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed'):
                     total_revenue += float(data.get('total', 0))
                     total_orders += 1
                     for item in data.get('items', []):
@@ -1465,11 +1561,8 @@ def reports():
                             item_summary[name] = {'qty': qty, 'total': (qty * price)}
                 
                 # Add all orders to the filtered list for the table display
-                data['display_time'] = created_at.strftime('%d/%m/%Y %H:%M')
-                # Exact timestamp (date + time with seconds + AM/PM) for the Time & Date column
-                data['display_datetime'] = created_at.strftime('%d/%m/%Y %I:%M:%S %p')
-                # Keep the raw ISO timestamp for the JS side (safe fallback rendering)
-                data['created_at_raw'] = data.get('created_at', '')
+                # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
+                enrich_order_display_times(data)
                 filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
@@ -1545,7 +1638,7 @@ def download_receipt(tran_id):
                                          items=order.get('items', []),
                                          total=order.get('total', 0),
                                          discount=order.get('discount', 0),
-                                         date=datetime.fromisoformat(order.get('created_at', datetime.now().isoformat())).strftime("%d/%m/%Y %H:%M:%S"),
+                                         date=format_ict(cambodia_time(datetime.fromisoformat(order.get('created_at', datetime.now().isoformat()))), "%d/%m/%Y %H:%M:%S"),
                                          payment_method='cash',
                                          RIEL_RATE=riel_rate,
                                          is_pdf=True)
@@ -1712,8 +1805,8 @@ def live_orders():
     all_orders = local_db.get_all_orders()
     active_orders = [o for o in all_orders if o['status'] == 'pending']
     for data in active_orders:
-        dt = datetime.fromisoformat(data['created_at'])
-        data['display_time'] = dt.strftime('%d/%m/%Y %I:%M %p')
+        dt = cambodia_time(datetime.fromisoformat(data['created_at']))
+        data['display_time'] = format_ict(dt, '%d/%m/%Y %I:%M %p')
         data['id'] = data.get('firestore_id') or f"local_{data['local_id']}"
     return render_template('orders.html', active_orders=active_orders)
 
@@ -1864,16 +1957,9 @@ def daily_report_api():
         report_data = local_db.get_daily_sales_report(target_date)
         
         # Enrich orders with display_datetime for the JS table
+        # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
         for order in report_data.get('orders', []):
-            try:
-                dt = datetime.fromisoformat(order.get('created_at', ''))
-                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
-                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
-                order['created_at_raw'] = order.get('created_at', '')
-            except:
-                order['display_time'] = ''
-                order['display_datetime'] = ''
-                order['created_at_raw'] = ''
+            enrich_order_display_times(order)
                 
         return jsonify({
             "status": "success",
@@ -1892,16 +1978,9 @@ def monthly_report_api():
         report_data = local_db.get_monthly_sales_report(target_month)
         
         # Enrich orders with display_datetime for the JS table
+        # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
         for order in report_data.get('orders', []):
-            try:
-                dt = datetime.fromisoformat(order.get('created_at', ''))
-                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
-                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
-                order['created_at_raw'] = order.get('created_at', '')
-            except:
-                order['display_time'] = ''
-                order['display_datetime'] = ''
-                order['created_at_raw'] = ''
+            enrich_order_display_times(order)
                 
         return jsonify({
             "status": "success",
@@ -1920,16 +1999,9 @@ def annually_report_api():
         report_data = local_db.get_annual_sales_report(target_year)
         
         # Enrich orders with display_datetime for the JS table
+        # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
         for order in report_data.get('orders', []):
-            try:
-                dt = datetime.fromisoformat(order.get('created_at', ''))
-                order['display_time'] = dt.strftime('%d/%m/%Y %H:%M')
-                order['display_datetime'] = dt.strftime('%d/%m/%Y %I:%M:%S %p')
-                order['created_at_raw'] = order.get('created_at', '')
-            except:
-                order['display_time'] = ''
-                order['display_datetime'] = ''
-                order['created_at_raw'] = ''
+            enrich_order_display_times(order)
                 
         return jsonify({
             "status": "success",
@@ -1978,7 +2050,11 @@ def checkout_endpoint():
             'status': 'paid',
             'tran_id': tran_id,
             'user': current_user.username if hasattr(current_user, 'username') else 'guest',
-            'created_at': datetime.now().isoformat()
+            # FIX: The server PC is ALREADY on Cambodia local time (GMT+7).
+            # datetime.now() gives the exact local wall-clock. Use strftime with
+            # a fixed format — NOT .isoformat() (microseconds) and NOT
+            # cambodia_time() (would double-shift +7h: 9 AM -> 4 PM).
+            'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
 
         local_id = local_db.add_order(order_data)
@@ -2001,7 +2077,7 @@ def checkout_endpoint():
                                                  items=order.get('items', []),
                                                  total=order.get('total', 0),
                                                  discount=order.get('discount', 0),
-                                                 date=datetime.fromisoformat(order.get('created_at', datetime.now().isoformat())).strftime("%d/%m/%Y %H:%M:%S"),
+                                                 date=format_ict(cambodia_time(datetime.fromisoformat(order.get('created_at', datetime.now().isoformat()))), "%d/%m/%Y %H:%M:%S"),
                                                  payment_method='cash',
                                                  RIEL_RATE=riel_rate,
                                                  is_pdf=True)
@@ -2087,7 +2163,10 @@ def create_aba_payment():
             'status': 'pending',
             'tran_id': tran_id,
             'user': current_user.username if hasattr(current_user, 'username') else 'guest',
-            'created_at': datetime.now().isoformat()
+            # FIX: server PC is ALREADY on Cambodia local time (GMT+7). Capture
+            # the exact local wall-clock — NOT .isoformat() (microseconds) and
+            # NOT cambodia_time() (would double-shift +7h again).
+            'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
         
         local_db.add_order(order_data)
@@ -2103,6 +2182,122 @@ def create_aba_payment():
     except Exception as e:
         print(f"❌ Backend Error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/create-acleda-payment', methods=['POST'])
+@csrf.exempt  # SECURITY: API endpoint
+@login_required
+def create_acleda_payment():
+    """Create a PENDING ACLEDA order (mirrors /create-aba-payment).
+
+    ACLEDA has NO Telegram auto-verification, so the cashier manually
+    confirms later. The order is saved as 'pending' with an ACL- tran_id.
+    When the cashier clicks "Confirm ACLEDA", /confirm-acleda flips THIS
+    exact row to 'paid by acleda' — never a brand-new duplicate row.
+    """
+    try:
+        data = request.json
+        items = data.get('items', [])
+        total = data.get('total')
+        discount = data.get('discount', 0)
+        # PILLAR 2: Collision-free crypto UUID (fallback if frontend omitted it)
+        tran_id = data.get('tran_id') or new_tran_id('ACL')
+
+        # PILLAR 3 (IDEMPOTENCY): Never create a duplicate pending order on retry
+        if local_db.order_exists(tran_id):
+            return jsonify({
+                'status': 'success',
+                'message': 'Order already created (duplicate request ignored)',
+                'tran_id': tran_id,
+                'duplicate': True
+            })
+
+        # Save to local database with 'pending' status
+        order_data = {
+            'items': items,
+            'total': total,
+            'discount': discount,
+            'status': 'pending',
+            'tran_id': tran_id,
+            'user': current_user.username if hasattr(current_user, 'username') else 'guest',
+            # FIX: server PC is ALREADY on Cambodia local time. Capture the
+            # exact local wall-clock — NO cambodia_time() (would add +7h again).
+            'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        }
+
+        local_db.add_order(order_data)
+
+        print(f"✅ ACLEDA order saved as pending locally. Tran ID: {tran_id} | Amount: ${total}")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'ACLEDA order created and pending manual confirmation',
+            'tran_id': tran_id
+        })
+
+    except Exception as e:
+        print(f"❌ Backend Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/confirm-acleda', methods=['POST'])
+@csrf.exempt  # SECURITY: API endpoint
+@login_required
+def confirm_acleda():
+    """Manually confirm an ACLEDA payment (cashier clicks "Confirm ACLEDA").
+
+    CRITICAL FIX: instead of INSERTING a brand-new order row, this route
+    looks up the EXISTING 'pending' row by its transaction ID and updates
+    THAT exact row to 'paid by acleda'. This prevents duplicate rows, and
+    created_at is re-stamped with the exact PC local time (NO extra +7h
+    offset — the server is already on Cambodia time).
+
+    Idempotent: if the row is already confirmed, returns success without
+    creating a duplicate or re-deducting stock.
+    """
+    try:
+        data = request.json or {}
+        tran_id = (data.get('tran_id') or '').strip()
+        if not tran_id:
+            return jsonify({'status': 'error', 'message': 'Missing tran_id'}), 400
+
+        # 1. Look up the existing pending row — DO NOT insert a new one.
+        order = local_db.get_order(tran_id)
+        if order is None:
+            return jsonify({'status': 'error', 'message': 'Order not found'}), 404
+
+        # 2. If already confirmed, treat as success (idempotent retry-safe).
+        current_status = str(order.get('status', '')).strip().lower()
+        if current_status in ('paid by acleda', 'paid', 'completed', 'paid by cash', 'paid by aba'):
+            return jsonify({
+                'status': 'success',
+                'message': 'Order already confirmed',
+                'tran_id': tran_id,
+                'local_id': order.get('local_id'),
+                'duplicate': True
+            }), 200
+
+        # 3. Update THAT exact row: status='paid by acleda' + exact local time.
+        #    NO cambodia_time() here — the PC is already on Cambodia time;
+        #    applying the helper again would add +7h (9 AM -> 4 PM).
+        local_db.update_order_status_and_time(
+            tran_id,
+            'paid by acleda',
+            datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        )
+
+        print(f"✅ ACLEDA manual confirmation: {tran_id} -> 'paid by acleda' (ICT timestamp)")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'ACLEDA payment confirmed',
+            'tran_id': tran_id,
+            'local_id': order.get('local_id')
+        }), 200
+
+    except Exception as e:
+        print(f"❌ ACLEDA confirm error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 @app.route('/check-status')
 @csrf.exempt  # SECURITY: API endpoint
@@ -2219,6 +2414,70 @@ def internal_error(error):
 def nsp_cosmetic_store_pos(req: https_fn.Request) -> https_fn.Response:
     with app.request_context(req.environ):
         return app.full_dispatch_request()
+
+# ============================================================
+# CUSTOMER FACING DISPLAY (CFD) — shared global state
+# The tablet polls /api/cfd/status every 1.5s; the POS pushes
+# updates via /api/cfd/set when the payment modal opens/closes.
+# ============================================================
+cfd_state = {
+    'status': 'idle',           # 'idle' | 'payment'
+    'data': {}                  # {total, amount_riel, tran_id, items, ...}
+}
+
+@app.route('/api/cfd/status', methods=['GET'])
+def cfd_status():
+    """GET the current CFD state (polled by the tablet)."""
+    return jsonify(cfd_state)
+
+@app.route('/api/cfd/set', methods=['POST'])
+@csrf.exempt  # SECURITY: JSON API endpoint (mirrors other /api/* POST routes)
+def cfd_set():
+    """POST a new CFD state from the POS (status + payload)."""
+    global cfd_state
+    try:
+        data = request.get_json(silent=True) or {}
+        new_status = data.get('status', 'idle')
+        if new_status not in ('idle', 'payment'):
+            return jsonify({'status': 'error', 'message': 'Invalid status'}), 400
+        payload = data.get('data') or {}
+        # Only keep JSON-serializable keys to keep the state lean and safe
+        allowed = ('total', 'amount_riel', 'usd_amount', 'tran_id', 'items', 'discount', 'shop_name', 'inv_no')
+        cfd_state = {
+            'status': new_status,
+            'data': {k: payload[k] for k in allowed if k in payload}
+        }
+        return jsonify({'status': 'ok', 'cfd_state': cfd_state})
+    except Exception as e:
+        print(f"❌ CFD set error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/cfd')
+def cfd_page():
+    """Serve the Customer Facing Display page."""
+    return render_template('cfd.html')
+
+@app.route('/api/cfd/products', methods=['GET'])
+def cfd_products():
+    """Random product selection for the idle slideshow."""
+    try:
+        products = local_db.get_products()
+        if not products:
+            return jsonify({'products': []})
+        random.shuffle(products)
+        # Return a rotating sample (cap at 12) with only the fields the CFD needs
+        sample = []
+        for p in products[:12]:
+            sample.append({
+                'id': p.get('id'),
+                'name': p.get('name'),
+                'price': p.get('price'),
+                'image': p.get('image')
+            })
+        return jsonify({'products': sample})
+    except Exception as e:
+        print(f"❌ CFD products error: {e}")
+        return jsonify({'products': []}), 500
 
 def open_browser():
     webbrowser.open_new('http://127.0.0.1:5000/')

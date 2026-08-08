@@ -148,6 +148,60 @@
 
 {% block extra_js %}
 <script>
+    // Cambodia ICT (UTC+7) timestamp formatter — shared across stock-history views.
+    // - Naive ISO strings (legacy datetime.now().isoformat()) are pinned to +07:00.
+    // - Aware strings (e.g. Firestore UTC with Z/+00:00) are shifted +7h.
+    function dashFormatDateTime(iso) {
+        if (!iso) return '—';
+        try {
+            let s = String(iso).trim();
+            // Normalize a lowercase trailing 'z' so every engine parses it.
+            if (/z$/i.test(s)) s = s.slice(0, -1) + 'Z';
+
+            // Extract Cambodia ICT (UTC+7) wall-clock components WITHOUT ever
+            // depending on the browser's own timezone.
+            let y, mo, d, h = 0, mi = 0, se = 0;
+
+            // 1) UTC-aware? ('Z' or explicit ±HH:MM / ±HHMM offset suffix)
+            if (/(Z|[+-]\d{2}:?\d{2})$/.test(s)) {
+                // Date.parse normalizes EVERY offset flavor to the same true
+                // UTC instant; +7h shifts it to the Cambodia ICT wall-clock.
+                const t = Date.parse(s);
+                if (isNaN(t)) return iso;
+                const ict = new Date(t + 7 * 3600 * 1000);
+                y = ict.getUTCFullYear(); mo = ict.getUTCMonth() + 1; d = ict.getUTCDate();
+                h = ict.getUTCHours(); mi = ict.getUTCMinutes(); se = ict.getUTCSeconds();
+            } else {
+                // 2) Naive string (e.g. legacy '2026-08-08T12:16:39'): the
+                //    wall-clock is ALREADY Cambodia local time — parse the
+                //    components directly with ZERO hour shift.
+                const dtParts = s.split('T');
+                const datePart = dtParts[0] || '';
+                const timePart = dtParts.length > 1 ? dtParts[1] : '';
+                const dm = datePart.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (!dm) return iso;
+                y = parseInt(dm[1], 10);
+                mo = parseInt(dm[2], 10);
+                d = parseInt(dm[3], 10);
+                const tm = timePart.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+                if (tm) {
+                    h = parseInt(tm[1], 10) % 24;
+                    mi = parseInt(tm[2], 10) || 0;
+                    se = parseInt(tm[3], 10) || 0;
+                }
+            }
+
+            // Format: dd/MM/yyyy hh:mm:ss AM/PM — matches the report API format.
+            const pad = (n) => String(n).padStart(2, '0');
+            const h12 = h % 12 === 0 ? 12 : h % 12;
+            const ampm = h < 12 ? 'AM' : 'PM';
+            return pad(d) + '/' + pad(mo) + '/' + y +
+                ' ' + pad(h12) + ':' + pad(mi) + ':' + pad(se) + ' ' + ampm;
+        } catch (e) {
+            return iso;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('searchInput');
         const table = document.getElementById('cosmeticsTable');
@@ -261,7 +315,7 @@
                     
                     if (data.history && data.history.length > 0) {
                         data.history.forEach(record => {
-                            const date = new Date(record.created_at).toLocaleString();
+                            const date = dashFormatDateTime(record.created_at);
                             const amountColor = record.change_amount > 0 ? '#059669' : '#dc2626';
                             const amountPrefix = record.change_amount > 0 ? '+' : '';
                             

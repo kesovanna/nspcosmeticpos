@@ -2,10 +2,17 @@ import firebase_admin
 from firebase_admin import firestore
 import local_db
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import json
 import threading
 import time
+import os
+from werkzeug.utils import secure_filename
+
+# --- Cambodia ICT = UTC+7 (fixed, no DST) ---
+# Used when pushing order created_at to Firestore so the SDK stores the
+# correct UTC instant instead of misinterpreting a naive local string as UTC.
+ICT_TZ = timezone(timedelta(hours=7), name='ICT')
 
 # --- SYNC STATE MANAGEMENT ---
 _sync_lock = threading.Lock()
@@ -30,17 +37,8 @@ def get_firestore_db():
 def push_order_transactionally(db, order_data):
     """
     Push one order to Firestore with EXACTLY-ONCE semantics.
-
-    - PILLAR 2: The Firestore document ID is the ``tran_id`` (UUID) itself, so
-      offline and online devices can never collide, and retries overwrite the
-      same document instead of duplicating.
-    - PILLAR 1: Creating the order document and deducting cloud stock happen in
-      ONE atomic Firestore transaction. If the transaction aborts, neither
-      happened; if it commits, both happened exactly once.
-    - PILLAR 3: If the document already exists with a confirmed status
-      (paid/completed), stock was already deducted — we only merge updates.
-      If it exists as ``pending`` and is now confirmed, we deduct at that
-      transition point (exactly once).
+    Fixes ReadAfterWriteError by moving ALL reads (including the order doc check) 
+    strictly inside Phase 1 of the transaction boundary.
     """
     tran_id = order_data.get('tran_id')
     if not tran_id:
@@ -50,50 +48,88 @@ def push_order_transactionally(db, order_data):
     items = order_data.get('items', []) or []
     new_status = order_data.get('status')
 
-    existing = doc_ref.get()
-    if existing.exists:
-        prev_status = existing.get('status')
-        # Already confirmed on cloud -> stock was deducted -> just merge updates
-        if prev_status in ('paid', 'completed') and new_status in ('paid', 'completed'):
-            doc_ref.set(order_data, merge=True)
-            return True, "order already confirmed; metadata merged"
-        # Pending -> confirmed transition: deduct cloud stock now (exactly once)
-        needs_deduction = new_status in ('paid', 'completed')
-    else:
-        # Brand new document: deduct only for confirmed sales
-        needs_deduction = new_status in ('paid', 'completed')
-
-    if not needs_deduction:
-        # Pending/unconfirmed order: store record only, never touch stock
-        doc_ref.set(order_data)
-        return True, "order created (pending, no stock deduction)"
-
     @firestore.transactional
     def create_order_and_deduct_stock(transaction):
-        # 1. Create/overwrite the order document inside the transaction
-        transaction.set(doc_ref, order_data)
-        # 2. Atomically read-update stock for every sold item
-        for item in items:
-            prod_id = item.get('id') or item.get('product_id')
-            if not prod_id:
-                continue
-            qty_to_deduct = int(item.get('quantity', 0) or item.get('qty', 0))
-            if qty_to_deduct <= 0:
-                continue
-            item_ref = db.collection('items').document(prod_id)
-            snapshot = item_ref.get(transaction=transaction)
-            if not snapshot.exists:
-                # Product missing on cloud (may have been deleted); skip item
-                continue
-            current_stock = snapshot.get('stock_quantity') or 0
-            # Clamp at 0: never allow negative cloud stock during reconciliation
-            new_stock = max(0, current_stock - qty_to_deduct)
-            if new_stock != current_stock:
-                transaction.update(item_ref, {'stock_quantity': new_stock})
+        # ------------------------------------------------------------
+        # PHASE 1: ALL READS FIRST (Strictly required by Firestore)
+        # ------------------------------------------------------------
+        # 1. Read the order document snapshot FIRST inside the transaction
+        existing_snapshot = doc_ref.get(transaction=transaction)
+        
+        needs_deduction = False
+        action_type = "set" # Default operation style
+        
+        if existing_snapshot.exists:
+            prev_status = existing_snapshot.get('status')
+            # Already confirmed on cloud -> stock was deducted -> just merge updates
+            if prev_status in ('paid', 'completed') and new_status in ('paid', 'completed'):
+                action_type = "merge"
+            else:
+                # Pending -> confirmed transition: deduct cloud stock now
+                needs_deduction = new_status in ('paid', 'completed')
+                action_type = "set"
+        else:
+            # Brand new cloud document: deduct only for confirmed sales
+            needs_deduction = new_status in ('paid', 'completed')
+            action_type = "set"
 
-    transaction = db.transaction()
-    create_order_and_deduct_stock(transaction)
-    return True, "order created and cloud stock deducted atomically"
+        # 2. Gather all product stock snapshots upfront within the transaction
+        stock_snapshots = []
+        if needs_deduction:
+            for item in items:
+                prod_id = item.get('id') or item.get('product_id')
+                if not prod_id:
+                    continue
+                qty_to_deduct = int(item.get('quantity', 0) or item.get('qty', 0))
+                if qty_to_deduct <= 0:
+                    continue
+                
+                item_ref = db.collection('items').document(prod_id)
+                # READ statement inside transaction
+                product_snapshot = item_ref.get(transaction=transaction)
+                stock_snapshots.append({
+                    'ref': item_ref,
+                    'snapshot': product_snapshot,
+                    'qty': qty_to_deduct
+                })
+
+        # ------------------------------------------------------------
+        # PHASE 2: ALL WRITES NEXT (No more reads allowed after this)
+        # ------------------------------------------------------------
+        # 1. Write the Order Document based on inferred action type
+        if action_type == "merge":
+            transaction.set(doc_ref, order_data, merge=True)
+            # Early return within transaction context for merged metadata
+            return True
+
+        transaction.set(doc_ref, order_data)
+            
+        # 2. Atomically update stock for every sold item using pre-fetched snapshots
+        if needs_deduction:
+            for entry in stock_snapshots:
+                item_ref = entry['ref']
+                snapshot = entry['snapshot']
+                qty_to_deduct = entry['qty']
+                
+                if not snapshot.exists:
+                    continue
+                    
+                current_stock = snapshot.get('stock_quantity') or 0
+                # Clamp at 0: never allow negative cloud stock during reconciliation
+                new_stock = max(0, current_stock - qty_to_deduct)
+                
+                if new_stock != current_stock:
+                    transaction.update(item_ref, {'stock_quantity': new_stock})
+                    
+        return True
+
+    try:
+        transaction_ref = db.transaction()
+        create_order_and_deduct_stock(transaction_ref)
+        return True, "Order pushed and cloud stock calculated transactionally"
+    except Exception as e:
+        print(f"❌ Firestore Transaction Failed for {tran_id}: {e}")
+        return False, str(e)
 
 def pull_from_firestore():
     """Pull products and users from Firestore to local SQLite"""
@@ -115,7 +151,6 @@ def pull_from_firestore():
             p['id'] = doc.id
             
             # Audit: Ensure price normalization (Safety check for inflated cloud data)
-            # Pull current rate from settings if available, else default
             current_rate = float(local_db.get_setting('exchange_rate', 4039))
             if p.get('price', 0) > 1000:
                 p['price'] = p['price'] / current_rate
@@ -137,7 +172,6 @@ def pull_from_firestore():
         local_db.save_users(users_list)
 
         # 2b. Prune local users that no longer exist in Firestore
-        # (Prevents deleted accounts from resurrecting in the local DB)
         firestore_usernames = {u['username'] for u in users_list}
         local_usernames = {u['username'] for u in local_db.get_all_users()}
         for username in (local_usernames - firestore_usernames):
@@ -172,7 +206,6 @@ def push_to_firestore():
                 except Exception as e:
                     print(f"Failed to delete {prod_id} from Firestore: {e}")
             
-            # Clear log only for IDs that were successfully deleted from Firestore
             if successfully_deleted:
                 local_db.clear_deletion_log(successfully_deleted)
 
@@ -189,7 +222,6 @@ def push_to_firestore():
         try:
             users = local_db.get_all_users()
             for user in users:
-                # Audit: Specifically call a function to get user images
                 profile_data = local_db.get_user_profile(user['username'])
                 if not profile_data:
                     continue
@@ -199,10 +231,8 @@ def push_to_firestore():
                     'cover_image': profile_data.get('cover_image')
                 }
 
-                # Only push if they have images
                 if user_data['profile_image'] or user_data['cover_image']:
-                    print(f"Syncing images for user: {user.get('username')}") # Debug log
-                    # Use set(merge=True) so it works even if the document doesn't exist yet
+                    print(f"Syncing images for user: {user.get('username')}")
                     db.collection('users').document(user['username']).set(user_data, merge=True)
                     count += 1
         except Exception as e:
@@ -210,10 +240,9 @@ def push_to_firestore():
             traceback.print_exc()
             return False, f"Error syncing user profile images: {str(e)}"
 
-        # 3. Push Orders (PILLAR 1+2+3: exactly-once, atomic, collision-free)
+        # 4. Push Orders (PILLAR 1+2+3: exactly-once, atomic, collision-free)
         unsynced = local_db.get_unsynced_orders()
         for order in unsynced:
-            # Prepare data for Firestore
             order_data = {
                 'items': json.loads(order['items']),
                 'total': order['total'],
@@ -221,20 +250,38 @@ def push_to_firestore():
                 'tran_id': order['tran_id'],
                 'user': order['user']
             }
-            # Handle created_at
             if order['created_at']:
                 try:
-                    order_data['created_at'] = datetime.fromisoformat(order['created_at'])
+                    # ------------------------------------------------------------------
+                    # TIMEZONE FIX: preserve the exact Cambodia wall-clock instant.
+                    #
+                    # The local DB stores NAIVE ICT strings like
+                    # '2026-08-08T11:39:36' (no offset). Passing that to Firestore
+                    # as a naive datetime makes the SDK serialize it as UTC+00:00,
+                    # so reading it back and converting to ICT (+7) shifted it to
+                    # 18:39 (the "06:39 PM instead of 11:40 AM" bug).
+                    #
+                    # Fix: attach the ICT timezone (+07:00) to the parsed datetime
+                    # BEFORE the write. Firestore then stores the correct UTC
+                    # instant (04:39:36Z), and the read-back cambodia_time()
+                    # conversion yields exactly 11:39:36 ICT. Round-trip verified.
+                    # ------------------------------------------------------------------
+                    created_dt = datetime.fromisoformat(order['created_at'])
+                    if created_dt.tzinfo is None:
+                        # Naive local string -> assume it is already Cambodia wall-clock
+                        created_dt = created_dt.replace(tzinfo=ICT_TZ)
+                    else:
+                        # Already aware (e.g. +00:00 from Firestore read-back) -> normalize
+                        created_dt = created_dt.astimezone(ICT_TZ)
+                    order_data['created_at'] = created_dt
                 except:
-                    order_data['created_at'] = datetime.now()
+                    order_data['created_at'] = datetime.now(ICT_TZ)
             else:
-                order_data['created_at'] = datetime.now()
+                order_data['created_at'] = datetime.now(ICT_TZ)
 
-            # Exactly-once, transactional push (see push_order_transactionally)
             pushed_ok, pushed_msg = push_order_transactionally(db, order_data)
 
             if pushed_ok:
-                # Mark as synced locally; firestore_id == tran_id (UUID doc id)
                 local_db.mark_order_synced(order['local_id'], order['tran_id'])
                 count += 1
             else:
@@ -275,10 +322,7 @@ def sync_all():
             sync_status['is_syncing'] = False
 
 def trigger_auto_sync(delay=5):
-    """
-    Schedules a sync to happen after 'delay' seconds.
-    If called again before the delay expires, the timer resets.
-    """
+    """Schedules a sync to happen after 'delay' seconds."""
     global _sync_timer
     with _sync_lock:
         if _sync_timer is not None:
@@ -290,9 +334,7 @@ def trigger_auto_sync(delay=5):
         print(f"Auto-sync scheduled in {delay} seconds...")
 
 def start_background_sync(interval=30):
-    """
-    Starts a background thread that syncs every 'interval' seconds (default 30s).
-    """
+    """Starts a background thread that syncs periodically."""
     def sync_loop():
         while True:
             time.sleep(interval)

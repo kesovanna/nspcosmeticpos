@@ -2,8 +2,38 @@ import sqlite3
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+
+# Cambodia ICT = UTC+7 (fixed, no DST)
+ICT_TZ = timezone(timedelta(hours=7), name='ICT')
+
+# Canonical set of "paid / revenue-earning" statuses. Every revenue counter
+# (dashboard stats + daily/monthly/annual sales reports) MUST use exactly
+# this set so the summary cards can never disagree with the table filters.
+# 'paid by cash' / 'paid by aba' / 'paid by acleda' are the canonical
+# payment-method statuses; 'paid' / 'completed' are the legacy bare forms.
+PAID_STATUSES = ('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed')
+
+# SQL fragment: case-insensitive, whitespace-trimmed status membership.
+# Shared by every query that aggregates revenue / order counts.
+PAID_STATUSES_SQL = (
+    "LOWER(TRIM(status)) IN "
+    "('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed')"
+)
+
+def cambodia_time(dt):
+    """Normalize any datetime to Cambodia ICT (UTC+7).
+
+    Naive datetimes are assumed to already be Cambodia local wall-clock
+    (legacy rows written by datetime.now().isoformat()); aware datetimes
+    (e.g. Firestore Timestamps with +00:00) are converted to ICT.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=ICT_TZ)
+    return dt.astimezone(ICT_TZ)
 
 # --- PORTABLE PATH LOGIC ---
 def get_resource_path(relative_path):
@@ -681,6 +711,26 @@ def update_order_status_by_local_id(local_id, status):
     conn.commit()
     conn.close()
 
+def update_order_status_and_time(tran_id, status, created_at):
+    """Update an order's status AND created_at in one atomic UPDATE.
+
+    Used by ACLEDA manual confirmation: flips the EXISTING pending row to
+    'paid by acleda' and re-stamps its timestamp with the Cambodia ICT
+    value, so the row never shifts +7 hours and never duplicates.
+    """
+    conn = get_connection()
+    try:
+        conn.execute(
+            'UPDATE orders SET status = ?, created_at = ? WHERE tran_id = ?',
+            (status, created_at, tran_id)
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 def update_order_receipt_status(tran_id, has_receipt=1):
     conn = get_connection()
     # Try by tran_id first
@@ -852,25 +902,42 @@ def get_daily_sales_report(target_date):
     """
     Get revenue, total orders, and top products for a specific date (YYYY-MM-DD).
     Also returns all orders for the table display.
+
+    NOTE: Rows are filtered by Cambodia ICT (UTC+7) date, so UTC-aware
+    timestamps (e.g. from Firestore) are correctly bucketed.
     """
     conn = get_connection()
-    # Find orders for that date. Store uses ISO string for created_at.
-    # We use LIKE 'target_date%' to match the date part.
-    orders = conn.execute(
-        "SELECT * FROM orders WHERE created_at LIKE ?",
-        (f"{target_date}%",)
-    ).fetchall()
+    orders = conn.execute("SELECT * FROM orders").fetchall()
     conn.close()
+
+    # ICT date boundary for the requested day
+    try:
+        dt = datetime.strptime(target_date, '%Y-%m-%d')
+    except Exception:
+        dt = datetime.now()
+    start_dt = cambodia_time(datetime(dt.year, dt.month, dt.day))
+    end_dt = start_dt + timedelta(days=1)
 
     total_revenue = 0
     total_orders = 0
     item_summary = {}
+    day_orders = []
 
     for o in orders:
-        if o['status'] in ('paid', 'completed'):
+        try:
+            created_at = cambodia_time(datetime.fromisoformat(o['created_at']))
+        except Exception:
+            continue
+        if not (start_dt <= created_at < end_dt):
+            continue
+        day_orders.append(o)
+        if o['status'].strip().lower() in PAID_STATUSES:
             total_revenue += float(o['total'] or 0)
             total_orders += 1
-            items = json.loads(o['items'])
+            try:
+                items = json.loads(o['items'])
+            except (json.JSONDecodeError, TypeError):
+                items = []
             for item in items:
                 name = item.get('name', 'Unknown')
                 qty = int(item.get('quantity', 0) or item.get('qty', 0))
@@ -887,30 +954,51 @@ def get_daily_sales_report(target_date):
         "revenue": total_revenue,
         "order_count": total_orders,
         "top_products": top_items,
-        "orders": [dict(o) for o in orders]
+        "orders": [dict(o) for o in day_orders]
     }
 
 def get_monthly_sales_report(target_month):
     """
     Get revenue, total orders, and top products for a specific month (YYYY-MM).
     Also returns all orders for the table display.
+
+    NOTE: Rows are filtered by Cambodia ICT (UTC+7) month.
     """
     conn = get_connection()
-    orders = conn.execute(
-        "SELECT * FROM orders WHERE created_at LIKE ?",
-        (f"{target_month}%",)
-    ).fetchall()
+    orders = conn.execute("SELECT * FROM orders").fetchall()
     conn.close()
+
+    # ICT month boundary
+    try:
+        dt = datetime.strptime(target_month, '%Y-%m')
+    except Exception:
+        dt = datetime.now()
+    start_dt = cambodia_time(datetime(dt.year, dt.month, 1))
+    if dt.month == 12:
+        end_dt = cambodia_time(datetime(dt.year + 1, 1, 1))
+    else:
+        end_dt = cambodia_time(datetime(dt.year, dt.month + 1, 1))
 
     total_revenue = 0
     total_orders = 0
     item_summary = {}
+    month_orders = []
 
     for o in orders:
-        if o['status'] in ('paid', 'completed'):
+        try:
+            created_at = cambodia_time(datetime.fromisoformat(o['created_at']))
+        except Exception:
+            continue
+        if not (start_dt <= created_at < end_dt):
+            continue
+        month_orders.append(o)
+        if o['status'].strip().lower() in PAID_STATUSES:
             total_revenue += float(o['total'] or 0)
             total_orders += 1
-            items = json.loads(o['items'])
+            try:
+                items = json.loads(o['items'])
+            except (json.JSONDecodeError, TypeError):
+                items = []
             for item in items:
                 name = item.get('name', 'Unknown')
                 qty = int(item.get('quantity', 0) or item.get('qty', 0))
@@ -926,30 +1014,48 @@ def get_monthly_sales_report(target_month):
         "revenue": total_revenue,
         "order_count": total_orders,
         "top_products": top_10,
-        "orders": [dict(o) for o in orders]
+        "orders": [dict(o) for o in month_orders]
     }
 
 def get_annual_sales_report(target_year):
     """
     Get revenue, total orders, and top products for a specific year (YYYY).
     Also returns all orders for the table display.
+
+    NOTE: Rows are filtered by Cambodia ICT (UTC+7) year.
     """
     conn = get_connection()
-    orders = conn.execute(
-        "SELECT * FROM orders WHERE created_at LIKE ?",
-        (f"{target_year}%",)
-    ).fetchall()
+    orders = conn.execute("SELECT * FROM orders").fetchall()
     conn.close()
+
+    # ICT year boundary
+    try:
+        year = int(target_year)
+    except Exception:
+        year = datetime.now().year
+    start_dt = cambodia_time(datetime(year, 1, 1))
+    end_dt = cambodia_time(datetime(year + 1, 1, 1))
 
     total_revenue = 0
     total_orders = 0
     item_summary = {}
+    year_orders = []
 
     for o in orders:
-        if o['status'] in ('paid', 'completed'):
+        try:
+            created_at = cambodia_time(datetime.fromisoformat(o['created_at']))
+        except Exception:
+            continue
+        if not (start_dt <= created_at < end_dt):
+            continue
+        year_orders.append(o)
+        if o['status'].strip().lower() in PAID_STATUSES:
             total_revenue += float(o['total'] or 0)
             total_orders += 1
-            items = json.loads(o['items'])
+            try:
+                items = json.loads(o['items'])
+            except (json.JSONDecodeError, TypeError):
+                items = []
             for item in items:
                 name = item.get('name', 'Unknown')
                 qty = int(item.get('quantity', 0) or item.get('qty', 0))
@@ -965,7 +1071,7 @@ def get_annual_sales_report(target_year):
         "revenue": total_revenue,
         "order_count": total_orders,
         "top_products": top_items,
-        "orders": [dict(o) for o in orders]
+        "orders": [dict(o) for o in year_orders]
     }
 
 def get_activities(limit=20):
@@ -996,11 +1102,11 @@ def get_activities(limit=20):
                 # Parse items JSON
                 items = json.loads(items_json) if items_json else []
                 
-                # Convert created_at to datetime if it's a string
+                # Convert created_at to datetime if it's a string (normalize to ICT)
                 if isinstance(created_at, str):
-                    order_time = datetime.fromisoformat(created_at)
+                    order_time = cambodia_time(datetime.fromisoformat(created_at))
                 else:
-                    order_time = created_at
+                    order_time = cambodia_time(created_at)
                 
                 # Build item description
                 item_names = []
@@ -1058,9 +1164,9 @@ def get_activities(limit=20):
             
             try:
                 if isinstance(created_at, str):
-                    event_time = datetime.fromisoformat(created_at)
+                    event_time = cambodia_time(datetime.fromisoformat(created_at))
                 else:
-                    event_time = created_at
+                    event_time = cambodia_time(created_at)
                     
                 product_name = product_name or "ផលិតផលមិនស្គាល់"
                 
@@ -1095,8 +1201,9 @@ def get_activities(limit=20):
         activities = activities[:limit]
         
         # Format time strings for the final list
+        now_ict = cambodia_time(datetime.now())
         for activity in activities:
-            time_diff = datetime.now() - activity['time_obj']
+            time_diff = now_ict - activity['time_obj']
             if time_diff.total_seconds() < 60:
                 time_str = "ម៉ោងនេះ"
             elif time_diff.total_seconds() < 3600:
@@ -1140,16 +1247,28 @@ def get_dashboard_stats(riel_rate=4000):
     The order items JSON stores selling price + qty, while cost_price
     lives on the products table (joined at query time).
     """
-    today_start = datetime.now().strftime('%Y-%m-%d') + 'T00:00:00'
-    week_ago = (datetime.now() - timedelta(days=6)).strftime('%Y-%m-%d') + 'T00:00:00'
+    now_ict = cambodia_time(datetime.now())
+    today_start_dt = cambodia_time(datetime(now_ict.year, now_ict.month, now_ict.day))
+    week_ago_dt = today_start_dt - timedelta(days=6)
 
-    # 1. Today's paid/completed orders (raw, for revenue + profit)
+    # 1. Today's paid/completed orders (raw, for revenue + profit).
+    #    Uses the module-level canonical PAID set (PAID_STATUSES_SQL) so the
+    #    dashboard can never disagree with the sales-report revenue counters.
     conn = get_connection()
-    today_rows = conn.execute(
-        "SELECT * FROM orders WHERE created_at >= ? AND status IN ('paid', 'completed')",
-        (today_start,)
+    all_rows = conn.execute(
+        f"SELECT * FROM orders WHERE {PAID_STATUSES_SQL}"
     ).fetchall()
-
+    today_rows = []
+    revenue_rows = []
+    for o in all_rows:
+        try:
+            ts = cambodia_time(datetime.fromisoformat(o['created_at']))
+        except Exception:
+            continue
+        if today_start_dt <= ts:
+            today_rows.append(o)
+        if week_ago_dt <= ts:
+            revenue_rows.append((ts, o))
     # 2. Product cost lookup (single query, reused across all orders)
     cost_map = {}
     prod_rows = conn.execute(
@@ -1163,28 +1282,17 @@ def get_dashboard_stats(riel_rate=4000):
         "SELECT COUNT(*) AS c FROM products WHERE stock_quantity <= ?", (5,)
     ).fetchone()
 
-    # 4. 7-day revenue series (sum total of paid/completed orders per calendar day)
-    revenue_rows = conn.execute(
-        """SELECT substr(created_at, 1, 10) AS day, SUM(total) AS usd
-           FROM orders
-           WHERE created_at >= ? AND status IN ('paid', 'completed')
-           GROUP BY substr(created_at, 1, 10)
-           ORDER BY day ASC""",
-        (week_ago,)
-    ).fetchall()
-    revenue_by_day = {row['day']: float(row['usd'] or 0.0) for row in revenue_rows}
+    # 4. 7-day revenue series (sum total of paid/completed orders per ICT calendar day)
+    revenue_by_day = {}
+    for ts, o in revenue_rows:
+        day = ts.strftime('%Y-%m-%d')
+        revenue_by_day[day] = revenue_by_day.get(day, 0.0) + float(o['total'] or 0)
 
     # 5. Top selling categories (qty + revenue from paid/completed orders in last 7 days)
-    cat_rows = conn.execute(
-        """SELECT substr(created_at, 1, 10) AS day, items
-           FROM orders
-           WHERE created_at >= ? AND status IN ('paid', 'completed')""",
-        (week_ago,)
-    ).fetchall()
     cat_agg = {}
-    for row in cat_rows:
+    for ts, o in revenue_rows:
         try:
-            item_list = json.loads(row['items'] or '[]')
+            item_list = json.loads(o['items'] or '[]')
         except (json.JSONDecodeError, TypeError):
             item_list = []
         for item in item_list:
@@ -1202,25 +1310,61 @@ def get_dashboard_stats(riel_rate=4000):
         for cat, agg in top_categories
     ]
 
-    # 6. Recent invoices (top 5 paid/completed by created_at desc)
+    # 6. Recent invoices (top 5 paid/completed by created_at desc, ICT-normalized)
     recent_rows = conn.execute(
-        """SELECT tran_id, local_id, total, user, status, created_at
-           FROM orders
-           WHERE status IN ('paid', 'completed')
-           ORDER BY created_at DESC
-           LIMIT 5"""
+        f"""SELECT tran_id, local_id, total, user, status, created_at
+            FROM orders
+            WHERE {PAID_STATUSES_SQL}"""
     ).fetchall()
+
+    # 6b. LIVE FALLBACK GUARD (anti-desync)
+    # --------------------------------
+    # The numbers above are computed from rows that were paid at the moment
+    # this function started. If those orders were subsequently deleted (or
+    # their status changed away from the paid set) while this call was in
+    # flight, the summary cards would show stale revenue/counts even though
+    # the sales-report table (which lists ALL order rows) shows 0 rows.
+    #
+    # So we re-query the orders table directly and count TODAY's PAID rows
+    # only -- the exact canonical paid set, matching the revenue pipeline
+    # (pending/ABA rows are NOT included because they contribute $0 until
+    # the Telegram listener flips them to 'paid'; the reports page has its
+    # own pending filter for visibility). Status matching is
+    # case-insensitive (LOWER + TRIM) so 'Paid'/'PAID'/'paid by cash' rows
+    # never slip through. The date-boundary comparison mirrors
+    # get_daily_sales_report(): created_at is normalized with cambodia_time()
+    # (naive local rows are treated as ICT, +07:00-aware rows are converted).
+    # If zero paid rows remain today, the guard hard-forces the dashboard
+    # numbers to zero so the cards can never disagree with an empty table.
+    live_today_count = 0
+    for row in conn.execute(
+        f"""SELECT created_at FROM orders
+            WHERE {PAID_STATUSES_SQL}"""
+    ).fetchall():
+        try:
+            ts = cambodia_time(datetime.fromisoformat(str(row['created_at'])))
+        except Exception:
+            continue
+        if today_start_dt <= ts < (today_start_dt + timedelta(days=1)):
+            live_today_count += 1
 
     # 7. Recent stock movements (top 5 by created_at desc, join product name)
     stock_rows = conn.execute(
         """SELECT sh.product_id, sh.change_amount, sh.reason, sh.created_at, p.name AS product_name
            FROM stock_history sh
-           LEFT JOIN products p ON sh.product_id = p.id
-           ORDER BY sh.created_at DESC
-           LIMIT 5"""
+           LEFT JOIN products p ON sh.product_id = p.id"""
     ).fetchall()
 
     conn.close()
+
+    # Normalize + sort in Python so naive (ICT) and aware (UTC) mix correctly
+    def _sort_key(created_at):
+        try:
+            return cambodia_time(datetime.fromisoformat(str(created_at)))
+        except Exception:
+            return now_ict
+    recent_rows = sorted(recent_rows, key=lambda r: _sort_key(r['created_at']), reverse=True)[:5]
+    stock_rows = sorted(stock_rows, key=lambda s: _sort_key(s['created_at']), reverse=True)[:5]
 
     # --- Compute today's revenue + gross profit from today_rows ---
     today_revenue = 0.0
@@ -1242,7 +1386,7 @@ def get_dashboard_stats(riel_rate=4000):
     # --- Build the 7-day series (fill missing days with 0) ---
     revenue_7d = []
     for i in range(6, -1, -1):
-        day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+        day = (now_ict - timedelta(days=i)).strftime('%Y-%m-%d')
         usd = revenue_by_day.get(day, 0.0)
         revenue_7d.append({
             'date': day,
@@ -1250,6 +1394,26 @@ def get_dashboard_stats(riel_rate=4000):
             'usd': round(usd, 2),
             'riel': round(usd * riel_rate)
         })
+
+    # --- LIVE FALLBACK GUARD (anti-desync) ---
+    # The metrics above were computed from rows that were paid at the moment
+    # this function started. If those orders were subsequently deleted (or
+    # their status changed away from the paid set) while this call was in
+    # flight, the summary cards would show stale revenue/counts even though
+    # the sales-report table (which lists ALL order rows) shows 0 rows. The
+    # guard re-queries the orders table directly for today's date range; if
+    # zero PAID orders remain, it hard-forces the dashboard numbers to zero
+    # so the cards can never disagree with an empty table.
+    if live_today_count == 0 and today_orders > 0:
+        print("[dashboard-stats] Live guard: today's paid orders are gone "
+              f"(computed {today_orders} stale) -> forcing today's metrics to 0")
+        today_revenue = 0.0
+        today_profit = 0.0
+        today_orders = 0
+        today_key = now_ict.strftime('%Y-%m-%d')
+        revenue_by_day[today_key] = 0.0
+        top_categories = []
+        recent_rows = []
 
     # --- Recent orders (already sorted desc, keep top 5) ---
     recent_orders = []

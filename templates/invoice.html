@@ -6,6 +6,7 @@
     <title>វិក្កយបត្រ - NSP Cosmetic Store</title>
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap');
 
@@ -63,6 +64,22 @@
         .aba-qr-container { text-align: center; padding: 10px; }
         .aba-qr-img { width: 220px; height: 220px; margin: 0 auto 15px; border: 8px solid white; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .aba-deeplink { display: inline-block; margin-top: 15px; padding: 12px 25px; background: #005a9c; color: white; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .btn-success { background: #28a745; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .btn-success:hover { background: #218838; }
+        .qr-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .qr-modal { background: #fff; width: 100%; max-width: 760px; border-radius: 20px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-height: 92vh; overflow-y: auto; }
+        .qr-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .qr-modal-header h3 { margin: 0; font-size: 18px; color: #333; }
+        .qr-modal-close { background: transparent; border: none; font-size: 28px; line-height: 1; cursor: pointer; color: #666; }
+        .qr-modal-close:hover { color: #d81b60; }
+        .qr-modal-grid { display: flex; gap: 20px; align-items: stretch; }
+        .qr-col { flex: 1; border: 1px solid #eee; border-radius: 14px; padding: 18px 14px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .qr-bank-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; color: #333; margin-bottom: 12px; }
+        .qr-bank-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        @media (max-width: 640px) {
+            .qr-modal-grid { flex-direction: column; }
+            .qr-col { width: 100%; }
+        }
         @media (max-width: 600px) { h1, h2 { font-size: 1.5rem !important; text-align: center; } }
 
         /* WeasyPrint & Thermal Printer Optimization */
@@ -262,8 +279,8 @@
     <div class="btn-group">
         {% if payment_method|lower == 'qr' %}
         <button class="btn btn-aba" onclick="payWithABA()">
-            <img src="https://www.ababank.com/typo3conf/ext/aba/Resources/Public/Images/aba-logo.png" style="height: 18px;" alt="ABA">
-            បង់ប្រាក់ជាមួយ ABA Pay
+            <span style="font-size: 24px;">📱</span>
+            ទូទាត់តាម QR Code (Scan to Pay)
         </button>
         {% else %}
         <button class="btn btn-aba" style="background: #28a745;" onclick="confirmCashPayment()">
@@ -276,8 +293,55 @@
     </div>
 </div>
 
+<!-- ============ QR PAYMENT MODAL (ABA + ACLEDA) ============ -->
+<div id="paymentModal" class="qr-modal-overlay" style="display:none;" onclick="if(event.target===this) closePaymentModal()">
+    <div class="qr-modal" role="dialog" aria-modal="true" aria-label="QR Code Payment">
+        <div class="qr-modal-header">
+            <h3>ទូទាត់តាម QR Code | Scan to Pay</h3>
+            <button type="button" class="qr-modal-close" onclick="closePaymentModal()" aria-label="Close">&times;</button>
+        </div>
+        <div class="qr-modal-grid">
+            <!-- COLUMN 1: ABA Mobile (dynamic) -->
+            <div class="qr-col">
+                <div class="qr-bank-title">
+                    <span class="qr-bank-dot" style="background:#005a9c;"></span>
+                    ABA Mobile
+                </div>
+                <div class="aba-qr-container" style="padding: 5px;">
+                    <div id="qrcode"></div>
+                    <div style="font-weight:800; color:#28a745; font-size:24px; margin: 6px 0;" id="amount">៛ 0</div>
+                    <div style="font-weight:700; color:#d81b60; font-size:16px; margin-bottom: 6px;" id="usd_amount">$ 0.00</div>
+                    <p style="font-size:12px; color:#666; margin:0;">សូមស្កេន QR នេះជាមួយកម្មវិធី <b>ABA Mobile</b></p>
+                    <div id="polling-status" style="font-size:13px; color:#005a9c; margin-top:12px; font-weight:bold; animation: pulse 2s infinite;">🔄 កំពុងរង់ចាំការបង់ប្រាក់...</div>
+                </div>
+            </div>
+
+            <!-- COLUMN 2: ACLEDA ToanChet (static placeholder) -->
+            <div class="qr-col">
+                <div class="qr-bank-title">
+                    <span class="qr-bank-dot" style="background:#ED1C24;"></span>
+                    ACLEDA ToanChet
+                </div>
+                <img src="/static/images/acleda_qr.png" alt="ACLEDA QR" style="width: 100%; max-width: 200px; border-radius: 10px; margin: 0 auto; display: block;">
+                <p style="font-size:12px; color:#666; margin:10px 0 0;">ស្កេនជាមួយ <b>ACLEDA ToanChet</b> រួចបញ្ជាក់ការទូទាត់ខាងក្រោម</p>
+                <button type="button" onclick="payWithACLEDA()" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (Manual Confirm)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     let pollingInterval; 
+
+    // The ACTIVE transaction ID for this checkout session.
+    //
+    // Set by payWithABA() when it creates the pending order ("TX" + UUID),
+    // and persisted to sessionStorage so a page refresh keeps the same ID.
+    // payWithACLEDA() reads this SAME ID instead of minting a brand-new
+    // ACL- UUID — otherwise the QR flow creates a duplicate pending row
+    // and the original order stays stuck as 'pending' forever.
+    let activeTranId = sessionStorage.getItem('checkout_tran_id') || null;
+
     const TOTAL_AMOUNT = "{{ total }}";
     const CART_ITEMS = {{ items | tojson }};
     // RIEL_RATE is already defined in Jinja, we don't need to redefine it as const if it causes issues, 
@@ -381,6 +445,12 @@
             
             // PILLAR 2: Collision-free, crypto-secure transaction ID.
             const tran_id = "TX" + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
+
+            // Share this exact ID with the whole checkout session so the
+            // ACLEDA manual-confirm button confirms THE SAME order (never
+            // a duplicate). Persisted to sessionStorage for reload safety.
+            activeTranId = tran_id;
+            sessionStorage.setItem('checkout_tran_id', tran_id);
             
             // Get items for the backend
             const itemsToSend = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
@@ -409,24 +479,210 @@
         }
     }
 
+    // Build a deterministic ABA deep-link (EMVCo-style) that generates the same
+    // QR for the same (tran_id, amount) — the Telegram listener matches by amount.
+    function buildABALink(tran_id) {
+        const amount = parseFloat(TOTAL_AMOUNT).toFixed(2);
+        const payload = [
+            '000201',
+            '010212',
+            '52040000',
+            '5303704',
+            '5802KH',
+            '00' + String('00' + tran_id.length).slice(-2) + tran_id,
+            '54' + String('00' + amount.length).slice(-2) + amount,
+            '5802KH',
+            '6304'
+        ].join('');
+        return payload;
+    }
+
+    // ============ CUSTOMER FACING DISPLAY (CFD) SYNC ============
+    // Pushes the current state to /api/cfd/set so the tablet's /cfd page
+    // switches instantly between the product slideshow and the QR view.
+    function sendCFDState(status, extraData) {
+        const payload = {
+            status: status,
+            data: {
+                total: parseFloat(TOTAL_AMOUNT),
+                amount_riel: Math.round(parseFloat(TOTAL_AMOUNT) * JS_RIEL_RATE),
+                usd_amount: parseFloat(TOTAL_AMOUNT),
+                // Bulletproof: work whether the cart lives in `cart` or `CART_ITEMS`
+                items: (typeof cart !== 'undefined' ? cart : (typeof CART_ITEMS !== 'undefined' ? CART_ITEMS : [])).map(it => ({
+                    name: it.name || it.product_name || 'Item',
+                    price: it.price || it.unit_price || 0,
+                    qty: it.quantity || it.qty || 1,
+                    image: it.image || ''
+                })),
+                discount: finalDiscount
+            }
+        };
+        if (extraData) Object.assign(payload.data, extraData);
+        try {
+            fetch('/api/cfd/set', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(() => {});
+        } catch (e) { console.warn('CFD sync failed:', e); }
+    }
+
+    function openPaymentModal() {
+        document.getElementById('paymentModal').style.display = 'flex';
+        // Tell the CFD tablet to switch to the checkout QR view
+        sendCFDState('payment');
+    }
+
+    function closePaymentModal() {
+        document.getElementById('paymentModal').style.display = 'none';
+        // Tell the CFD tablet to switch back to the product slideshow
+        sendCFDState('idle');
+    }
+
+    // ============ ACLEDA MANUAL CONFIRMATION ============
+    // ACLEDA has no Telegram auto-verification; the cashier confirms manually.
+    //
+    // FIX: The flow now mirrors ABA — it FIRST creates a 'pending' ACLEDA
+    // order (/create-acleda-payment, ACL- tran_id), then the manual confirm
+    // button UPDATES that exact existing row to 'paid by acleda' via
+    // /confirm-acleda. No new duplicate row is ever inserted at confirm time.
+    // The backend stamps created_at with the PC's exact local wall-clock time
+    // (datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) — the PC is already on
+    // Cambodia time, so no extra +7h cambodia_time() shift is applied.
+    async function payWithACLEDA() {
+        try {
+            Swal.fire({ title: 'កំពុងដំណើរការ... | Processing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
+            // ------------------------------------------------------------
+            // FIX (Bug 1 + Bug 2): REUSE the SAME active transaction ID.
+            //
+            // Previously this function minted a brand-new "ACL-" + UUID,
+            // which created a SECOND pending row while the original
+            // TX... order (created by payWithABA) stayed stuck as
+            // 'pending' forever. Now we reuse the exact ID the QR flow
+            // created — it is stored in activeTranId + sessionStorage
+            // ('checkout_tran_id') — so /create-acleda-payment (idempotent)
+            // and /confirm-acleda act on THE SAME order. No duplicates.
+            // ------------------------------------------------------------
+            let tran_id = activeTranId || sessionStorage.getItem('checkout_tran_id');
+
+            // Fallback ONLY if there is genuinely no active transaction:
+            // mint one ACL- ID and share it the same way. This guarantees
+            // the success popup can never "break on an unrecorded ID" —
+            // the ID always refers to a real row that this flow creates.
+            if (!tran_id) {
+                tran_id = "ACL-" + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
+                activeTranId = tran_id;
+                sessionStorage.setItem('checkout_tran_id', tran_id);
+            }
+
+            const itemsToSend = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
+
+            // 1. Ensure the PENDING order exists (idempotent — if the row
+            //    already exists, the backend returns success without
+            //    duplicating; if it doesn't, it creates it with this ID).
+            const response = await fetch('/create-acleda-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    items: itemsToSend,
+                    total: parseFloat(TOTAL_AMOUNT),
+                    discount: finalDiscount,
+                    tran_id: tran_id
+                })
+            });
+
+            const data = await response.json();
+            if (data.status !== "success") {
+                Swal.fire("បញ្ហា", data.message || "មិនអាចបង្កើតការបង់ប្រាក់បានទេ", "error");
+                return;
+            }
+
+            // 2. Confirm it — updates the SAME pending row to 'paid by acleda'.
+            const confirmResponse = await fetch('/confirm-acleda', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tran_id: tran_id })
+            });
+
+            const confirmData = await confirmResponse.json();
+            if (confirmData.status !== "success") {
+                Swal.fire("បញ្ហា", confirmData.message || "មិនអាចបញ្ជាក់ការទូទាត់បានទេ", "error");
+                return;
+            }
+
+            // 3. SUCCESS POPUP FIRST — fire the SweetAlert2 success popup
+            //    BEFORE clearing sessionStorage, exactly as required. This
+            //    guarantees the popup always shows on a confirmed payment
+            //    (it can never be skipped by a storage-clear side effect).
+            Swal.fire({
+                icon: 'success',
+                title: 'ការលក់ជោគជ័យ! | Payment Confirmed!',
+                text: 'ACLEDA បានបញ្ជាក់រួចរាល់ | ACLEDA confirmed',
+                timer: 2500,
+                showConfirmButton: false
+            });
+
+            // Stop polling (ABA path) so it doesn't fight the redirect.
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+
+            // 4. NOW clear the cart + transaction ID and redirect home.
+            sessionStorage.removeItem('checkout_cart');
+            sessionStorage.removeItem('checkout_total');
+            sessionStorage.removeItem('checkout_discount');
+            sessionStorage.removeItem('checkout_tran_id');
+            activeTranId = null;
+
+            setTimeout(() => { window.location.href = '/'; }, 2500);
+        } catch (error) {
+            console.error("payWithACLEDA error:", error);
+            Swal.fire('បញ្ហា | Error', 'ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា | Server connection failed', 'error');
+        }
+    }
+
     function showQRPopup(tran_id) {
         const rielTotal = (parseFloat(TOTAL_AMOUNT) * JS_RIEL_RATE).toLocaleString();
         const discountRiel = (finalDiscount * JS_RIEL_RATE).toLocaleString();
-        Swal.fire({
-            title: 'ស្កេនដើម្បីបង់ប្រាក់ | Scan to Pay',
-            html: `
-                <div class="aba-qr-container">
-                    <img src="/static/images/aba_qr.jpg" class="aba-qr-img" style="width:250px; height:250px;">
-                    <div style="font-weight:800; color:#28a745; font-size:26px; margin: 5px 0;">៛ ${rielTotal}</div>
-                    <div style="font-weight:700; color:#d81b60; font-size:18px; margin-bottom: 10px;">$ ${parseFloat(TOTAL_AMOUNT).toFixed(2)}</div>
-                    ${finalDiscount > 0 ? `<div style="font-weight:600; color:#dc2626; font-size:16px; margin-bottom: 10px;">បញ្ចុះតម្លៃ | Discount: -៛ ${discountRiel}</div>` : ''}
-                    <p style="font-size:14px; font-weight:bold; color:#cc0000; margin-bottom:10px;">⚠️ បញ្ចូលទឹកប្រាក់ឲ្យបានត្រឹមត្រូវ / Input exact amount</p>
-                    <p style="font-size:13px; color:#666;">សូមស្កេន QR នេះជាមួយកម្មវិធី <b>ABA Mobile</b></p>
-                    <div id="polling-status" style="font-size:14px; color:#005a9c; margin-top:15px; font-weight:bold; animation: pulse 2s infinite;">🔄 កំពុងរង់ចាំការបង់ប្រាក់...</div>
-                </div>
-            `,
-            showConfirmButton: false, showCloseButton: true, allowOutsideClick: false, width: '400px'
-        });
+
+        // Populate the dynamic ABA container inside the modal (IDs: qrcode / amount / usd_amount)
+        const amountEl = document.getElementById('amount');
+        if (amountEl) amountEl.textContent = '៛ ' + rielTotal;
+        const usdEl = document.getElementById('usd_amount');
+        if (usdEl) usdEl.textContent = '$ ' + parseFloat(TOTAL_AMOUNT).toFixed(2);
+
+        const qrEl = document.getElementById('qrcode');
+        if (qrEl) {
+            qrEl.innerHTML = '';
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(qrEl, {
+                    text: buildABALink(tran_id),
+                    width: 200,
+                    height: 200,
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } else {
+                qrEl.innerHTML = '<img src="/static/images/aba_qr.jpg" class="aba-qr-img" style="width:200px; height:200px;">';
+            }
+        }
+
+        // Close the "Preparing..." loading Swal shown by payWithABA()
+        if (typeof Swal !== 'undefined') {
+            try { Swal.close(); } catch (e) {}
+            // SweetAlert2 can leave a stuck .swal2-loading popup behind when
+            // close() runs mid-showLoading — force-remove any lingering overlay.
+            document.querySelectorAll('.swal2-container').forEach(el => el.remove());
+        }
+
+        // Open the modal (ABA auto-verifies via Telegram listener + polling)
+        openPaymentModal();
+
+        // Send the real tran_id to the CFD so the tablet's ABA QR matches
+        // the one on the POS (both are generated from the same payload).
+        sendCFDState('payment', { tran_id: tran_id });
+
         startPolling(tran_id);
     }
 
@@ -443,6 +699,9 @@
                 if (data.status === "paid" || data.status === "completed" || data.code === "00") { 
                     // STOP the loop so it doesn't keep running
                     clearInterval(pollingInterval);
+
+                    // Payment completed → send the CFD back to the idle slideshow
+                    sendCFDState('idle');
                     
                     // REDIRECT the user to the success page
                     window.location.href = `/success?tran_id=${tran_id}`;

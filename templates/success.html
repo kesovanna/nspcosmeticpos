@@ -231,7 +231,7 @@
     <div class="info-section">
         <div class="info-row">
             <span class="info-label">កាលបរិច្ឆេទ | Date</span>
-            <span class="info-value">{{ order['created_at'][:19].replace('T', ' ') }}</span>
+            <span class="info-value">{{ format_ict_str(order.get('created_at')) }}</span>
         </div>
         <div class="info-row">
             <span class="info-label">លេខប្រតិបត្តិការ | Tran ID</span>

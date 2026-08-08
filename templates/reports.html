@@ -120,8 +120,14 @@
     .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
     .status-completed { background: #dcfce7; color: #166534; }
     .status-paid { background: #dcfce7; color: #166534; }
+    .status-paid-by-cash { background: #dcfce7; color: #166534; }
+    .status-paid-by-aba { background: #dcfce7; color: #166534; }
+    .status-paid-by-acleda { background: #dcfce7; color: #166534; }
     .status-canceled { background: #fee2e2; color: #991b1b; }
     .status-pending { background: #fef9c3; color: #854d0e; }
+
+    /* Status filter dropdown — light style with white bg, dark text */
+    #statusFilter option { color: #111827; background: #ffffff; }
 
     @media print { 
         .sidebar, .no-print, .header-right { display: none !important; } 
@@ -157,6 +163,11 @@
         <h2>បញ្ជីការលក់</h2>
         <input type="date" id="reportDatePicker" onchange="changeReportDate(this.value)" 
                style="padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white; outline: none;">
+        <select id="statusFilter" onchange="filterReportByStatus()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #d1d5db; background: white; color: #374151; outline: none; margin-left: 10px; cursor: pointer; font-size: 14px;">
+            <option value="all">ស្ថានភាពទាំងអស់ (All)</option>
+            <option value="paid">បានបង់ប្រាក់រួច (Paid)</option>
+            <option value="pending">កំពុងរង់ចាំ (Pending)</option>
+        </select>
     </div>
     <button onclick="window.print()" class="btn-print no-print">
         <i data-lucide="printer"></i> Print
@@ -232,13 +243,26 @@
                         
                         <!-- Status -->
                         <td rowspan="{{ items|length }}" style="text-align: center !important; white-space: nowrap !important;">
-                            <span class="status-badge status-{{ order.status|lower }}">{{ order.status }}</span>
+                            {% set st_lower = order.status|lower %}
+                            {% if st_lower == 'pending' %}
+                                <span class="status-badge status-pending">Pending</span>
+                            {% elif st_lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}
+                                {% if order.tran_id and order.tran_id.upper().startswith('TX') %}
+                                    <span class="status-badge status-paid">Paid by ABA</span>
+                                {% elif order.tran_id and 'ACL' in order.tran_id|upper %}
+                                    <span class="status-badge status-paid">Paid by ACLEDA</span>
+                                {% else %}
+                                    <span class="status-badge status-paid">Paid by Cash</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="status-badge status-canceled">{{ order.status }}</span>
+                            {% endif %}
                         </td>
                         
                         <!-- Receipt -->
                         <td rowspan="{{ items|length }}" style="text-align: center !important; white-space: nowrap !important;">
                             {% set filename = "invoice_" + (order.tran_id or order.local_id)|string + ".pdf" %}
-                            {% if order.has_receipt and order.status|lower in ['paid', 'completed'] %}
+                            {% if order.has_receipt and order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}
                                 <a href="/reports/view/{{ filename }}" target="_blank" 
                                    style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block;">
                                     View PDF
@@ -379,13 +403,16 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
+                        // Re-fetch table + summary stats so edited status
+                        // (e.g. canceled) is reflected immediately.
+                        if (typeof window.refreshReportData === 'function') {
+                            window.refreshReportData();
+                        }
                         Swal.fire(
                             'ជោគជ័យ!',
                             'របាយការណ៍ត្រូវបានកែប្រែដោយជោគជ័យ។',
                             'success'
-                        ).then(() => {
-                            window.location.reload();
-                        });
+                        );
                     } else {
                         Swal.fire('បរាជ័យ', data.message || 'មានបញ្ហាក្នុងការកែប្រែរបាយការណ៍។', 'error');
                     }
@@ -421,13 +448,17 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
+                        // Immediately re-fetch the report (table + summary stat
+                        // cards) so the deleted transaction's numbers disappear
+                        // without requiring a hard page reload.
+                        if (typeof window.refreshReportData === 'function') {
+                            window.refreshReportData();
+                        }
                         Swal.fire(
                             'បានលុប!',
                             'របាយការណ៍ត្រូវបានលុបដោយជោគជ័យ។',
                             'success'
-                        ).then(() => {
-                            window.location.reload();
-                        });
+                        );
                     } else {
                         Swal.fire('បរាជ័យ', data.message || 'មានបញ្ហាក្នុងការលុបរបាយការណ៍។', 'error');
                     }
@@ -464,5 +495,336 @@
             });
         }
     }
+</script>
+
+<script>
+/* =====================================================================
+   Auto-Refresh Sales Report Table
+   - Fetches the latest data from the report API immediately on load
+   - Re-fetches when the tab becomes visible again (visibilitychange /
+     window focus) so a checkout in another tab shows up instantly
+   - Light polling every 30s while the tab is visible & focused
+   ===================================================================== */
+(function () {
+    const RIEL_RATE = Number({{ RIEL_RATE|default(4000) }} || 4000);
+
+    // ----- Current report scope from URL (mirrors the server route) -----
+    function getReportScope() {
+        const p = new URLSearchParams(window.location.search);
+        const type = p.get('type') || 'daily';
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+        if (type === 'monthly') {
+            return { type: type, month: p.get('month') || today.slice(0, 7) };
+        }
+        if (type === 'annually') {
+            return { type: type, year: p.get('year') || String(now.getFullYear()) };
+        }
+        return { type: type, date: p.get('date') || today };
+    }
+
+    function buildApiUrl(scope) {
+        const base = '/api/reports/';
+        if (scope.type === 'monthly') return base + 'monthly?month=' + encodeURIComponent(scope.month);
+        if (scope.type === 'annually') return base + 'annually?year=' + encodeURIComponent(scope.year);
+        return base + 'daily?date=' + encodeURIComponent(scope.date);
+    }
+
+    // ----- HTML escaping (API data is inserted as markup) -----
+    function esc(v) {
+        return String(v == null ? '' : v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // ----- Number formatting (mirrors "{:,.2f}" / "{:,.0f}") -----
+    function fmtUsd(n) {
+        return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtRiel(n) {
+        return Math.round(Number(n || 0)).toLocaleString('en-US');
+    }
+
+    // ----- Update the summary stat cards -----
+    // When called from renderTable, it passes the *filtered* row aggregates
+    // so the cards stay in sync with the visible table.
+    function renderStats(d) {
+        const revenue = document.querySelector('.stat-card.revenue .value');
+        const orders = document.querySelector('.stat-card.orders .value');
+        const top = document.querySelector('.stat-card.units .value');
+        if (revenue) revenue.textContent = '$ ' + fmtUsd(d.revenue);
+        if (orders) orders.textContent = d.order_count + ' orders';
+        if (top) {
+            const tp = (d.top_products && d.top_products.length) ? d.top_products[0] : null;
+            top.textContent = tp ? tp.qty + ' ឯកតា' : 'N/A';
+        }
+    }
+
+    // ----- Status classification helpers -----
+    // The DB stores bare 'paid'/'pending'; payment method is derived from
+    // the tran_id prefix (CASH- => cash, TX => ABA). ACLEDA reuses the
+    // CASH- prefix via confirmCashPayment, so those display as cash.
+    const PAID_STATUSES = ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'];
+
+    function getStatusGroup(order) {
+        const st = String(order.status || '').trim().toLowerCase();
+        if (st === 'pending') return 'pending';
+        if (PAID_STATUSES.indexOf(st) !== -1) {
+            // The explicit status text WINS over the tran_id prefix.
+            // This matters because an ACLEDA manual confirmation now
+            // reuses the QR flow's "TX..." pending order and flips it
+            // to 'paid by acleda' — without this check it would be
+            // mislabeled as ABA based on the TX prefix.
+            if (st.indexOf('acleda') !== -1) return 'acleda';
+            if (st.indexOf('aba') !== -1) return 'aba';
+            if (st.indexOf('cash') !== -1) return 'cash';
+            const tran = String(order.tran_id || '').toUpperCase();
+            if (tran.indexOf('TX') === 0) return 'aba';
+            if (tran.indexOf('CASH') === 0) return 'cash';
+            if (tran.indexOf('ACL') === 0) return 'acleda';
+            return 'cash';
+        }
+        return st; // cancelled / canceled / other raw statuses
+    }
+
+    function statusLabel(group) {
+        switch (group) {
+            case 'cash': return 'Paid by Cash';
+            case 'aba': return 'Paid by ABA';
+            case 'acleda': return 'Paid by ACLEDA';
+            case 'pending': return 'Pending';
+            case 'completed': return 'Completed';
+            case 'paid': return 'Paid';
+            default: return group ? group.charAt(0).toUpperCase() + group.slice(1) : group;
+        }
+    }
+
+    function statusCssClass(group) {
+        switch (group) {
+            case 'cash': case 'aba': case 'acleda': case 'completed': case 'paid':
+                return 'status-paid';
+            case 'pending':
+                return 'status-pending';
+            default:
+                return 'status-canceled';
+        }
+    }
+
+    // Whether a receipt PDF link should show for this order
+    function hasReceiptFor(order, group) {
+        return !!(order.has_receipt && (group === 'paid' || group === 'completed' || group === 'cash' || group === 'aba' || group === 'acleda'));
+    }
+
+    // ----- Rebuild the table body (mirrors the Jinja template) -----
+    function renderTable(ordersArr) {
+        const tbody = document.querySelector('.nsp-table tbody');
+        if (!tbody) return;
+
+        // Local status filter (dropdown value). Kept outside refresh so
+        // filterReportByStatus() can re-render from cache without refetch.
+        const filter = (document.getElementById('statusFilter') || {}).value || 'all';
+
+        const visible = (ordersArr || []).filter(function (o) {
+            if (!o) return false;
+            const g = getStatusGroup(o);
+            if (filter === 'paid') return PAID_STATUSES.indexOf(String(o.status || '').trim().toLowerCase()) !== -1;
+            if (filter === 'pending') return g === 'pending';
+            return true; // 'all'
+        });
+
+        if (!visible.length) {
+            tbody.innerHTML = '<tr><td colspan="13" style="text-align:center !important;color:#9ca3af !important;padding:50px !important;white-space:nowrap !important;">មិនទាន់មានទិន្នន័យលក់នៅឡើយទេ</td></tr>';
+            renderStats({ revenue: 0, order_count: 0, top_products: [] });
+            return;
+        }
+
+        // ----- Recompute summary cards from the FILTERED visible rows -----
+        let sumTotal = 0;
+        let paidCount = 0;
+        const qtyByProduct = {};
+        for (const o of visible) {
+            const isPaid = PAID_STATUSES.indexOf(String(o.status || '').trim().toLowerCase()) !== -1;
+            // Revenue, order count AND top-product stats only count PAID orders,
+            // so pending-only views show $0.00 / 0 orders / N/A consistently.
+            if (!isPaid) continue;
+            sumTotal += Number(o.total || 0);
+            paidCount++;
+            let items = o.items;
+            if (typeof items === 'string') { try { items = JSON.parse(items); } catch (e) { items = []; } }
+            if (Array.isArray(items)) {
+                for (const it of items) {
+                    if (!it || !it.name) continue;
+                    const qty = Number(it.qty != null ? it.qty : (it.quantity || 0));
+                    qtyByProduct[it.name] = (qtyByProduct[it.name] || 0) + qty;
+                }
+            }
+        }
+        let topName = null, topQty = 0;
+        for (const name in qtyByProduct) {
+            if (qtyByProduct[name] > topQty) { topQty = qtyByProduct[name]; topName = name; }
+        }
+        renderStats({
+            revenue: sumTotal,
+            order_count: paidCount,
+            top_products: topName ? [{ qty: topQty }] : []
+        });
+
+        let html = '';
+        let rowNo = 1;
+        for (const order of visible) {
+            // items arrives as a JSON string from the report API (same as index.html)
+            let items = order.items;
+            if (typeof items === 'string') {
+                try { items = JSON.parse(items); } catch (e) { items = []; }
+            }
+            if (!Array.isArray(items)) items = [];
+            if (!items.length) continue;
+            const span = items.length;
+            const dd = String(order.display_datetime || order.display_time || '');
+            const parts = dd.split(' ');
+            const timeBold = (parts[1] || '') + (parts.length > 2 ? ' ' + parts[2] : '');
+            const dateSmall = parts[0] || '';
+            const tranId = order.tran_id || (order.id ? String(order.id).slice(0, 8) : '');
+            const discount = Number(order.discount || 0);
+            const total = Number(order.total || 0);
+            const group = getStatusGroup(order);
+            const label = statusLabel(group);
+            const cssCls = statusCssClass(group);
+            const hasReceipt = hasReceiptFor(order, group);
+            const filename = 'invoice_' + (order.tran_id || order.local_id) + '.pdf';
+            const pdfUrl = '/reports/view/' + filename;
+            const idAttr = esc(order.tran_id || order.local_id);
+
+            // ----- Parent row (first item + order-level info) -----
+            html += '<tr>';
+            html += '<td rowspan="' + span + '" style="text-align:center !important;font-weight:700 !important;white-space:nowrap !important;">' + rowNo + '</td>';
+            html += '<td rowspan="' + span + '" style="text-align:center !important;white-space:nowrap !important;">'
+                  + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.4;">'
+                  + '<span style="font-weight:600;color:#1e293b;">' + esc(timeBold) + '</span>'
+                  + '<span style="font-size:11px;color:#64748b;">' + esc(dateSmall) + '</span>'
+                  + '</div></td>';
+            html += '<td rowspan="' + span + '" style="text-align:center !important;white-space:nowrap !important;">'
+                  + '<span style="background:#d81b60;color:white;padding:6px 10px;border-radius:4px;display:inline-block;font-family:monospace;font-size:11px;font-weight:700;word-break:break-all;">' + esc(tranId) + '</span>'
+                  + '</td>';
+
+            // First item columns
+            const i0 = items[0];
+            const i0qty = Number(i0.qty != null ? i0.qty : (i0.quantity || 0));
+            const i0price = Number(i0.price || 0);
+            html += '<td style="text-align:center !important;font-weight:500 !important;color:#1e293b !important;white-space:nowrap !important;">' + esc(i0.name) + '</td>';
+            html += '<td style="text-align:center !important;white-space:nowrap !important;">' + i0qty + '</td>';
+            html += '<td style="text-align:center !important;white-space:nowrap !important;">$ ' + fmtUsd(i0price) + '</td>';
+            html += '<td style="text-align:center !important;white-space:nowrap !important;font-weight:700 !important;">$ ' + fmtUsd(i0qty * i0price) + '</td>';
+
+            // Order totals
+            html += '<td rowspan="' + span + '" style="text-align:center !important;color:#dc2626 !important;font-weight:700 !important;white-space:nowrap !important;">$ ' + fmtUsd(discount) + '</td>';
+            html += '<td rowspan="' + span + '" style="text-align:center !important;font-size:14px !important;color:#0f172a !important;font-weight:700 !important;white-space:nowrap !important;">$ ' + fmtUsd(total) + '</td>';
+            html += '<td rowspan="' + span + '" style="text-align:center !important;color:#16a34a !important;font-size:14px !important;font-weight:700 !important;white-space:nowrap !important;">៛ ' + fmtRiel(total * RIEL_RATE) + '</td>';
+
+            // Status — translated label + group-based badge color
+            html += '<td rowspan="' + span + '" style="text-align:center !important;white-space:nowrap !important;">'
+                  + '<span class="status-badge ' + cssCls + '">' + esc(label) + '</span></td>';
+
+            // Receipt PDF
+            html += '<td rowspan="' + span + '" style="text-align:center !important;white-space:nowrap !important;">';
+            if (hasReceipt) {
+                html += '<a href="' + pdfUrl + '" target="_blank" style="padding:4px 8px;background:#059669;color:white;text-decoration:none;border-radius:4px;font-size:11px;white-space:nowrap;display:inline-block;">View PDF</a>';
+            } else {
+                html += '<span style="color:#6c757d;font-size:11px;">No Receipt</span>';
+            }
+            html += '</td>';
+
+            // Actions
+            html += '<td rowspan="' + span + '" style="text-align:center !important;white-space:nowrap !important;">'
+                  + '<div class="action-buttons">'
+                  + '<button class="btn-action btn-edit" onclick="editReport(\'' + idAttr + '\')" title="កែប្រែ"><i data-lucide="pencil" style="width:14px;height:14px;"></i></button>'
+                  + '<button class="btn-action btn-delete" onclick="deleteReport(\'' + idAttr + '\')" title="លុប"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>'
+                  + '<button class="btn-action btn-share" onclick="shareReport(\'' + pdfUrl + '\', \'' + idAttr + '\')" title="ចែករំលែក"><i data-lucide="share-2" style="width:14px;height:14px;"></i></button>'
+                  + '</div></td>';
+            html += '</tr>';
+
+            // ----- Child rows (remaining items) -----
+            for (let k = 1; k < items.length; k++) {
+                const it = items[k];
+                const qty = Number(it.qty != null ? it.qty : (it.quantity || 0));
+                const price = Number(it.price || 0);
+                html += '<tr>'
+                      + '<td style="text-align:center !important;font-weight:500 !important;color:#1e293b !important;white-space:nowrap !important;">' + esc(it.name) + '</td>'
+                      + '<td style="text-align:center !important;white-space:nowrap !important;">' + qty + '</td>'
+                      + '<td style="text-align:center !important;white-space:nowrap !important;">$ ' + fmtUsd(price) + '</td>'
+                      + '<td style="text-align:center !important;white-space:nowrap !important;font-weight:700 !important;">$ ' + fmtUsd(qty * price) + '</td>'
+                      + '</tr>';
+            }
+            rowNo++;
+        }
+        tbody.innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // ----- Cached payload so the status dropdown re-renders without refetch -----
+    let lastReportData = null;
+
+    // ----- Local status filter (dropdown) -----
+    // Re-renders the table + summary cards from the cached payload.
+    // No network request — instant response when the user changes the filter.
+    function filterReportByStatus() {
+        if (lastReportData && lastReportData.orders) {
+            renderTable(lastReportData.orders);
+        } else {
+            refreshReportData();
+        }
+    }
+
+    // ----- Fetch + render -----
+    function refreshReportData() {
+        const scope = getReportScope();
+        const url = buildApiUrl(scope);
+        return fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then((res) => {
+                if (res.status === 401) return null; // auth page handles login; keep current content
+                return res.json();
+            })
+            .then((json) => {
+                if (!json || json.status !== 'success' || !json.data) return null;
+                lastReportData = json.data;
+                renderStats(json.data);
+                renderTable(json.data.orders);
+                return json;
+            })
+            .catch(() => null);
+    }
+
+    // ----- Boot: immediate fetch + visibility change + light polling -----
+    function startAutoRefresh() {
+        // 1. Immediate fetch once the page is interactive (fresh data, covers bfcache restore)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () { refreshReportData(); });
+        } else {
+            refreshReportData();
+        }
+
+        // 2. Re-fetch whenever the tab becomes visible again (user returns after a checkout)
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') refreshReportData();
+        });
+        window.addEventListener('focus', function () { refreshReportData(); });
+
+        // 3. Light polling: every 30s, only while the tab is visible & focused
+        setInterval(function () {
+            if (document.visibilityState === 'visible' && !document.hidden) refreshReportData();
+        }, 30000);
+    }
+
+    startAutoRefresh();
+    // Expose so other handlers (deleteReport, editReport) can re-fetch the
+    // table + summary stats without requiring a hard page reload.
+    window.refreshReportData = refreshReportData;
+    // Expose the status filter handler (called by the dropdown's onchange)
+    window.filterReportByStatus = filterReportByStatus;
+})();
 </script>
 {% endblock %}

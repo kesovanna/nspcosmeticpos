@@ -1300,17 +1300,41 @@
 <div class="abstract-waves"></div>
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-header" id="refresh-zone" style="padding: 0; display: flex; flex-direction: column; align-items: center; border-bottom: 1px solid var(--border-color); gap: 0;">
-        <div style="position: relative; width: 100%; height: 160px; overflow: hidden;" id="coverGalleryContainer" title="ចុចដើម្បីគ្រប់គ្រងរូបភាព (Click to manage gallery)">
+        <div style="position: relative; width: 100%; height: 160px; overflow: hidden; background: #1e293b; cursor: pointer;" id="coverGalleryContainer" onclick="nextCoverPhoto(event)" title="ចុចដើម្បីប្តូររូបភាពគ្រប (Click to cycle cover photo)">
             <div id="coverSlideshow" style="width: 100%; height: 100%; position: relative;">
-                <img id="sidebarCoverImg" src="{{ current_user.cover_image if current_user.cover_image else '/static/images/default.jpg' }}" onerror="this.src='/static/images/default.jpg';" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; transition: opacity 1s ease-in-out; z-index: 0;">
+                <img id="sidebarCoverImg"
+                     src="{{ current_user.cover_image if current_user.cover_image else 'https://picsum.photos/400/200?nature,landscape' }}"
+                     onerror="if(this.src.indexOf('picsum')===-1){this.src='https://picsum.photos/400/200?nature,landscape';}else{this.onerror=null;this.src='/static/images/default.jpg';}"
+                     alt="Cover"
+                     style="width: 100%; height: 100%; object-fit: cover; object-position: center; position: absolute; top: 0; left: 0; transition: opacity 1s ease-in-out; z-index: 0;">
             </div>
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, transparent 20%, rgba(0,0,0,0.8) 100%); z-index: 1;"></div>
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, transparent 35%, rgba(0,0,0,0.85) 100%); z-index: 1;"></div>
             
-            <button type="button" onclick="openCoverGalleryModal(event)" class="sidebar-camera-btn" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; z-index: 20; border: 1px solid rgba(255,255,255,0.4); cursor: pointer; padding: 0;">
+            <button type="button" onclick="event.stopPropagation(); openCoverGalleryModal(event);" class="sidebar-camera-btn" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; z-index: 20; border: 1px solid rgba(255,255,255,0.4); cursor: pointer; padding: 0;">
                 <i data-lucide="images" style="width: 15px; height: 15px;"></i>
             </button>
         </div>
         <input type="file" id="coverInputSide" style="display: none;" accept="image/*" onchange="previewCoverPic(this)">
+
+        <script>
+        let coverCycleStep = 0;
+        const ORIGINAL_USER_COVER = "{{ current_user.cover_image if current_user.cover_image else '' }}";
+
+        function nextCoverPhoto(event) {
+            if (event && event.target.closest('.sidebar-camera-btn')) return;
+            
+            const img = document.getElementById('sidebarCoverImg');
+            coverCycleStep++;
+            
+            // If user has a personal cover, bring it back every 4th click so they don't lose it
+            if (ORIGINAL_USER_COVER && coverCycleStep % 4 === 0) {
+                img.src = ORIGINAL_USER_COVER;
+            } else {
+                // Force a fresh image from Picsum by bypassing browser cache with a timestamp
+                img.src = `https://picsum.photos/400/200?nature,landscape&t=${Date.now()}`;
+            }
+        }
+        </script>
 
         <div style="padding: 0 15px 20px; display: flex; flex-direction: column; align-items: center; width: 100%; position: relative;">
             <div style="position: relative; display: inline-block; margin-top: -45px; z-index: 10;" title="ចុចដើម្បីប្តូររូបភាព (Click to change profile)">
@@ -4464,7 +4488,7 @@
                     
                     if (data.history && data.history.length > 0) {
                         data.history.forEach(record => {
-                            const date = new Date(record.created_at).toLocaleString();
+                            const date = dashFormatDateTime(record.created_at);
                             const amountColor = record.change_amount > 0 ? '#059669' : '#dc2626';
                             const amountPrefix = record.change_amount > 0 ? '+' : '';
                             
@@ -5963,12 +5987,54 @@ function dashFormatUsd(n) {
 function dashFormatDateTime(iso) {
     if (!iso) return '—';
     try {
-        const d = new Date(iso);
-        if (isNaN(d.getTime())) return dashEscapeHtml(iso);
-        return d.toLocaleString('en-GB', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        });
+        let s = String(iso).trim();
+        // Normalize a lowercase trailing 'z' so every engine parses it (ES spec
+        // allows 'z', but some environments only accept uppercase 'Z').
+        if (/z$/i.test(s)) s = s.slice(0, -1) + 'Z';
+
+        // Extract Cambodia ICT (UTC+7) wall-clock components WITHOUT ever
+        // depending on the browser's own timezone.
+        let y, mo, d, h = 0, mi = 0, se = 0;
+
+        // 1) UTC-aware? ('Z' or explicit ±HH:MM / ±HHMM offset suffix)
+        if (/(Z|[+-]\d{2}:?\d{2})$/.test(s)) {
+            // Date.parse normalizes EVERY offset flavor ('Z', '+00:00', '+07:00',
+            // '-05:00', '+0700'...) to the same true UTC instant.
+            const t = Date.parse(s);
+            if (isNaN(t)) return dashEscapeHtml(iso);
+            // Shift the true UTC instant by +7h -> Cambodia ICT wall-clock,
+            // then read the UTC fields (they now ARE the ICT wall-clock).
+            const ict = new Date(t + 7 * 3600 * 1000);
+            y = ict.getUTCFullYear(); mo = ict.getUTCMonth() + 1; d = ict.getUTCDate();
+            h = ict.getUTCHours(); mi = ict.getUTCMinutes(); se = ict.getUTCSeconds();
+        } else {
+            // 2) Naive string (e.g. legacy '2026-08-08T12:16:39' written by
+            //    datetime.now()): the wall-clock is ALREADY Cambodia local
+            //    time — parse the components directly with ZERO hour shift.
+            //    NEVER run it through new Date() alone, which would interpret
+            //    it as the browser's own timezone (another ±7h error).
+            const dtParts = s.split('T');
+            const datePart = dtParts[0] || '';
+            const timePart = dtParts.length > 1 ? dtParts[1] : '';
+            const dm = datePart.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (!dm) return dashEscapeHtml(iso);
+            y = parseInt(dm[1], 10);
+            mo = parseInt(dm[2], 10);
+            d = parseInt(dm[3], 10);
+            const tm = timePart.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            if (tm) {
+                h = parseInt(tm[1], 10) % 24;
+                mi = parseInt(tm[2], 10) || 0;
+                se = parseInt(tm[3], 10) || 0;
+            }
+        }
+
+        // Format: dd/MM/yyyy hh:mm:ss AM/PM — matches the report API format.
+        const pad = (n) => String(n).padStart(2, '0');
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        const ampm = h < 12 ? 'AM' : 'PM';
+        return pad(d) + '/' + pad(mo) + '/' + y +
+            ' ' + pad(h12) + ':' + pad(mi) + ':' + pad(se) + ' ' + ampm;
     } catch (e) {
         return dashEscapeHtml(iso);
     }
@@ -6412,7 +6478,10 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // ស្វែងរកគ្រប់ក្រឡាដែលផ្ទុកម៉ោង UTC
+    // The server ALREADY enriches data-time to Cambodia ICT wall-clock
+    // (format 'dd/MM/yyyy hh:mm:ss AM/PM' via enrich_order_display_times).
+    // We only re-render the SAME wall-clock components — NO +7h shift,
+    // otherwise ICT times (12:16:27 PM) would double-shift (07:16:27 PM).
     const timeBlocks = document.querySelectorAll('.auto-khmer-time');
     
     timeBlocks.forEach(block => {
@@ -6433,18 +6502,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 if(ampm === 'PM' && hours < 12) hours += 12;
                 if(ampm === 'AM' && hours === 12) hours = 0;
                 
-                // បង្កើតកាលបរិច្ឆេទជា UTC រួចបូកថែម ៧ ម៉ោង (ម៉ោងកម្ពុជា)
-                const dateObj = new Date(Date.UTC(year, month - 1, day, hours, mins, secs));
-                dateObj.setUTCHours(dateObj.getUTCHours() + 7);
+                // data-time is ALREADY Cambodia ICT — render the SAME
+                // wall-clock (24h -> 12h AM/PM) with NO hour shifting.
+                const newDay = String(day).padStart(2, '0');
+                const newMonth = String(month).padStart(2, '0');
+                const newYear = year;
                 
-                // រៀបចំទម្រង់ម៉ោងថ្មីដើម្បីបង្ហាញ
-                const newDay = String(dateObj.getUTCDate()).padStart(2, '0');
-                const newMonth = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
-                const newYear = dateObj.getUTCFullYear();
-                
-                let newHours = dateObj.getUTCHours();
-                const newMins = String(dateObj.getUTCMinutes()).padStart(2, '0');
-                const newSecs = String(dateObj.getUTCSeconds()).padStart(2, '0');
+                let newHours = hours;
+                const newMins = String(mins).padStart(2, '0');
+                const newSecs = String(secs).padStart(2, '0');
                 const newAmpm = newHours >= 12 ? 'PM' : 'AM';
                 
                 newHours = newHours % 12 || 12;

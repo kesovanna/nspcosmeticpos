@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSP Customer Display</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700;800&family=Moul&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kantumruy Pro', sans-serif; }
+        /* ===== 4 DISTINCT SLIDESHOW ANIMATIONS ===== */
+        @keyframes anim-zoom-in {
+            0%   { transform: scale(1); }
+            100% { transform: scale(1.15); }
+        }
+        @keyframes anim-zoom-out {
+            0%   { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+        @keyframes anim-pan-right {
+            0%   { transform: scale(1.1) translateX(0); }
+            100% { transform: scale(1.1) translateX(3%); }
+        }
+        @keyframes anim-pan-up {
+            0%   { transform: scale(1.1) translateY(0); }
+            100% { transform: scale(1.1) translateY(-3%); }
+        }
+        @keyframes fadeSwap {
+            0%   { opacity: 0; }
+            10%  { opacity: 1; }
+            90%  { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        .anim-zoom-in  { animation: anim-zoom-in  12s ease-in-out infinite; }
+        .anim-zoom-out { animation: anim-zoom-out 12s ease-in-out infinite; }
+        .anim-pan-right{ animation: anim-pan-right 12s ease-in-out infinite; }
+        .anim-pan-up   { animation: anim-pan-up   12s ease-in-out infinite; }
+        .slide-fade { animation: fadeSwap 6s ease-in-out infinite; }
+        @keyframes pulseSoft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.55; }
+        }
+        .pulse-soft { animation: pulseSoft 2s ease-in-out infinite; }
+        .grain-overlay {
+            background:
+                radial-gradient(ellipse at 20% 10%, rgba(255,255,255,0.08), transparent 50%),
+                radial-gradient(ellipse at 80% 90%, rgba(216,27,96,0.18), transparent 50%);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white overflow-hidden h-screen w-screen" ondblclick="toggleFullScreen()">
+
+<!-- ================= IDLE STATE: PRODUCT SLIDESHOW ================= -->
+<div id="cfd-idle" class="absolute inset-0 transition-opacity duration-700">
+    <!-- Layered slideshow -->
+    <div id="slideshow-layer" class="absolute inset-0"></div>
+    <!-- Branding + gradient overlay -->
+    <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/20 grain-overlay"></div>
+    <!-- Header -->
+    <div class="absolute top-0 inset-x-0 flex items-center justify-between px-10 py-6">
+        <div class="flex items-center gap-4">
+            <img src="/static/images/nsp_logo.png" class="w-14 h-14 rounded-2xl object-cover shadow-lg" onerror="this.style.display='none'">
+            <div>
+                <div class="text-3xl font-black tracking-wide" style="color:#d81b60;">NSP Cosmetic Store</div>
+                <div class="text-slate-400 text-sm tracking-widest uppercase">Customer Display</div>
+            </div>
+        </div>
+        <div class="text-right">
+            <div class="text-slate-300 text-sm">សូមស្វាគមន៍ | Welcome</div>
+            <div id="idle-clock" class="text-2xl font-bold text-white"></div>
+        </div>
+    </div>
+    <!-- Product name banner -->
+    <div class="absolute bottom-10 inset-x-0 text-center px-10">
+        <div id="slide-name" class="text-5xl font-extrabold text-white drop-shadow-lg mb-2">កំពុងផ្ទុក...</div>
+        <div id="slide-price" class="text-2xl font-bold text-pink-400 drop-shadow">—</div>
+    </div>
+</div>
+
+<!-- ================= ACTIVE STATE: CHECKOUT QR VIEW ================= -->
+<div id="cfd-active" class="absolute inset-0 hidden flex-col items-center justify-center bg-slate-950 transition-opacity duration-500 px-8">
+    <div class="w-full max-w-6xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-4">
+                <img src="/static/images/nsp_logo.png" class="w-12 h-12 rounded-xl object-cover" onerror="this.style.display='none'">
+                <div class="text-3xl font-black tracking-wide" style="color:#d81b60;">NSP Cosmetic Store</div>
+            </div>
+            <div class="flex items-center gap-3 bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 px-5 py-2.5 rounded-full text-xl font-bold pulse-soft">
+                <span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span>
+                ស្កេនដើម្បីបង់ប្រាក់ | Scan to Pay
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 items-stretch">
+            <!-- LEFT: Cart Summary -->
+            <div class="lg:col-span-2 bg-white/5 backdrop-blur border border-white/10 rounded-3xl p-8 flex flex-col">
+                <h2 class="text-2xl font-extrabold text-white mb-6 flex items-center gap-3">
+                    <span class="text-3xl">🛒</span> បញ្ជីទំនិញ | Cart Summary
+                </h2>
+                <div id="cfd-items" class="flex-1 overflow-y-auto space-y-3 pr-2" style="max-height: 340px;"></div>
+                <div class="border-t border-white/10 mt-6 pt-5 space-y-2">
+                    <div class="flex justify-between text-2xl text-slate-300">
+                        <span>សរុប | Total</span>
+                        <span id="cfd-total-usd" class="font-bold text-white">$ 0.00</span>
+                    </div>
+                    <div class="flex justify-between text-3xl">
+                        <span class="font-bold" style="color:#d81b60;">៛ Riel</span>
+                        <span id="cfd-total-riel" class="font-black" style="color:#28a745;">៛ 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Two QR codes -->
+            <div class="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <!-- ABA -->
+                <div class="bg-white rounded-3xl p-6 flex flex-col items-center justify-between shadow-2xl">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-3 h-3 rounded-full" style="background:#005a9c;"></span>
+                        <span class="text-xl font-extrabold text-slate-800">ABA Mobile</span>
+                    </div>
+                    <div class="bg-white p-3 rounded-2xl border border-slate-200">
+                        <div id="cfd-qr-aba" class="mx-auto"></div>
+                    </div>
+                    <div class="text-center mt-4">
+                        <div id="cfd-amount-usd" class="text-2xl font-black text-slate-800">$ 0.00</div>
+                        <div id="cfd-amount-riel" class="text-lg font-bold" style="color:#d81b60;">៛ 0</div>
+                    </div>
+                    <div class="text-sm text-slate-500 mt-3 text-center">ស្កេនជាមួយកម្មវិធី <b>ABA Mobile</b></div>
+                </div>
+                <!-- ACLEDA -->
+                <div class="bg-white rounded-3xl p-6 flex flex-col items-center justify-between shadow-2xl">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-3 h-3 rounded-full" style="background:#ED1C24;"></span>
+                        <span class="text-xl font-extrabold text-slate-800">ACLEDA ToanChet</span>
+                    </div>
+                    <div class="bg-white p-3 rounded-2xl border border-slate-200">
+                        <img src="/static/images/acleda_qr.png" alt="ACLEDA QR" class="w-44 h-44 object-contain rounded-xl mx-auto">
+                    </div>
+                    <div class="text-center mt-4">
+                        <div id="cfd-acleda-usd" class="text-2xl font-black text-slate-800">$ 0.00</div>
+                        <div id="cfd-acleda-riel" class="text-lg font-bold" style="color:#ED1C24;">៛ 0</div>
+                    </div>
+                    <div class="text-sm text-slate-500 mt-3 text-center">ស្កេនជាមួយ <b>ACLEDA ToanChet</b></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============ STATE POLLING ============
+    const POLL_INTERVAL = 1500;   // ms — per spec
+    let currentStatus = 'idle';
+    let slides = [];
+    let slideIdx = 0;
+    let slideTimer = null;
+
+    // ============ IDLE SLIDESHOW ============
+    async function fetchSlides() {
+        try {
+            const r = await fetch('/api/cfd/products');
+            if (r.ok) {
+                const data = await r.json();
+                slides = (data.products || []).filter(p => p.name);
+                if (slides.length === 0) {
+                    document.getElementById('slide-name').textContent = 'សូមរង់ចាំបន្តិចទៀត...';
+                }
+            }
+        } catch (e) { console.error('cfd slides error:', e); }
+    }
+
+    function productImgSrc(p) {
+        const img = p.image || 'default.jpg';
+        if (img.startsWith('http') || img.startsWith('data:')) return img;
+        return '/static/images/' + img;
+    }
+
+    // Cycle through 4 distinct animations — one per slide (zoom-in, zoom-out, pan-right, pan-up)
+    const animList = ['anim-zoom-in', 'anim-zoom-out', 'anim-pan-right', 'anim-pan-up'];
+
+    function renderSlide() {
+        const layer = document.getElementById('slideshow-layer');
+        const nameEl = document.getElementById('slide-name');
+        const priceEl = document.getElementById('slide-price');
+        if (slides.length === 0) {
+            nameEl.textContent = 'NSP Cosmetic Store';
+            priceEl.textContent = 'សូមស្វាគមន៍ | Welcome';
+            return;
+        }
+        const p = slides[slideIdx % slides.length];
+        nameEl.textContent = p.name;
+        priceEl.textContent = 'កម្មវិធី | Special Price: $' + Number(p.price || 0).toFixed(2);
+
+        // Build new slide layer
+        const newLayer = document.createElement('div');
+        newLayer.className = 'absolute inset-0 slide-fade';
+        const img = document.createElement('img');
+        img.src = productImgSrc(p);
+        // Apply the 4-animation rotation (round-robin by slide index)
+        img.className = 'w-full h-full object-cover ' + animList[slideIdx % animList.length];
+        img.onerror = () => { img.src = '/static/images/default.jpg'; };
+        const overlay = document.createElement('div');
+        overlay.className = 'absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/30';
+        newLayer.appendChild(img);
+        newLayer.appendChild(overlay);
+        layer.innerHTML = '';
+        layer.appendChild(newLayer);
+        slideIdx++;
+    }
+
+    function startSlideshow() {
+        if (slideTimer) clearInterval(slideTimer);
+        renderSlide();
+        if (slides.length > 1) {
+            slideTimer = setInterval(renderSlide, 6000);
+        }
+    }
+
+    // ============ CLOCK ============
+    function tickClock() {
+        const el = document.getElementById('idle-clock');
+        const d = new Date();
+        el.textContent = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+    tickClock();
+    setInterval(tickClock, 30000);
+
+    // ============ QR HELPERS ============
+    // Deterministic EMVCo-style payload (mirrors the POS buildABALink)
+    function buildABALink(tran_id, amountUsd) {
+        const amount = Number(amountUsd || 0).toFixed(2);
+        const payload = [
+            '000201', '010212', '52040000', '5303704', '5802KH',
+            '00' + String('00' + tran_id.length).slice(-2) + tran_id,
+            '54' + String('00' + amount.length).slice(-2) + amount,
+            '5802KH', '6304'
+        ].join('');
+        return payload;
+    }
+
+    function renderABAQR(tran_id, amountUsd) {
+        const el = document.getElementById('cfd-qr-aba');
+        el.innerHTML = '';
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(el, {
+                text: buildABALink(tran_id, amountUsd),
+                width: 190,
+                height: 190,
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+    }
+
+    // ============ ACTIVE VIEW POPULATION ============
+    function showActive(data) {
+        const active = document.getElementById('cfd-active');
+        const idle = document.getElementById('cfd-idle');
+
+        const totalUsd = parseFloat(data.total || data.usd_amount || 0);
+        const riel = parseInt(data.amount_riel || 0, 10);
+
+        // Items
+        const itemsBox = document.getElementById('cfd-items');
+        itemsBox.innerHTML = '';
+        const items = data.items || [];
+        if (items.length === 0) {
+            itemsBox.innerHTML = '<div class="text-slate-400 text-xl text-center py-10">កំពុងរៀបចំ... | Preparing</div>';
+        }
+        items.forEach(it => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl px-4 py-3';
+            const qty = it.qty || it.quantity || 1;
+            const price = parseFloat(it.price || 0);
+            const img = document.createElement('img');
+            img.src = productImgSrc(it);
+            img.className = 'w-12 h-12 rounded-xl object-cover';
+            img.onerror = () => { img.src = '/static/images/default.jpg'; };
+            const info = document.createElement('div');
+            info.className = 'flex-1';
+            const name = document.createElement('div');
+            name.className = 'text-lg font-bold text-white';
+            name.textContent = it.name || 'Item';
+            const sub = document.createElement('div');
+            sub.className = 'text-sm text-slate-400';
+            sub.textContent = qty + ' x $' + price.toFixed(2);
+            info.appendChild(name);
+            info.appendChild(sub);
+            const total = document.createElement('div');
+            total.className = 'text-xl font-black text-emerald-400';
+            total.textContent = '$' + (qty * price).toFixed(2);
+            row.appendChild(img);
+            row.appendChild(info);
+            row.appendChild(total);
+            itemsBox.appendChild(row);
+        });
+
+        // Totals
+        document.getElementById('cfd-total-usd').textContent = '$' + totalUsd.toFixed(2);
+        document.getElementById('cfd-total-riel').textContent = '៛ ' + riel.toLocaleString('en-US');
+        document.getElementById('cfd-amount-usd').textContent = '$' + totalUsd.toFixed(2);
+        document.getElementById('cfd-amount-riel').textContent = '៛ ' + riel.toLocaleString('en-US');
+        document.getElementById('cfd-acleda-usd').textContent = '$' + totalUsd.toFixed(2);
+        document.getElementById('cfd-acleda-riel').textContent = '៛ ' + riel.toLocaleString('en-US');
+
+        // ABA QR (dynamic, mirrors POS)
+        renderABAQR(data.tran_id || 'TX-CFD', totalUsd);
+
+        // Switch views
+        idle.classList.remove('opacity-100');
+        idle.classList.add('opacity-0');
+        active.classList.remove('hidden');
+        active.classList.add('flex');
+        setTimeout(() => { idle.style.display = 'none'; }, 500);
+    }
+
+    function showIdle() {
+        const active = document.getElementById('cfd-active');
+        const idle = document.getElementById('cfd-idle');
+        active.classList.add('hidden');
+        active.classList.remove('flex');
+        idle.style.display = 'block';
+        requestAnimationFrame(() => {
+            idle.classList.remove('opacity-0');
+            idle.classList.add('opacity-100');
+        });
+    }
+
+    // ============ MAIN POLL LOOP (every 1.5s) ============
+    async function pollState() {
+        try {
+            const r = await fetch('/api/cfd/status');
+            if (!r.ok) return;
+            const state = await r.json();
+            if (state.status === 'payment' && currentStatus !== 'payment') {
+                currentStatus = 'payment';
+                showActive(state.data || {});
+            } else if (state.status === 'idle' && currentStatus !== 'idle') {
+                currentStatus = 'idle';
+                showIdle();
+            } else if (state.status === 'payment' && currentStatus === 'payment') {
+                // Keep the active view fresh (e.g. new totals while modal is open)
+                if (state.data && state.data.tran_id) showActive(state.data);
+            }
+        } catch (e) { console.error('cfd poll error:', e); }
+    }
+
+    // ============ FULLSCREEN TOGGLE (double-tap / double-click) ============
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(e => {});
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    // ============ SCREEN WAKE LOCK (prevent tablet sleeping) ============
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+    }
+    requestWakeLock();
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') requestWakeLock();
+    });
+
+    // ============ INIT ============
+    fetchSlides().then(startSlideshow);
+    pollState();
+    setInterval(pollState, POLL_INTERVAL);
+    // Re-fetch slides periodically in case new products are added
+    setInterval(() => fetchSlides().then(() => { if (slides.length && !slideTimer) startSlideshow(); }), 60000);
+</script>
+</body>
+</html>
