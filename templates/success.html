@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ការទូទាត់ជោគជ័យ - NSP Cosmetic Store</title>
+    <title>វិក្កយបត្រ - NSP Cosmetic Store</title>
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -38,82 +38,131 @@
         }
         {% endif %}
 
-        :root { --primary-color: #28a745; --secondary-color: #218838; --bg-color: #f0f2f5; --card-bg: #ffffff; --text-main: #333333; --text-muted: #666666; --border-color: #eeeeee; }
-        body { font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; background-color: var(--bg-color); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; height: auto; }
-        
-        h1, .moul { font-family: 'Khmer OS Moul Light', 'Kantumruy Pro', sans-serif !important; font-weight: bold !important; }
-        .invoice-card, table, .total-section { font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        
-        .invoice-card { background: var(--card-bg); width: 100%; max-width: 450px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); position: relative; overflow: hidden; margin-bottom: 20px; height: auto; }
-        .invoice-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 8px; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); }
-        
-        .success-banner { text-align: center; color: var(--primary-color); margin-bottom: 20px; }
-        .success-icon { font-size: 48px; margin-bottom: 10px; }
-
-        .header { text-align: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px dashed var(--border-color); }
-        .logo { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 3px solid var(--bg-color); }
-        h1 { margin: 0; font-family: 'Khmer OS Moul Light', 'Kantumruy Pro', sans-serif; font-weight: bold; font-size: 20px; color: var(--primary-color); letter-spacing: 0.5px; }
-        .invoice-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 5px; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        
-        .info-section { margin-bottom: 20px; }
-        .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
-        .info-label { color: var(--text-muted); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        .info-value { font-weight: 700; color: var(--text-main); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        th { text-align: left; font-size: 12px; color: var(--text-muted); border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; text-transform: uppercase; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        td { padding: 12px 0; border-bottom: 1px solid var(--bg-color); font-size: 14px; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        .item-qty { text-align: center; color: var(--text-muted); }
-        .item-price { text-align: right; font-weight: 600; }
-        
-        .total-section { background: var(--bg-color); padding: 15px; border-radius: 12px; margin-top: 10px; }
-        .total-row { display: flex; justify-content: space-between; align-items: center; }
-        .total-label { font-size: 16px; font-weight: 700; color: var(--text-main); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        .total-amount-usd { font-size: 16px; color: #d81b60; font-weight: 600; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        .total-amount-riel { font-size: 24px; font-weight: 800; color: var(--primary-color); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-
-        @page { size: 80mm 140mm; margin: 4mm; }
-        
-        {% if is_pdf %}
-        html { height: auto; }
-        body { background: white; padding: 0; margin: 0; width: 100%; height: auto; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; display: block; }
-        .invoice-card { box-shadow: none; border-radius: 0; padding: 0; width: 100%; max-width: 100%; margin-bottom: 0; height: auto; }
-        .invoice-card::before { display: none; }
-        .btn-group, .success-banner { display: none !important; }
-        .total-section { background: #f0f0f0 !important; }
-        .logo { width: 50px; height: 50px; }
-        h1 { font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important; font-size: 16px; }
-        table { font-size: 12px; }
-        .item-price { font-size: 12px; }
-        .total-amount-riel { font-size: 20px !important; }
-        {% endif %}
-
-        @media print {
-            @page { size: 80mm 140mm; margin: 4mm; }
-            html { height: auto; }
-            body { background: white; padding: 0; margin: 0; width: 100%; height: auto; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; display: block; }
-            .invoice-card { box-shadow: none; border-radius: 0; padding: 0; width: 100%; max-width: 100%; margin-bottom: 0; height: auto; }
-            .invoice-card::before { display: none; }
-            .btn-group, .success-banner { display: none !important; }
-            .total-section { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; color-adjust: exact; }
-            .logo { width: 50px; height: 50px; }
-            h1, .moul { font-family: 'Khmer OS Moul Light', 'Kantumruy Pro', sans-serif !important; font-size: 16px; }
-            table { font-size: 12px; }
+        @page {
+            size: A6 portrait;
+            margin: 8mm 6mm 8mm 6mm;
+        }
+        body {
+            font-family: 'Khmer OS Battambang', sans-serif;
+            font-size: 11px;
+            color: #1e293b;
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+        .moul {
+            font-family: 'Khmer OS Moul Light', sans-serif;
+        }
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 10px;
+            border-bottom: 1px dashed #cbd5e1;
+            padding-bottom: 6px;
+        }
+        .info-section {
+            margin-bottom: 10px;
+            font-size: 10.5px;
+        }
+        .info-row {
+            margin-bottom: 4px;
+        }
+        .info-label {
+            color: #64748b;
+            display: inline-block;
+            width: 90px;
+        }
+        .info-value {
+            font-weight: bold;
+            color: #0f172a;
+        }
+        .tran-id-badge {
+            font-family: monospace;
+            font-size: 10px;
+            word-break: break-all;
+            display: block;
+            margin-top: 2px;
+            color: #d81b60;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+        th {
+            font-family: 'Khmer OS Battambang', sans-serif;
+            font-weight: bold;
+            background-color: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 6px 4px;
+            text-align: left;
+            font-size: 10px;
+        }
+        td {
+            padding: 6px 4px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: top;
+            font-size: 10.5px;
+        }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .price-col { font-weight: 600; }
+        .total-section {
+            margin-top: 6px;
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 6px;
+        }
+        .total-row {
+            display: table;
+            width: 100%;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+        .total-label {
+            display: table-cell;
+            text-align: left;
+        }
+        .total-value {
+            display: table-cell;
+            text-align: right;
+            font-weight: 700;
+        }
+        .grand-total-box {
+            background-color: #f8fafc;
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            margin-top: 4px;
+        }
+        .footer-text {
+            text-align: center;
+            font-size: 9.5px;
+            color: #64748b;
+            margin-top: 15px;
+            font-style: italic;
         }
     </style>
 </head>
 <body>
 
-<div class="invoice-card" id="receipt-content">
-    <div class="success-banner">
-        <div class="success-icon">✅</div>
-        <div style="font-weight: bold; font-size: 20px;">ការទូទាត់ជោគជ័យ!</div>
-    </div>
+<div class="receipt-header">
+        <div style="margin-bottom: 4px;">
+            <img src="{{ url_for('static', filename='images/nsp_logo.png') }}" alt="NSP Logo" style="width: 50px; height: 50px; object-fit: contain; margin: 0 auto;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/924/924514.png';">
+        </div>
 
-    <div class="header">
-        <img src="{{ url_for('static', filename='images/nsp_logo.png') }}" class="logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/924/924514.png';">
-        <h1 class="moul">ហាងគ្រឿងសម្អាង NSP</h1>
-        <div class="invoice-title">Official Receipt</div>
+        <h1 class="moul" style="margin: 0 0 2px 0; font-size: 16px; color: #db2777; font-weight: normal; line-height: 1.2; text-align: center;">
+            ហាងគ្រឿងសម្អាង NSP
+        </h1>
+
+        <div style="font-size: 9px; letter-spacing: 1px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; text-align: center;">
+            OFFICIAL RECEIPT
+        </div>
+
+        <div style="text-align: center; font-size: 9.5px; color: #4b5563; line-height: 1.4;">
+            <div style="margin-bottom: 1px;">ផ្សារស្វាយជ្រំ, ឃុំស្វាយជ្រំ, ស្រុកស្វាយជ្រំ, ខេត្តស្វាយរៀង</div>
+            <div style="font-weight: bold; color: #1e293b;">088 6999606 / 096 888 1857</div>
+        </div>
     </div>
 
     <div class="info-section">
@@ -121,38 +170,39 @@
             <span class="info-label">កាលបរិច្ឆេទ | Date</span>
             <span class="info-value">{{ format_ict_str(order.get('created_at')) }}</span>
         </div>
-        <div class="info-row">
-            <span class="info-label">លេខប្រតិបត្តិការ | Tran ID</span>
-            <span class="info-value">{{ order['tran_id'] }}</span>
+        <div class="info-row" style="margin-top: 4px;">
+            <span class="info-label" style="vertical-align: top;">លេខប្រតិបត្តិការ</span>
+            <span class="info-value" style="display: inline-block; width: 150px; line-height: 1.2; word-break: break-all;">
+                {{ order.tran_id }}
+            </span>
         </div>
         <div class="info-row">
             <span class="info-label">អ្នកលក់ | Cashier</span>
-            <span class="info-value">{{ order['user'] }}</span>
+            <span class="info-value">{{ order.get('user') or 'reamkesovanna' }}</span>
         </div>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th>Item</th>
-                <th style="text-align: center;">Qty</th>
-                <th style="text-align: right;">Price</th>
+                <th style="width: 55%;">ITEM</th>
+                <th class="text-center" style="width: 15%;">QTY</th>
+                <th class="text-right" style="width: 30%;">PRICE</th>
             </tr>
         </thead>
         <tbody>
             {% for item in order['items'] %}
             {% set qty = item.get('quantity') or item.get('qty') or 0 %}
-            {% set subtotal = item['price'] * qty %}
             <tr>
                 <td>
-                    {{ item['name'] }}<br>
-                    <small style="color:var(--primary-color); font-size:12px; font-weight:bold;">៛ {{ (item['price'] * RIEL_RATE) | round | int | string }}</small> | 
-                    <small style="color:#d81b60; font-size:11px;">$ {{ "%.2f"|format(item['price']) }}</small>
+                    <div style="font-weight: 600; color: #0f172a;">{{ item['name'] }}</div>
+                    <div style="font-size: 9px; color: #64748b; margin-top: 1px;">
+                        ${{ "{:,.2f}".format(item['price']) }} | ៛{{ "{:,.0f}".format(item['price'] * (RIEL_RATE|default(4000)|float)) }}
+                    </div>
                 </td>
-                <td class="item-qty">{{ qty }}</td>
-                <td class="item-price">
-                    <span style="color:var(--primary-color); font-weight:bold; font-size:16px;">៛ {{ (subtotal * RIEL_RATE) | round | int | string }}</span><br>
-                    <small style="color:#d81b60; font-size:11px;">$ {{ "%.2f"|format(subtotal) }}</small>
+                <td class="text-center" style="vertical-align: middle; font-weight: 600;">{{ qty }}</td>
+                <td class="text-right price-col" style="vertical-align: middle;">
+                    ${{ "{:,.2f}".format(qty * item['price']) }}
                 </td>
             </tr>
             {% endfor %}
@@ -160,16 +210,33 @@
     </table>
 
     <div class="total-section">
-        <div class="total-row" style="flex-direction: column; align-items: flex-end; gap: 4px;">
-            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
-                <span class="total-label">សរុប | Grand Total</span>
-                <span class="total-amount-riel">៛ {{ (order['total'] * RIEL_RATE) | round | int | string }}</span>
+        {% set discount_val = order.discount|default(0)|float %}
+        {% set total_usd = order.total|default(0)|float %}
+        {% set subtotal_usd = total_usd + discount_val %}
+
+        <div class="total-row">
+            <div class="total-label">សរុបដើម | Subtotal</div>
+            <div class="total-value">${{ "{:,.2f}".format(subtotal_usd) }}</div>
+        </div>
+
+        <div class="total-row" style="color: #dc2626;">
+            <div class="total-label">បញ្ចុះតម្លៃ | Discount</div>
+            <div class="total-value">-${{ "{:,.2f}".format(discount_val) }}</div>
+        </div>
+
+        <div class="grand-total-box">
+            <div class="total-row" style="margin-bottom: 2px;">
+                <div class="total-label" style="font-weight: bold; font-size: 11.5px;">សរុបជារួម | Grand Total</div>
+                <div class="total-value" style="color: #16a34a; font-size: 12px;">${{ "{:,.2f}".format(total_usd) }}</div>
             </div>
-            <div class="total-amount-usd">$ {{ "%.2f"|format(order['total']) }}</div>
+            <div class="total-row" style="margin-bottom: 0;">
+                <div class="total-label" style="color: #16a34a; font-size: 11px; font-weight: bold;">សរុបជាប្រាក់រៀល</div>
+                <div class="total-value" style="color: #16a34a; font-size: 11.5px;">៛{{ "{:,.0f}".format(total_usd * (RIEL_RATE|default(4000)|float)) }}</div>
+            </div>
         </div>
     </div>
-    
-    <div style="text-align: center; margin-top: 20px; font-size: 12px; color: var(--text-muted);">
+
+    <div class="footer-text">
         សូមអរគុណសម្រាប់ការគាំទ្រ! | Thank you for your purchase!
     </div>
 </div>

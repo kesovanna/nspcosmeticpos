@@ -1363,9 +1363,11 @@
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('barcodeView', this); closeSidebarMobile();"><i data-lucide="barcode"></i> បោះពុម្ពបាកូដ</a>
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('notificationsView', this); closeSidebarMobile();"><i data-lucide="bell"></i> សេចក្តីជូនដំណឹង</a>
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('usersView', this); closeSidebarMobile();"><i data-lucide="users"></i> គណនីអ្នកប្រើប្រាស់</a>
+        {% if session.get('role') == 'admin' %}
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('activitiesView', this); closeSidebarMobile();"><i data-lucide="activity"></i> សកម្មភាព</a>
+        {% endif %}
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('terminologyView', this); closeSidebarMobile();"><i data-lucide="book-open"></i> អំពីការប្រើប្រាស់ប្រព័ន្ធ</a>
-        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+        {% if session.get('role') == 'admin' %}
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('managerView', this); closeSidebarMobile();"><i data-lucide="layout-dashboard"></i> ផ្ទាំងគ្រប់គ្រង</a>
         {% endif %}
         <a href="#" class="menu-item logout" onclick="event.preventDefault(); logoutUser();"><i data-lucide="log-out"></i> ចាកចេញ</a>
@@ -1441,7 +1443,7 @@
                     <span id="badgeCount" class="hidden">0</span>
                 </button>
             </div>
-            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+            {% if session.get('role') == 'admin' %}
             <a href="javascript:void(0);" class="btn-music" title="Dashboard" onclick="showView('managerView'); closeSidebarMobile();"><i data-lucide="layout-dashboard"></i></a>
             <button type="button" 
                     onclick="openAddProductModal()"
@@ -1754,11 +1756,11 @@
                                             {% set filename = "invoice_" + (order.tran_id or order.local_id)|string + ".pdf" %}
                                             {% if order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}
                                                 <button onclick="viewReceipt('{{ order.tran_id or order.local_id }}')" 
-                                                   style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block; cursor: pointer;">
+                                                   style="padding: 6px 12px; background-color: #e0f2fe; color: #0284c7; font-weight: 600; text-decoration: none; border: 1px solid #bae6fd; border-radius: 6px; font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); min-width: 80px;">
                                                     View PDF
                                                 </button>
                                             {% else %}
-                                                <span style="color: #6c757d; font-size: 11px;">No Receipt</span>
+                                                <span style="padding: 6px 12px; background-color: #f1f5f9; color: #64748b; font-weight: 500; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; min-width: 80px;">No Receipt</span>
                                             {% endif %}
                                         </td>
                                         
@@ -2083,6 +2085,7 @@
         <!-- END Notifications View -->
 
         <!-- START Activities View -->
+        {% if session.get('role') == 'admin' %}
         <div id="activitiesView" class="view-container">
             <div class="dashboard-header" style="margin-bottom: 20px;">
                 <h1 style="font-size: 24px; font-weight: 700; color: #1e293b; margin: 0; display: flex; align-items: center; gap: 10px;">
@@ -2132,6 +2135,7 @@
                 {% endif %}
             </div>
         </div>
+        {% endif %}
         <!-- END Activities View -->
 
         <!-- START Users View -->
@@ -2533,6 +2537,7 @@
         </div>
         <!-- END Terminology View (Guide Book) -->
 <!-- START Manager View -->
+        {% if session.get('role') == 'admin' %}
         <div id="managerView" class="view-container">
             <div class="dashboard-header" style="margin-bottom: 20px;">
                 <h1 style="font-size: 24px; font-weight: 700; color: #1e293b; margin: 0; display: flex; align-items: center; gap: 10px;">
@@ -2605,6 +2610,28 @@
                 </div>
             </div>
 
+            <!-- Category Product/Stock Summary Table (admin only) -->
+            <div style="background: #ffffff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <h3 style="margin: 0; color: #1e293b; font-size: 15px; font-weight: 700;">សង្ខេបផលិតផលតាមប្រភេទ (Category Product/Stock Summary)</h3>
+                    <i data-lucide="layers" style="width: 18px; height: 18px; color: #64748b;"></i>
+                </div>
+                <div style="max-height: 320px; overflow-y: auto; border-radius: 10px; border: 1px solid #e2e8f0;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead style="position: sticky; top: 0; background: #f8fafc;">
+                            <tr>
+                                <th style="padding: 10px 12px; text-align: left; color: #64748b; font-weight: 600;">ប្រភេទ (Category)</th>
+                                <th style="padding: 10px 12px; text-align: center; color: #64748b; font-weight: 600;">ចំនួនមុខ (Items)</th>
+                                <th style="padding: 10px 12px; text-align: center; color: #64748b; font-weight: 600;">ស្តុកសរុប (Total Stock)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categorySummaryTable" style="background: #ffffff;">
+                            <tr><td colspan="3" style="padding: 24px; text-align: center; color: #94a3b8;">កំពុងផ្ទុក… (Loading…)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Live Data Tables: Recent Invoices + Recent Stock Movements -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px;">
                 <!-- Recent Invoices -->
@@ -2662,6 +2689,7 @@
                 </button>
             </div>
         </div>
+        {% endif %}
         <!-- END Manager View -->
 
         <!-- START Add Product View -->
@@ -4966,7 +4994,10 @@
                     <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; ${badgeStyle}">${status}</span>
                 </td>
                 <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                    ${hasReceipt ? `<button onclick="viewReceipt('${tranId || orderId}')" style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block; cursor: pointer;">View PDF</button>` : `<span style="color: #6c757d; font-size: 11px;">No Receipt</span>`}
+                    ${hasReceipt 
+                        ? `<button onclick="viewReceipt('${tranId || orderId}')" style="padding: 6px 12px; background-color: #e0f2fe; color: #0284c7; font-weight: 600; text-decoration: none; border: 1px solid #bae6fd; border-radius: 6px; font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); min-width: 80px;">View PDF</button>` 
+                        : `<span style="padding: 6px 12px; background-color: #f1f5f9; color: #64748b; font-weight: 500; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; min-width: 80px;">No Receipt</span>`
+                    }
                 </td>
                 <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                     <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
@@ -6260,6 +6291,50 @@ async function loadDashboardData(showSpinner) {
     }, 60000);
 })();
 
+// =====================================================================
+// CATEGORY PRODUCT/STOCK SUMMARY TABLE (admin only)
+// Fetches /api/admin/category-summary and renders the table rows.
+// =====================================================================
+async function loadCategorySummary() {
+    const tbody = document.getElementById('categorySummaryTable');
+    if (!tbody) return; // table not present (non-admin)
+
+    try {
+        const resp = await fetch('/api/admin/category-summary', {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (resp.status === 403) {
+            tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:#b91c1c;">គ្មានសិទ្ធិចូលប្រើ (Access Denied)</td></tr>';
+            return;
+        }
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        if (data.status === 'error') throw new Error(data.message || 'Server error');
+
+        const cats = Array.isArray(data.categories) ? data.categories : [];
+        if (cats.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:#94a3b8;">គ្មានទិន្នន័យ (No data)</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = cats.map(c => `
+            <tr style="border-top:1px solid #f1f5f9;">
+                <td style="padding:10px 12px;font-weight:600;color:#1e293b;">${dashEscapeHtml(c.category)}</td>
+                <td style="padding:10px 12px;text-align:center;color:#475569;">${(Number(c.total_items) || 0).toLocaleString('en-US')}</td>
+                <td style="padding:10px 12px;text-align:center;font-weight:700;color:#059669;">${(Number(c.total_stock) || 0).toLocaleString('en-US')}</td>
+            </tr>`).join('');
+    } catch (err) {
+        console.error('[Dashboard] loadCategorySummary error:', err);
+        tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:#94a3b8;">មិនអាចផ្ទុកទិន្នន័យបានទេ (Load failed)</td></tr>';
+    }
+}
+
+// Load the category summary table on page load (admin only — table absent otherwise)
+(function initCategorySummary() {
+    if (!document.getElementById('categorySummaryTable')) return;
+    loadCategorySummary();
+})();
+
 // Refresh the dashboard whenever managerView is shown — this guarantees the
 // Chart.js canvases render at full size (they are 0x0 while the view is hidden).
 (function patchShowViewForDashboard() {
@@ -6271,6 +6346,7 @@ async function loadDashboardData(showSpinner) {
             // Slight delay so the view has actually been made visible (charts resize correctly)
             setTimeout(function() {
                 if (typeof loadDashboardData === 'function') loadDashboardData(false);
+                if (typeof loadCategorySummary === 'function') loadCategorySummary();
             }, 120);
         }
         return result;

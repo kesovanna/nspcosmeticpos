@@ -66,6 +66,9 @@
         .aba-deeplink { display: inline-block; margin-top: 15px; padding: 12px 25px; background: #005a9c; color: white; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 14px; }
         .btn-success { background: #28a745; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
         .btn-success:hover { background: #218838; }
+        .btn-success:disabled { background: #6c757d; cursor: not-allowed; opacity: 0.8; }
+        .btn-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; border-radius: 50%; animation: btn-spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+        @keyframes btn-spin { to { transform: rotate(360deg); } }
         .qr-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px; }
         /* SweetAlert2 must ALWAYS render above the payment modal (z-index 9999).
            Default Swal z-index is ~1069, which would hide the success alert
@@ -328,7 +331,7 @@
                 </div>
                 <img src="/static/images/acleda_qr.png" alt="ACLEDA QR" style="width: 100%; max-width: 200px; border-radius: 10px; margin: 0 auto; display: block;">
                 <p style="font-size:12px; color:#666; margin:10px 0 0;">ស្កេនជាមួយ <b>ACLEDA ToanChet</b> រួចបញ្ជាក់ការទូទាត់ខាងក្រោម</p>
-                <button type="button" onclick="payWithACLEDA()" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (Manual Confirm)</button>
+                <button type="button" id="acledaConfirmBtn" onclick="confirmAcledaPayment()" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (Manual Confirm)</button>
             </div>
         </div>
     </div>
@@ -341,7 +344,7 @@
     //
     // Set by payWithABA() when it creates the pending order ("TX" + UUID),
     // and persisted to sessionStorage so a page refresh keeps the same ID.
-    // payWithACLEDA() reads this SAME ID instead of minting a brand-new
+    // confirmAcledaPayment() reads this SAME ID instead of minting a brand-new
     // ACL- UUID — otherwise the QR flow creates a duplicate pending row
     // and the original order stays stuck as 'pending' forever.
     let activeTranId = sessionStorage.getItem('checkout_tran_id') || null;
@@ -543,121 +546,115 @@
         sendCFDState('idle');
     }
 
-    // ============ ACLEDA MANUAL CONFIRMATION ============
+    // ============ ACLEDA MANUAL CONFIRMATION (R7: TWO-STAGE DIRECT SYNCHRONOUS FLOW) ============
     // ACLEDA has no Telegram auto-verification; the cashier confirms manually.
     //
-    // FIX: The flow now mirrors ABA — it FIRST creates a 'pending' ACLEDA
-    // order (/create-acleda-payment, ACL- tran_id), then the manual confirm
-    // button UPDATES that exact existing row to 'paid by acleda' via
-    // /confirm-acleda. No new duplicate row is ever inserted at confirm time.
-    // The backend stamps created_at with the PC's exact local wall-clock time
-    // (datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) — the PC is already on
-    // Cambodia time, so no extra +7h cambodia_time() shift is applied.
-    async function payWithACLEDA() {
-    try {
-        Swal.fire({ title: 'កំពុងដំណើរការ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-
-        let tran_id = (typeof activeTranId !== 'undefined' ? activeTranId : null) || sessionStorage.getItem('checkout_tran_id');
-
-        if (!tran_id) {
-            tran_id = "ACL-" + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
-            if (typeof activeTranId !== 'undefined') activeTranId = tran_id;
-            sessionStorage.setItem('checkout_tran_id', tran_id);
+    // STAGE 1 (INSTANT — 0 seconds): The QR modal opens with the static
+    // ACLEDA ToanChet QR. NO backend call, NO PDF, NO stock deduction, NO
+    // loading spinner — the modal is pure HTML/CSS and appears immediately.
+    //
+    // STAGE 2 (SYNCHRONOUS): The cashier scans the QR, then clicks
+    // "បញ្ជាក់ការទូទាត់ (Manual Confirm)". THIS is the ONLY moment the
+    // backend creates the order, deducts stock, and generates the PDF — all
+    // synchronously in ONE request. The PDF physically exists on disk before
+    // the success popup appears. NO background /api/archive-pdf fetch
+    // (browser redirects abort background fetches → missing PDFs / 404).
+    async function confirmAcledaPayment() {
+        const btn = document.getElementById('acledaConfirmBtn');
+        const originalBtnHTML = btn ? btn.innerHTML : '';
+        // Button spinner (NOT a global blocking Swal) — the modal stays visible
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="btn-spinner"></span>កំពុងដំណើរការ... | Processing...';
         }
-
-        const itemsToSend = (typeof CART_ITEMS !== 'undefined' ? CART_ITEMS : null) || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
-        const totalAmount = parseFloat(typeof TOTAL_AMOUNT !== 'undefined' ? TOTAL_AMOUNT : sessionStorage.getItem('checkout_total') || 0);
-        const discountAmount = parseFloat(typeof finalDiscount !== 'undefined' ? finalDiscount : sessionStorage.getItem('checkout_discount') || 0);
-
-        const response = await fetch('/create-acleda-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                items: itemsToSend,
-                total: totalAmount,
-                discount: discountAmount,
-                tran_id: tran_id
-            })
-        });
-
-        const data = await response.json();
-        if (data.status !== "success") {
-            Swal.fire("បញ្ហា", data.message || "មិនអាចបង្កើតការបង់ប្រាក់បានទេ", "error");
-            return;
-        }
-
-        const confirmResponse = await fetch('/confirm-acleda', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tran_id: tran_id })
-        });
-
-        const confirmData = await confirmResponse.json();
-
-        if (confirmData.status !== "success") {
-            Swal.fire("បញ្ហា", confirmData.message || "មិនអាចបញ្ជាក់ការទូទាត់បានទេ", "error");
-            return;
-        }
-
-        const confirmedTranId = (confirmData.tran_id && String(confirmData.tran_id).trim())
-            ? String(confirmData.tran_id).trim()
-            : tran_id;
-
         try {
-            if (typeof pollingInterval !== 'undefined' && pollingInterval) {
-                clearInterval(pollingInterval);
-                pollingInterval = null;
+            // Reuse the ABA-minted tran_id if present (shared checkout session),
+            // otherwise mint a fresh ACL- ID. Persisted for reload safety.
+            let tran_id = (typeof activeTranId !== 'undefined' ? activeTranId : null) || sessionStorage.getItem('checkout_tran_id');
+
+            if (!tran_id) {
+                tran_id = "ACL-" + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
+                if (typeof activeTranId !== 'undefined') activeTranId = tran_id;
+                sessionStorage.setItem('checkout_tran_id', tran_id);
             }
-        } catch (e) { console.warn("Polling clear skipped"); }
 
-        // ==========================================
-        // កូដថ្មីដែលដោះស្រាយរឿង PDF និង Alert មើលមិនទាន់
-        // ==========================================
+            const itemsToSend = (typeof CART_ITEMS !== 'undefined' ? CART_ITEMS : null) || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
+            const totalAmount = parseFloat(typeof TOTAL_AMOUNT !== 'undefined' ? TOTAL_AMOUNT : sessionStorage.getItem('checkout_total') || 0);
+            const discountAmount = parseFloat(typeof finalDiscount !== 'undefined' ? finalDiscount : sessionStorage.getItem('checkout_discount') || 0);
 
-        // ១. បញ្ជាឱ្យ Backend បង្កើត PDF ជាមុនសិន
-        try {
-            await fetch(`/api/archive-pdf/${confirmedTranId}`, { 
+            // STAGE 2: ONE synchronous request — the backend creates the order
+            // (if missing), deducts stock, generates the PDF, and verifies the
+            // file exists on disk BEFORE returning success.
+            const response = await fetch('/confirm-acleda', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tran_id: tran_id,
+                    items: itemsToSend,
+                    total: totalAmount,
+                    discount: discountAmount
+                })
             });
-        } catch (err) {
-            console.warn("⚠️ មិនអាចហៅ API បង្កើត PDF បានទេ:", err);
+
+            const data = await response.json();
+
+            if (data.success !== true && data.status !== "success") {
+                throw new Error(data.message || 'មិនអាចបញ្ជាក់ការទូទាត់បានទេ');
+            }
+
+            const confirmedTranId = (data.tran_id && String(data.tran_id).trim())
+                ? String(data.tran_id).trim()
+                : tran_id;
+
+            // Stop any ABA polling loop
+            try {
+                if (typeof pollingInterval !== 'undefined' && pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+            } catch (e) { console.warn("Polling clear skipped"); }
+
+            // Close the payment modal + CFD BEFORE the success alert so the
+            // overlay (z-index 9999) never covers the popup.
+            try {
+                if (typeof closePaymentModal === 'function') closePaymentModal();
+            } catch (e) { console.warn("closePaymentModal skipped:", e); }
+            document.querySelectorAll('.swal2-container').forEach(el => el.remove());
+
+            // SUCCESS ALERT — 30s timer + OK button
+            await Swal.fire({
+                icon: 'success',
+                title: 'ការទូទាត់ជោគជ័យ!',
+                text: 'ប្រព័ន្ធបានកត់ត្រា និងបង្កើតវិក្កយបត្ររួចរាល់! (' + confirmedTranId + ')',
+                timer: 30000,
+                timerProgressBar: true,
+                showConfirmButton: true,
+                confirmButtonText: 'យល់ព្រម (OK)',
+                allowOutsideClick: false
+            });
+
+            // Cleanup session data and return home safely
+            sessionStorage.removeItem('checkout_cart');
+            sessionStorage.removeItem('checkout_total');
+            sessionStorage.removeItem('checkout_discount');
+            sessionStorage.removeItem('checkout_tran_id');
+            if (typeof activeTranId !== 'undefined') activeTranId = null;
+
+            window.location.replace('/');
+
+        } catch (error) {
+            console.error("confirmAcledaPayment error:", error);
+            // Re-enable the button so the cashier can retry
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHTML;
+            }
+            const friendlyMsg = (error && error.message && !String(error.message).includes('Failed to fetch'))
+                ? error.message
+                : 'ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា';
+            Swal.fire('បញ្ហា', friendlyMsg, 'error');
         }
-
-        // ២. SUCCESS ALERT — កំណត់ ៣០ វិនាទី និងមានប៊ូតុងចុច OK
-        // បិទ Modal បង់ប្រាក់ និង Loading Swal ជាមុនសិន ដើម្បីកុំឱ្យ
-        // overlay (z-index 9999) គ្របពីលើ Success Alert មើលមិនឃើញ។
-        try {
-            if (typeof closePaymentModal === 'function') closePaymentModal();
-        } catch (e) { console.warn("closePaymentModal skipped:", e); }
-        try { Swal.close(); } catch (e) {}
-        document.querySelectorAll('.swal2-container').forEach(el => el.remove());
-
-        await Swal.fire({
-            icon: 'success',
-            title: 'ការទូទាត់ជោគជ័យ!',
-            text: 'ប្រព័ន្ធបានកត់ត្រា និងបង្កើតវិក្កយបត្ររួចរាល់! (' + confirmedTranId + ')',
-            timer: 30000,
-            timerProgressBar: true,
-            showConfirmButton: true,
-            confirmButtonText: 'យល់ព្រម (OK)',
-            allowOutsideClick: false
-        });
-
-        // ៣. បោសសម្អាតទិន្នន័យ និងត្រឡប់ទៅទំព័រដើមវិញដោយសុវត្ថិភាព
-        sessionStorage.removeItem('checkout_cart');
-        sessionStorage.removeItem('checkout_total');
-        sessionStorage.removeItem('checkout_discount');
-        sessionStorage.removeItem('checkout_tran_id');
-        if (typeof activeTranId !== 'undefined') activeTranId = null;
-
-        window.location.replace('/');
-
-    } catch (error) {
-        console.error("payWithACLEDA error:", error);
-        Swal.fire('បញ្ហា', 'ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា', 'error');
     }
-}
     function showQRPopup(tran_id) {
         const rielTotal = (parseFloat(TOTAL_AMOUNT) * JS_RIEL_RATE).toLocaleString();
         const discountRiel = (finalDiscount * JS_RIEL_RATE).toLocaleString();
