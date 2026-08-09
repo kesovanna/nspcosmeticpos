@@ -1,29 +1,29 @@
 import subprocess
 import sys
-import time
 import os
+import runpy
 
 def main():
-    print("🚀 កំពុងចាប់ផ្តើមប្រព័ន្ធ NSP Cosmetic POS និង ABA Listener...")
-    
-    # កំណត់ផ្លូវទៅកាន់ថតដែលផ្ទុកកូដពិតប្រាកដ
+    print("🚀 កំពុងចាប់ផ្តើមប្រព័ន្ធ NSP Cosmetic POS (ទម្រង់ ១-Tab ងាយស្រួលបិទ)...")
     work_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # បញ្ជាឱ្យបើក File ដោយប្រើ cwd (Current Working Directory)
-    # នេះនឹងធ្វើឱ្យ Python យល់ថាវាស្ថិតនៅក្នុងថតកូដរបស់អ្នក
-    pos_process = subprocess.Popen([sys.executable, "main.py"], cwd=work_dir)
+    # ១. រត់ ABA Listener ស្ងាត់ៗនៅពីក្រោយ (កុំឱ្យវាមកដណ្តើម Tab)
     aba_process = subprocess.Popen([sys.executable, "aba_listener.py"], cwd=work_dir)
 
     try:
-        while True:
-            time.sleep(1)
+        # ២. ទាញយក main.py មករត់ក្នុង Tab ដើមនេះផ្ទាល់តែម្តង!
+        # ការធ្វើបែបនេះ ការពារមិនឱ្យ VS Code បើក Tab ថ្មីរញ៉េរញ៉ៃ
+        sys.argv.append("--no-reload") # បិទ Reloader កុំឱ្យវិលវល់
+        runpy.run_path("main.py", run_name="__main__")
+        
     except KeyboardInterrupt:
-        print("\n🛑 កំពុងបិទប្រព័ន្ធទាំងពីរ...")
-        pos_process.terminate()
+        # ពេលបងចុច Ctrl + C វានឹងរត់ចូលកន្លែងនេះ
+        pass
+    finally:
+        print("\n🛑 ទទួលបានបញ្ជា! កំពុងបោសសម្អាត និងបិទប្រព័ន្ធទាំងមូល...")
         aba_process.terminate()
-        pos_process.wait()
         aba_process.wait()
-        print("✅ ប្រព័ន្ធបានបិទដោយជោគជ័យ!")
+        print("✅ ប្រព័ន្ធបានបិទរួចរាល់ ១០០% គ្មានសល់ខ្មោច Process ទេ!")
 
 if __name__ == '__main__':
     main()

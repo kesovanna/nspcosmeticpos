@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ការទូទាត់ជោគជ័យ - NSP Cosmetic Store</title>
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap');
 
@@ -40,9 +41,7 @@
         :root { --primary-color: #28a745; --secondary-color: #218838; --bg-color: #f0f2f5; --card-bg: #ffffff; --text-main: #333333; --text-muted: #666666; --border-color: #eeeeee; }
         body { font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; background-color: var(--bg-color); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; height: auto; }
         
-        /* Khmer OS Moul Light for shop header only */
         h1, .moul { font-family: 'Khmer OS Moul Light', 'Kantumruy Pro', sans-serif !important; font-weight: bold !important; }
-        /* Kantumruy Pro for all body/table text (renders CTL perfectly via Google Fonts) */
         .invoice-card, table, .total-section { font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
         
         .invoice-card { background: var(--card-bg); width: 100%; max-width: 450px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); position: relative; overflow: hidden; margin-bottom: 20px; height: auto; }
@@ -73,144 +72,33 @@
         .total-amount-usd { font-size: 16px; color: #d81b60; font-weight: 600; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
         .total-amount-riel { font-size: 24px; font-weight: 800; color: var(--primary-color); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
 
-        .btn-group { width: 100%; max-width: 450px; display: flex; flex-direction: column; gap: 12px; }
-        .btn { border: none; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; text-decoration: none; }
+        @page { size: 80mm 140mm; margin: 4mm; }
         
-        .btn-pdf { background: #e74c3c; color: white; box-shadow: 0 4px 15px rgba(231, 76, 60, 0.2); }
-        .btn-pdf:hover { background: #c0392b; transform: translateY(-2px); }
-        
-        .btn-share { background: #3498db; color: white; box-shadow: 0 4px 15px rgba(52, 152, 219, 0.2); }
-        .btn-share:hover { background: #2980b9; transform: translateY(-2px); }
-        
-        .btn-close { background: #7f8c8d; color: white; box-shadow: 0 4px 15px rgba(127, 140, 141, 0.2); }
-        .btn-close:hover { background: #636e72; transform: translateY(-2px); }
-
-        /* WeasyPrint & Thermal Printer Optimization */
-        @page {
-            size: 80mm 140mm;
-            margin: 4mm;
-        }
-        
-        /* Apply to both screen and print for WeasyPrint compatibility */
         {% if is_pdf %}
-        html {
-            height: auto;
-        }
-        body {
-            background: white;
-            padding: 0;
-            margin: 0;
-            width: 100%;
-            height: auto;
-            font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            -webkit-font-smoothing: antialiased;
-            display: block;
-        }
-        .invoice-card {
-            box-shadow: none;
-            border-radius: 0;
-            padding: 0;
-            width: 100%;
-            max-width: 100%;
-            margin-bottom: 0;
-            height: auto;
-        }
-        .invoice-card::before {
-            display: none;
-        }
-        .btn-group, .success-banner {
-            display: none !important;
-        }
-        .total-section {
-            background: #f0f0f0 !important;
-        }
-        .logo {
-            width: 50px;
-            height: 50px;
-        }
-        h1 {
-            font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important;
-            font-size: 16px;
-        }
-        table {
-            font-size: 12px;
-        }
-        .item-price {
-            font-size: 12px;
-        }
-        .total-amount-riel {
-            font-size: 20px !important;
-        }
+        html { height: auto; }
+        body { background: white; padding: 0; margin: 0; width: 100%; height: auto; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; display: block; }
+        .invoice-card { box-shadow: none; border-radius: 0; padding: 0; width: 100%; max-width: 100%; margin-bottom: 0; height: auto; }
+        .invoice-card::before { display: none; }
+        .btn-group, .success-banner { display: none !important; }
+        .total-section { background: #f0f0f0 !important; }
+        .logo { width: 50px; height: 50px; }
+        h1 { font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important; font-size: 16px; }
+        table { font-size: 12px; }
+        .item-price { font-size: 12px; }
+        .total-amount-riel { font-size: 20px !important; }
         {% endif %}
 
         @media print {
-            @page {
-                size: 80mm 140mm;
-                margin: 4mm;
-            }
-            html {
-                height: auto;
-            }
-            body {
-                background: white;
-                padding: 0;
-                margin: 0;
-                width: 100%;
-                height: auto;
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-                -webkit-font-smoothing: antialiased;
-                display: block;
-            }
-            .invoice-card {
-                box-shadow: none;
-                border-radius: 0;
-                padding: 0;
-                width: 100%;
-                max-width: 100%;
-                margin-bottom: 0;
-                height: auto;
-            }
-            .invoice-card::before {
-                display: none;
-            }
-            .btn-group, .success-banner {
-                display: none !important;
-            }
-            .total-section {
-                background: #f0f0f0 !important;
-                -webkit-print-color-adjust: exact;
-                color-adjust: exact;
-            }
-            .logo {
-                width: 50px;
-                height: 50px;
-            }
-            h1, .moul {
-                font-family: 'Khmer OS Moul Light', 'Kantumruy Pro', sans-serif !important;
-                font-size: 16px;
-                -webkit-font-smoothing: antialiased;
-            }
-            table {
-                font-size: 12px;
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            td, th {
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            .item-price {
-                font-size: 12px;
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            .total-amount-riel {
-                font-size: 20px !important;
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            .info-label, .info-value {
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            .total-label {
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
+            @page { size: 80mm 140mm; margin: 4mm; }
+            html { height: auto; }
+            body { background: white; padding: 0; margin: 0; width: 100%; height: auto; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; display: block; }
+            .invoice-card { box-shadow: none; border-radius: 0; padding: 0; width: 100%; max-width: 100%; margin-bottom: 0; height: auto; }
+            .invoice-card::before { display: none; }
+            .btn-group, .success-banner { display: none !important; }
+            .total-section { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; color-adjust: exact; }
+            .logo { width: 50px; height: 50px; }
+            h1, .moul { font-family: 'Khmer OS Moul Light', 'Kantumruy Pro', sans-serif !important; font-size: 16px; }
+            table { font-size: 12px; }
         }
     </style>
 </head>
@@ -287,8 +175,8 @@
 </div>
 
 <script>
-    window.onload = function() {
-        console.log("Success page loaded. Triggering PDF archival...");
+    window.onload = async function() {
+        console.log("Success page loaded. Initializing flows...");
         
         const tranId = "{{ order.tran_id or order.local_id }}";
         
@@ -298,27 +186,37 @@
             audio.play().catch(e => console.warn("Sound blocked: " + e));
         } catch (e) { console.error("Audio playback error:", e); }
 
-        // 2. Trigger backend PDF generation (weasyprint with proper Khmer CTL support)
+        // 2. GUARANTEED VISUAL ALERT: SweetAlert2 Success Popup
+        if (typeof Swal !== 'undefined') {
+            await Swal.fire({
+                icon: 'success',
+                title: 'ការទូទាត់ជោគជ័យ!',
+                text: 'ប្រព័ន្ធបានកត់ត្រា និងបង្កើតវិក្កយបត្ររួចរាល់ | Confirmed & Archived',
+                timer: 2800,
+                timerProgressBar: true,
+                showConfirmButton: false
+            });
+        }
+
+        // 3. Trigger backend PDF generation via ACLEDA or general archive API
         console.log(`Archiving PDF for transaction ${tranId}...`);
-        fetch(`/api/archive-pdf/${tranId}`, {
+        
+        // Call /confirm-acleda fallback or /api/archive-pdf to make sure backend writes PDF
+        fetch('/confirm-acleda', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tran_id: tranId })
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
-                console.log("✅ PDF archived successfully:", data.filename);
-            } else {
-                console.error("⚠️ PDF archival warning:", data.message);
-            }
+            console.log("Backend PDF trigger response:", data);
         })
-        .catch(err => console.error("❌ PDF archival failed:", err));
+        .catch(err => console.error("❌ PDF background trigger failed:", err));
 
-        // 3. Auto-redirect to home after 3 seconds
+        // 4. Redirect home after the alert finishes
         setTimeout(function() {
-            console.log("Redirecting to home...");
             window.location.href = '/';
-        }, 3000);
+        }, 200);
     };
 </script>
 </body>

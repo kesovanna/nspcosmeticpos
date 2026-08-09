@@ -330,25 +330,66 @@ def archive_pdf(tran_id):
             "status": "error",
             "message": f"PDF generation failed: {str(e)}"
         }), 500
-        
+
+def render_pdf_receipt(tran_id):
+    """SYNCHRONOUS PDF receipt generator — the single source of truth.
+
+    Called INLINE (not in a background thread) from the payment-confirmation
+    routes so the PDF file physically exists on disk the moment the order is
+    marked paid. Returns (success: bool, message: str, filename: str|None).
+
+    Uses success.html (same as /api/archive-pdf) with is_pdf=True so Khmer
+    text renders correctly via weasyprint CTL support. Safe to call from any
+    request context (uses request.host_url for absolute asset URLs).
+    """
+    try:
+        # SECURITY: Validate tran_id format (alphanumeric, dash, underscore only)
+        if not isinstance(tran_id, str) or not all(c.isalnum() or c in '-_' for c in tran_id):
+            return False, "Invalid transaction ID format", None
+
+        # Fetch the order from the database
+        order = local_db.get_order(tran_id)
+        if order is None:
+            return False, f"Order not found: {tran_id}", None
+
+        # Get currency rate
+        riel_rate = get_riel_rate()
+
+        # Render the success.html template as a string with order data and PDF flag
+        html_content = render_template('success.html', order=order, RIEL_RATE=riel_rate, is_pdf=True)
+
+        # Convert HTML to PDF using weasyprint (supports CTL for Khmer text)
+        pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
+
+        # SECURITY: Ensure reports directory exists with absolute path
+        reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
+        if not os.path.exists(reports_dir):
+            os.makedirs(reports_dir)
+
+        # SECURITY: Strict filename validation to prevent path traversal
+        pdf_filename = secure_filename(f"invoice_{tran_id}.pdf")
+        if not pdf_filename or not pdf_filename.endswith('.pdf'):
+            return False, "Invalid filename generated", None
+
+        # SECURITY: Ensure final path is within reports directory
+        pdf_filepath = os.path.abspath(os.path.join(reports_dir, pdf_filename))
+        if not pdf_filepath.startswith(reports_dir):
+            return False, "Path traversal detected", None
+
         with open(pdf_filepath, 'wb') as f:
             f.write(pdf_bytes)
-        
+
         # Update database to mark receipt as archived
         local_db.update_order_receipt_status(tran_id, 1)
-        
-        return jsonify({
-            "status": "success",
-            "message": "PDF archived successfully",
-            "filename": pdf_filename
-        })
-        
+
+        print(f"✅ PDF receipt generated synchronously for order: {tran_id}")
+        return True, "PDF archived successfully", pdf_filename
+
     except Exception as e:
         print(f"❌ PDF Generation Error for {tran_id}: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"PDF generation failed: {str(e)}"
-        }), 500
+        import traceback
+        traceback.print_exc()
+        return False, f"PDF generation failed: {str(e)}", None
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 # Firebase Cloud Functions cookie handling
@@ -1431,6 +1472,37 @@ def delete_products_bulk():
         return jsonify({'status': 'error', 'message': f'Server error: {str(e)}'}), 500
 
 # --- INVENTORY API ROUTES ---
+@app.route('/api/products', methods=['GET'])
+@csrf.exempt
+@login_required
+def api_products():
+    """Return all products as JSON (id, name, price, barcode, stock_quantity).
+
+    Used by the POS homepage to refresh the product grid live after a
+    checkout without a full page reload — the grid is Jinja-rendered at
+    page load, and this endpoint lets refreshProductGrid() re-render it
+    with the freshest stock numbers.
+    """
+    try:
+        products = local_db.get_products()
+        payload = []
+        for p in products:
+            payload.append({
+                'id': p.get('id'),
+                'name': p.get('name'),
+                'price': p.get('price'),
+                'barcode': p.get('barcode', ''),
+                'image': p.get('image', ''),
+                'category': p.get('category', 'more'),
+                'stock_quantity': p.get('stock_quantity', 0),
+                'expiry_date': p.get('expiry_date'),
+                'low_stock_level': p.get('low_stock_level')
+            })
+        return jsonify({'status': 'success', 'products': payload})
+    except Exception as e:
+        print(f"❌ /api/products error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/products/<product_id>/restock', methods=['POST'])
 @csrf.exempt
 @login_required
@@ -1607,6 +1679,16 @@ def view_report(filename):
     
     # Check if file exists before trying to send
     if not os.path.exists(requested_path):
+        # On-demand fallback: generate the PDF synchronously if the order exists.
+        # This covers ACLEDA/ABA QR orders whose PDF was never archived
+        # (e.g. older orders with has_receipt=0 but status 'paid by acleda').
+        tran_id = filename[len('invoice_'):-len('.pdf')] if filename.startswith('invoice_') and filename.endswith('.pdf') else None
+        if tran_id:
+            ok, msg, gen_filename = render_pdf_receipt(tran_id)
+            if ok and gen_filename:
+                requested_path = os.path.abspath(os.path.join(reports_dir, gen_filename))
+                if requested_path.startswith(reports_dir) and os.path.exists(requested_path):
+                    return send_from_directory(reports_dir, gen_filename)
         return "File not found", 404
         
     return send_from_directory(reports_dir, filename)
@@ -1632,24 +1714,30 @@ def download_receipt(tran_id):
             order = local_db.get_order(tran_id)
             if not order:
                 return jsonify({"status": "error", "message": "Order not found"}), 404
-                
+
+            # Derive payment method from the order status so the PDF renders
+            # the correct label (ACLEDA/ABA/Cash), not a hardcoded 'cash'.
+            status_lower = str(order.get('status', '')).lower()
+            if 'acleda' in status_lower:
+                payment_method = 'acleda'
+            elif 'aba' in status_lower:
+                payment_method = 'aba'
+            else:
+                payment_method = 'cash'
+
             riel_rate = get_riel_rate()
-            html_content = render_template('invoice.html', 
-                                         items=order.get('items', []),
-                                         total=order.get('total', 0),
-                                         discount=order.get('discount', 0),
-                                         date=format_ict(cambodia_time(datetime.fromisoformat(order.get('created_at', datetime.now().isoformat()))), "%d/%m/%Y %H:%M:%S"),
-                                         payment_method='cash',
+            html_content = render_template('success.html',
+                                         order=order,
                                          RIEL_RATE=riel_rate,
                                          is_pdf=True)
-            
+
             if not os.path.exists(reports_dir):
                 os.makedirs(reports_dir)
-                
+
             pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
             with open(pdf_filepath, 'wb') as f:
                 f.write(pdf_bytes)
-                
+
             local_db.update_order_receipt_status(tran_id, 1)
             
         return jsonify({
@@ -2011,6 +2099,52 @@ def annually_report_api():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/reports', methods=['GET'])
+@login_required
+@admin_required
+def unified_report_api():
+    """
+    Unified report endpoint.
+
+    Query params:
+      ?type=daily&date=2026-08-09   -> daily report for that date
+      ?type=monthly&date=2026-08    -> monthly report for that month
+      ?type=yearly&date=2026        -> yearly report for that year
+
+    Returns the same shape as the individual endpoints:
+      {status, type, date, data: {revenue, order_count, top_products, orders}}
+    """
+    try:
+        report_type = request.args.get('type', 'daily').strip().lower()
+        date_param = request.args.get('date', '').strip()
+
+        if report_type == 'monthly':
+            if not date_param:
+                date_param = datetime.now().strftime('%Y-%m')
+            report_data = local_db.get_monthly_sales_report(date_param)
+        elif report_type in ('yearly', 'annually', 'annual'):
+            if not date_param:
+                date_param = datetime.now().strftime('%Y')
+            report_data = local_db.get_annual_sales_report(date_param)
+        else:
+            # default: daily
+            if not date_param:
+                date_param = datetime.now().strftime('%Y-%m-%d')
+            report_data = local_db.get_daily_sales_report(date_param)
+
+        # Enrich orders with display_datetime for the JS table
+        for order in report_data.get('orders', []):
+            enrich_order_display_times(order)
+
+        return jsonify({
+            "status": "success",
+            "type": report_type,
+            "date": date_param,
+            "data": report_data
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/checkout', methods=['POST'])
 @csrf.exempt  # SECURITY: API endpoint
 @login_required
@@ -2058,6 +2192,14 @@ def checkout_endpoint():
         }
 
         local_id = local_db.add_order(order_data)
+
+        # 2.5 SYNCHRONOUS PDF GENERATION — the PDF must physically exist on
+        #     disk the moment payment succeeds, so the reports page shows
+        #     "View PDF" (has_receipt=1) immediately. No background thread,
+        #     no race with the frontend's /api/archive-pdf call.
+        pdf_ok, pdf_msg, pdf_filename = render_pdf_receipt(tran_id)
+        if not pdf_ok:
+            print(f"⚠️ Synchronous PDF generation failed for cash order {tran_id}: {pdf_msg}")
 
         # 3. Trigger background tasks for non-critical operations
         # PDF Generation - Move to background thread to avoid blocking
@@ -2154,6 +2296,15 @@ def create_aba_payment():
                 'duplicate': True
             })
 
+        # PILLAR 1: Atomic stock deduction across BOTH databases.
+        # The ABA order is created as 'pending' and the Telegram listener
+        # later flips it to 'paid' — but the stock must be reserved NOW so
+        # the product cards show the reduced quantity immediately and other
+        # cashiers cannot oversell the same units.
+        success, msg = process_stock_deduction(items)
+        if not success:
+            return jsonify({'status': 'error', 'message': msg}), 400
+
         # Save to local database with 'pending' status
         # aba_listener.py will look for 'pending' orders with matching amount
         order_data = {
@@ -2211,6 +2362,16 @@ def create_acleda_payment():
                 'duplicate': True
             })
 
+        # PILLAR 1: Atomic stock deduction across BOTH databases.
+        # Same rule as the ABA flow: the ACLEDA order is created 'pending'
+        # and manually confirmed later, but the stock is reserved NOW so the
+        # product cards show the reduced quantity immediately. /confirm-acleda
+        # only flips the status — it must NEVER re-deduct (success.html also
+        # POSTs to /confirm-acleda for PDF archiving, which would double-deduct).
+        success, msg = process_stock_deduction(items)
+        if not success:
+            return jsonify({'status': 'error', 'message': msg}), 400
+
         # Save to local database with 'pending' status
         order_data = {
             'items': items,
@@ -2240,64 +2401,105 @@ def create_acleda_payment():
 
 
 @app.route('/confirm-acleda', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
-@login_required
+@csrf.exempt
 def confirm_acleda():
-    """Manually confirm an ACLEDA payment (cashier clicks "Confirm ACLEDA").
-
-    CRITICAL FIX: instead of INSERTING a brand-new order row, this route
-    looks up the EXISTING 'pending' row by its transaction ID and updates
-    THAT exact row to 'paid by acleda'. This prevents duplicate rows, and
-    created_at is re-stamped with the exact PC local time (NO extra +7h
-    offset — the server is already on Cambodia time).
-
-    Idempotent: if the row is already confirmed, returns success without
-    creating a duplicate or re-deducting stock.
-    """
     try:
         data = request.json or {}
         tran_id = (data.get('tran_id') or '').strip()
         if not tran_id:
             return jsonify({'status': 'error', 'message': 'Missing tran_id'}), 400
 
-        # 1. Look up the existing pending row — DO NOT insert a new one.
+        # 1. ឆែករកមើល Order 
         order = local_db.get_order(tran_id)
         if order is None:
             return jsonify({'status': 'error', 'message': 'Order not found'}), 404
 
-        # 2. If already confirmed, treat as success (idempotent retry-safe).
-        current_status = str(order.get('status', '')).strip().lower()
-        if current_status in ('paid by acleda', 'paid', 'completed', 'paid by cash', 'paid by aba'):
-            return jsonify({
-                'status': 'success',
-                'message': 'Order already confirmed',
-                'tran_id': tran_id,
-                'local_id': order.get('local_id'),
-                'duplicate': True
-            }), 200
+        # 1.5 Only flip status if the order is still 'pending'. ABA orders are
+        #     already 'paid' (aba_listener flipped them) — this route doubles as
+        #     the success.html PDF trigger, so it must NOT re-label an ABA order
+        #     as 'paid by acleda' (that would corrupt the reports status badge).
+        current_status = str(order.get('status', '') or '').strip().lower()
+        if current_status in ('pending', '', 'unpaid'):
+            # 2. នេះ! ឈ្មោះ Function ដែលត្រឹមត្រូវគឺអាមួយនេះ៖
+            local_db.update_order_status_and_time(
+                tran_id,
+                'paid by acleda',
+                datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+            )
+            print(f"✅ ACLEDA order {tran_id} flipped pending -> paid by acleda")
+        else:
+            print(f"ℹ️ Order {tran_id} already '{order.get('status')}' — status preserved (PDF trigger only)")
 
-        # 3. Update THAT exact row: status='paid by acleda' + exact local time.
-        #    NO cambodia_time() here — the PC is already on Cambodia time;
-        #    applying the helper again would add +7h (9 AM -> 4 PM).
-        local_db.update_order_status_and_time(
-            tran_id,
-            'paid by acleda',
-            datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-        )
+        # 2.5 SYNCHRONOUS PDF GENERATION — the PDF must physically exist on
+        #     disk the moment payment succeeds, so the reports page shows
+        #     "View PDF" (has_receipt=1) immediately. No background thread,
+        #     no race with the frontend's /api/archive-pdf call.
+        pdf_ok, pdf_msg, pdf_filename = render_pdf_receipt(tran_id)
+        if not pdf_ok:
+            print(f"⚠️ Synchronous PDF generation failed for ACLEDA {tran_id}: {pdf_msg}")
 
-        print(f"✅ ACLEDA manual confirmation: {tran_id} -> 'paid by acleda' (ICT timestamp)")
+        # 3. Generate PDF Background (មានសោរ app_context ត្រឹមត្រូវ)
+        #    FIX: request.host_url is captured OUTSIDE the thread — the
+        #    request context is dead inside the background thread, so
+        #    accessing request.* there would raise RuntimeError and the
+        #    PDF would silently never be generated.
+        base_url = request.host_url
 
-        return jsonify({
-            'status': 'success',
-            'message': 'ACLEDA payment confirmed',
-            'tran_id': tran_id,
-            'local_id': order.get('local_id')
-        }), 200
+        def generate_pdf_acleda_background(t_id, base_url):
+            # App context first (required for render_template / url_for),
+            # then a synthetic REQUEST context bound to the captured
+            # base_url — invoice.html calls url_for('static', ...) which
+            # raises "Unable to build URLs outside an active request"
+            # without an active request context.
+            with app.app_context():
+                with app.test_request_context(base_url=base_url):
+                    try:
+                        riel_rate = get_riel_rate()
+                        ord_data = local_db.get_order(t_id)
+                        if ord_data:
+                            html_content = render_template('invoice.html', 
+                                                         items=ord_data.get('items', []),
+                                                         total=ord_data.get('total', 0),
+                                                         discount=ord_data.get('discount', 0),
+                                                         date=format_ict(cambodia_time(datetime.fromisoformat(ord_data.get('created_at', datetime.now().isoformat()))), "%d/%m/%Y %H:%M:%S"),
+                                                         payment_method='acleda',
+                                                         RIEL_RATE=riel_rate,
+                                                         is_pdf=True)
+                            pdf_bytes = HTML(string=html_content, base_url=base_url).write_pdf()
+                            reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
+                            if not os.path.exists(reports_dir):
+                                os.makedirs(reports_dir)
+                            pdf_filename = secure_filename(f"invoice_{t_id}.pdf")
+                            if pdf_filename and pdf_filename.endswith('.pdf'):
+                                pdf_filepath = os.path.abspath(os.path.join(reports_dir, pdf_filename))
+                                if pdf_filepath.startswith(reports_dir):
+                                    with open(pdf_filepath, 'wb') as f:
+                                        f.write(pdf_bytes)
+                                    local_db.update_order_receipt_status(t_id, 1)
+                                    print(f"✅ PDF receipt generated for ACLEDA order: {t_id}")
+                    except Exception as pdf_error:
+                        print(f"⚠️ PDF generation warning for ACLEDA {t_id}: {str(pdf_error)}")
+                        # FIX: print the full traceback so future failures are
+                        # visible in the terminal instead of failing silently.
+                        import traceback
+                        traceback.print_exc()
 
+        def sync_background():
+            try:
+                sync.trigger_auto_sync(delay=3)
+            except Exception:
+                pass
+
+        import threading
+        pdf_thread = threading.Thread(target=generate_pdf_acleda_background, args=(tran_id, base_url), daemon=True)
+        sync_thread = threading.Thread(target=sync_background, daemon=True)
+        pdf_thread.start()
+        sync_thread.start()
+
+        return jsonify({'status': 'success', 'message': 'ACLEDA payment confirmed'})
     except Exception as e:
-        print(f"❌ ACLEDA confirm error: {e}")
+        print(f"❗ Confirm ACLEDA Error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
 
 @app.route('/check-status')
 @csrf.exempt  # SECURITY: API endpoint
@@ -2497,7 +2699,8 @@ if __name__ == '__main__':
     
     # Start the server (debug=True enables auto-reload of templates)
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # បិទការបង្កើតម៉ាស៊ីនទី២ (use_reloader=False) ឱ្យដាច់ស្រឡះ ដើម្បីការពារការគាំង Database
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
 # --- FIREBASE CLOUD FUNCTIONS WRAPPER ---
 from firebase_functions import https_fn
 from firebase_admin import initialize_app

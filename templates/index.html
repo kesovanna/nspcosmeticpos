@@ -1744,7 +1744,7 @@
                                         
                                         <!-- Status -->
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                            <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; {% if order.status|lower in ['paid', 'completed'] %}background: #dcfce7; color: #166534;{% elif order.status|lower == 'pending' %}background: #fef9c3; color: #854d0e;{% else %}background: #fee2e2; color: #991b1b;{% endif %}">
+                                            <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; {% if order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}background: #dcfce7; color: #166534;{% elif order.status|lower == 'pending' %}background: #fef9c3; color: #854d0e;{% else %}background: #fee2e2; color: #991b1b;{% endif %}">
                                                 {{ order.status }}
                                             </span>
                                         </td>
@@ -1752,7 +1752,7 @@
                                         <!-- Receipt -->
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                             {% set filename = "invoice_" + (order.tran_id or order.local_id)|string + ".pdf" %}
-                                            {% if order.status|lower in ['paid', 'completed'] %}
+                                            {% if order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}
                                                 <button onclick="viewReceipt('{{ order.tran_id or order.local_id }}')" 
                                                    style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block; cursor: pointer;">
                                                     View PDF
@@ -3702,7 +3702,15 @@
 
         const item = cart.find(i => i.id === id || i.name === name);
         const currentQty = item ? item.qty : 0;
-        const availableStock = stock !== undefined ? parseInt(stock) : 999;
+
+        // LIVE STOCK GUARD: prefer the card's data-stock attribute — it is
+        // kept fresh by refreshProductGrid() after every checkout — over the
+        // Jinja-rendered value baked into the onclick at page load.
+        let availableStock = stock !== undefined ? parseInt(stock) : 999;
+        const cardEl = document.querySelector(`.card[data-id="${id}"]`);
+        if (cardEl && cardEl.dataset.stock !== undefined && cardEl.dataset.stock !== '') {
+            availableStock = parseInt(cardEl.dataset.stock);
+        }
 
         if (availableStock <= 0 || currentQty >= availableStock) {
             Swal.fire({
@@ -4552,6 +4560,7 @@
         
         // If monthly report, show month picker first
         if (type === 'monthly') {
+            configureReportDatePicker('monthly');
             showMonthPicker();
             return;
         }
@@ -4565,17 +4574,18 @@
             }
         });
 
-        // Determine API endpoint and parameters
-        let apiUrl = '';
-        let params = {};
-        
+        // Configure the date picker for the selected scope
+        configureReportDatePicker(type);
+
+        // Determine API endpoint and parameters (unified endpoint)
+        const now = new Date();
+        let dateValue = '';
         if (type === 'daily') {
-            const today = new Date().toISOString().split('T')[0];
-            apiUrl = '/api/reports/daily?date=' + today;
+            dateValue = now.toISOString().split('T')[0];
         } else if (type === 'annually') {
-            const year = new Date().getFullYear();
-            apiUrl = '/api/reports/annually?year=' + year;
+            dateValue = String(now.getFullYear());
         }
+        const apiUrl = '/api/reports?type=' + type + '&date=' + encodeURIComponent(dateValue);
 
         // Fetch report data
         fetch(apiUrl)
@@ -4584,54 +4594,8 @@
                 Swal.close();
                 
                 if (data.status === 'success') {
-                    // Update summary stats
-                    const stats = data.data;
-                    const revenueUSD = stats.revenue || 0;
-                    const revenueRiel = revenueUSD * 4000;
-                    const orderCount = stats.order_count || 0;
-                    const topProductName = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].name : 'N/A';
-                    const topProductQty = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].qty : 'N/A';
-                    
-                    // Update the stats cards
-                    const statCards = document.querySelectorAll('.stat-card .value');
-                    const statLabels = document.querySelectorAll('.stat-card .label');
-                    if (statCards.length >= 3) {
-                        statCards[0].innerHTML = '៛ ' + revenueRiel.toLocaleString('en-US', {maximumFractionDigits: 0}) + '<br><span style="font-size: 20px; display: block; margin-top: 8px;">$ ' + revenueUSD.toLocaleString('en-US', {maximumFractionDigits: 2}) + '</span>';
-                        statCards[1].innerHTML = orderCount + ' ការកុម្ម៉ង់ទិញ';
-                        statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' មុខទំនិញ)</span>' : 'N/A';
-                        
-                        // Update revenue label based on report type
-                        if (statLabels.length >= 3) {
-                            if (type === 'daily') {
-                                statLabels[0].textContent = 'ចំណូលថ្ងៃនេះ';
-                                statLabels[2].textContent = 'ទំនិញលក់ដាច់ជាងគេប្រចាំថ្ងៃ ចំនួន ១០ម៉ាក';
-                            } else if (type === 'monthly') {
-                                statLabels[0].textContent = 'ចំណូលប្រចាំខែនេះ';
-                                statLabels[2].textContent = 'ទំនិញលក់ដាច់ជាងគេប្រចាំខែ ចំនួន ១០ម៉ាក';
-                            } else if (type === 'annually') {
-                                statLabels[0].textContent = 'ចំណូលប្រចាំឆ្នាំនេះ';
-                                statLabels[2].textContent = 'ទំនិញលក់ដាច់ជាងគេប្រចាំឆ្នាំ ចំនួន ១០ម៉ាក';
-                            }
-                        }
-                    }
-                    
-                    // Store top products data globally for modal
-                    window.currentTopProducts = stats.top_products || [];
-                    
-                    // SYNC: Update card display to match modal data source
-                    console.log('[switchReportType] Syncing card with modal data:', stats.top_products);
-                    
-                    // Update the label for the date picker based on report type
-                    const headerLabel = document.querySelector('.history-header h2');
-                    if (headerLabel) {
-                        if (type === 'daily') {
-                            headerLabel.textContent = 'បញ្ជីការលក់ - ប្រចាំថ្ងៃ';
-                            document.getElementById('reportDatePickerHome').style.display = 'block';
-                        } else if (type === 'annually') {
-                            headerLabel.textContent = 'បញ្ជីការលក់ - ប្រចាំឆ្នាំ';
-                            document.getElementById('reportDatePickerHome').style.display = 'none';
-                        }
-                    }
+                    const headerText = type === 'daily' ? 'បញ្ជីការលក់ - ប្រចាំថ្ងៃ' : 'បញ្ជីការលក់ - ប្រចាំឆ្នាំ';
+                    applyReportData(data, type, headerText);
                     
                     console.log('[switchReportType] Report data updated successfully');
                 } else {
@@ -4642,6 +4606,78 @@
                 console.error('[switchReportType] Fetch error:', error);
                 Swal.fire('Error', 'មានបញ្ហាក្នុងការទាញយកទិន្នន័យរបាយការណ៍', 'error');
             });
+    }
+
+    // --- Configure the report date picker for the active scope ---
+    function configureReportDatePicker(type) {
+        const picker = document.getElementById('reportDatePickerHome');
+        if (!picker) return;
+        const now = new Date();
+        // Clear the value first so changing the input type never triggers a
+        // format-mismatch warning (e.g. "2026-08-09" vs type="month").
+        picker.value = '';
+        if (type === 'daily') {
+            picker.type = 'date';
+            picker.value = now.toISOString().split('T')[0];
+            picker.style.display = 'inline-block';
+        } else if (type === 'monthly') {
+            picker.type = 'month';
+            picker.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            picker.style.display = 'inline-block';
+        } else if (type === 'annually') {
+            picker.type = 'number';
+            picker.min = '2000';
+            picker.max = '2100';
+            picker.step = '1';
+            picker.value = String(now.getFullYear());
+            picker.style.display = 'inline-block';
+        }
+    }
+
+    // --- Apply report data to stats cards, labels, header and table ---
+    function applyReportData(data, type, headerText) {
+        const stats = data.data;
+        const revenueUSD = stats.revenue || 0;
+        const revenueRiel = revenueUSD * 4000;
+        const orderCount = stats.order_count || 0;
+        const topProductName = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].name : 'N/A';
+        const topProductQty = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].qty : 'N/A';
+        
+        // Update the stats cards
+        const statCards = document.querySelectorAll('.stat-card .value');
+        const statLabels = document.querySelectorAll('.stat-card .label');
+        if (statCards.length >= 3) {
+            statCards[0].innerHTML = '៛ ' + revenueRiel.toLocaleString('en-US', {maximumFractionDigits: 0}) + '<br><span style="font-size: 20px; display: block; margin-top: 8px;">$ ' + revenueUSD.toLocaleString('en-US', {maximumFractionDigits: 2}) + '</span>';
+            statCards[1].innerHTML = orderCount + ' ការកុម្ម៉ង់ទិញ';
+            statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' ឯកតា)</span>' : 'N/A';
+            
+            // Update revenue label based on report type
+            if (statLabels.length >= 3) {
+                if (type === 'daily') {
+                    statLabels[0].textContent = 'ចំណូលថ្ងៃនេះ';
+                    statLabels[2].textContent = 'ទំនិញលក់ដាច់ជាងគេប្រចាំថ្ងៃ ចំនួន ១០ម៉ាក';
+                } else if (type === 'monthly') {
+                    statLabels[0].textContent = 'ចំណូលប្រចាំខែនេះ';
+                    statLabels[2].textContent = 'ទំនិញលក់ដាច់ជាងគេប្រចាំខែ ចំនួន ១០ម៉ាក';
+                } else if (type === 'annually') {
+                    statLabels[0].textContent = 'ចំណូលប្រចាំឆ្នាំនេះ';
+                    statLabels[2].textContent = 'ទំនិញលក់ដាច់ជាងគេប្រចាំឆ្នាំ ចំនួន ១០ម៉ាក';
+                }
+            }
+        }
+        
+        // Store top products data globally for modal
+        window.currentTopProducts = stats.top_products || [];
+        
+        // Update the header label (h2 is the sibling of the date picker)
+        const pickerEl = document.getElementById('reportDatePickerHome');
+        const headerLabel = pickerEl ? pickerEl.previousElementSibling : null;
+        if (headerLabel && headerLabel.tagName === 'H2' && headerText) {
+            headerLabel.textContent = headerText;
+        }
+        
+        // Re-render the table rows
+        renderReportTable(stats.orders || []);
     }
 
     // --- Month Picker Function ---
@@ -4713,7 +4749,7 @@
 
         const year = currentYear;
         const monthStr = String(month).padStart(2, '0');
-        const apiUrl = '/api/reports/monthly?month=' + year + '-' + monthStr;
+        const apiUrl = '/api/reports?type=monthly&date=' + year + '-' + monthStr;
 
         fetch(apiUrl)
             .then(response => response.json())
@@ -4721,35 +4757,21 @@
                 Swal.close();
                 
                 if (data.status === 'success') {
-                    // Update summary stats
-                    const stats = data.data;
-                    const revenueUSD = stats.revenue || 0;
-                    const revenueRiel = revenueUSD * 4000;
-                    const orderCount = stats.order_count || 0;
-                    const topProductName = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].name : 'N/A';
-                    const topProductQty = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].qty : 'N/A';
-                    
-                    // Update the stats cards
-                    const statCards = document.querySelectorAll('.stat-card .value');
-                    const statLabels = document.querySelectorAll('.stat-card .label');
-                    if (statCards.length >= 3) {
-                        statCards[0].innerHTML = '៛ ' + revenueRiel.toLocaleString('en-US', {maximumFractionDigits: 0}) + '<br><span style="font-size: 20px; display: block; margin-top: 8px;">$ ' + revenueUSD.toLocaleString('en-US', {maximumFractionDigits: 2}) + '</span>';
-                        statCards[1].innerHTML = orderCount + ' ការកុម្ម៉ង់ទិញ';
-                        statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' ឯកតា)</span>' : 'N/A';
-                        
-                        // Update revenue label for monthly report with specific month name
-                        if (statLabels.length >= 1) {
-                            statLabels[0].textContent = 'ចំណូលប្រចាំខែ' + monthName;
-                        }
+                    // Update the date picker to reflect the selected month
+                    const picker = document.getElementById('reportDatePickerHome');
+                    if (picker) {
+                        picker.type = 'month';
+                        picker.value = year + '-' + monthStr;
+                        picker.style.display = 'inline-block';
                     }
                     
-                    // Store top products data globally for modal
-                    window.currentTopProducts = stats.top_products || [];
+                    // Update summary stats + labels + header + table
+                    applyReportData(data, 'monthly', 'បញ្ជីការលក់ - ប្រចាំខែ ' + monthName);
                     
-                    // Update the label
-                    const headerLabel = document.querySelector('.history-header h2');
-                    if (headerLabel) {
-                        headerLabel.textContent = 'បញ្ជីការលក់ - ប្រចាំខែ ' + monthName;
+                    // Update revenue label with the specific month name
+                    const statLabels = document.querySelectorAll('.stat-card .label');
+                    if (statLabels.length >= 1) {
+                        statLabels[0].textContent = 'ចំណូលប្រចាំខែ' + monthName;
                     }
                     
                     console.log('[selectMonth] Month report data loaded for:', monthStr);
@@ -4814,19 +4836,23 @@
         }
         
         let apiUrl = '';
+        const picker = document.getElementById('reportDatePickerHome');
         if (type === 'daily') {
-            const dateInput = document.getElementById('reportDatePickerHome');
-            const date = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
-            apiUrl = '/api/reports/daily?date=' + date;
+            const date = picker && picker.value ? picker.value : new Date().toISOString().split('T')[0];
+            apiUrl = '/api/reports?type=daily&date=' + encodeURIComponent(date);
         } else if (type === 'monthly') {
-            // For monthly, we might need to extract the month from the header or use current month
-            const now = new Date();
-            const year = now.getFullYear();
-            const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-            apiUrl = '/api/reports/monthly?month=' + year + '-' + monthStr;
+            // Use the month picker value if available, else current month
+            let monthVal = '';
+            if (picker && picker.value) {
+                monthVal = picker.value;
+            } else {
+                const now = new Date();
+                monthVal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            }
+            apiUrl = '/api/reports?type=monthly&date=' + encodeURIComponent(monthVal);
         } else if (type === 'annually') {
-            const year = new Date().getFullYear();
-            apiUrl = '/api/reports/annually?year=' + year;
+            const year = picker && picker.value ? picker.value : new Date().getFullYear();
+            apiUrl = '/api/reports?type=yearly&date=' + encodeURIComponent(year);
         }
 
         if (apiUrl) {
@@ -4848,6 +4874,9 @@
                             statCards[2].innerHTML = topProductName !== 'N/A' ? topProductName + '<br><span style="font-size: 18px; display: block; margin-top: 8px;">(' + topProductQty + ' ឯកតា)</span>' : 'N/A';
                         }
                         window.currentTopProducts = stats.top_products || [];
+                        
+                        // Re-render the table rows too
+                        renderReportTable(stats.orders || []);
                     }
                 })
                 .catch(error => console.error('Error updating summary cards:', error));
@@ -4858,130 +4887,124 @@
         const urlParams = new URLSearchParams(window.location.search);
         urlParams.set('date', date);
         // Removed window.location.href navigation - update the table dynamically instead
-        // Re-fetch the daily report for the selected date and update summary cards
+        // Re-fetch the report for the selected value and update summary cards + table
         updateSummaryCards();
+    }
 
-        // Dynamically re-render the orders table for the selected date without page reload
-        fetch('/api/reports/daily?date=' + encodeURIComponent(date))
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success' && data.data) {
-                    const orders = data.data.orders || [];
-                    const tbody = document.querySelector('#reportTableContainer tbody');
-                    if (!tbody) return;
+    // --- Shared table renderer: builds the full report table body from orders ---
+    function renderReportTable(orders) {
+        const tbody = document.querySelector('#reportTableContainer tbody');
+        if (!tbody) return;
 
-                    if (orders.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="14" style="background: #ffffff; text-align: center !important; color: #9ca3af !important; padding: 50px !important; border: 1px solid #cbd5e1; vertical-align: middle; white-space: nowrap !important;">មិនទាន់មានទិន្នន័យលក់នៅឡើយទេ</td></tr>';
-                        return;
-                    }
+        if (!orders || orders.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="14" style="background: #ffffff; text-align: center !important; color: #9ca3af !important; padding: 50px !important; border: 1px solid #cbd5e1; vertical-align: middle; white-space: nowrap !important;">មិនទាន់មានទិន្នន័យលក់នៅឡើយទេ</td></tr>';
+            return;
+        }
 
-                    let html = '';
-                    let count = 1;
-                    orders.forEach((order) => {
-                        const items = order.items ? (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) : [];
-                        if (items.length === 0) return;
-                        
-                        // Parse items into consistent format
-                        const parsedItems = items.map(item => ({
-                            name: item.name || 'Unknown',
-                            qty: item.qty || item.quantity || 0,
-                            price: item.price || 0
-                        }));
-                        
-                        const firstItem = parsedItems[0];
-                        const total = order.total || 0;
-                        const discount = order.discount || 0;
-                        const status = order.status || 'pending';
-                        const statusLower = status.toLowerCase();
-                        const tranId = order.tran_id || (order.id ? order.id.slice(0, 8) : '');
-                        const orderId = order.id || order.local_id || tranId;
-                        const filename = 'invoice_' + (tranId || orderId) + '.pdf';
-                        const pdfUrl = '/reports/view/' + filename;
-                        
-                        // Status badge styling
-                        let badgeStyle = 'background: #fee2e2; color: #991b1b;';
-                        if (['paid', 'completed'].includes(statusLower)) {
-                            badgeStyle = 'background: #dcfce7; color: #166534;';
-                        } else if (statusLower === 'pending') {
-                            badgeStyle = 'background: #fef9c3; color: #854d0e;';
-                        }
-                        
-                        const hasReceipt = ['paid', 'completed'].includes(statusLower);
-                        
-                        // Format Time & Date
-                        const dtStr = order.display_datetime || order.display_time || '';
-                        const dtParts = dtStr.split(' ');
-                        const datePart = dtParts[0] || '';
-                        const timePart = dtParts[1] || '';
-                        const ampmPart = dtParts[2] || '';
-                        
-                        html += `<tr>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                <input type="checkbox" class="report-row-checkbox" value="${orderId}">
-                            </td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${count}</td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
-                                    <span style="font-weight: 600; color: #1e293b;">${timePart} ${ampmPart}</span>
-                                    <span style="font-size: 11px; color: #64748b;">${datePart}</span>
-                                </div>
-                            </td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                <span style="background: #d81b60; color: white; padding: 6px 10px; border-radius: 4px; display: inline-block; font-family: monospace; font-size: 11px; font-weight: 700; word-break: break-all;">${tranId}</span>
-                            </td>
-                            <td style="background: #ffffff; text-align: center !important; font-weight: 500 !important; color: #1e293b !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${firstItem.name}</td>
-                            <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${firstItem.qty}</td>
-                            <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(firstItem.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                            <td style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(firstItem.qty * firstItem.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; color: #dc2626 !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(discount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; font-size: 14px !important; color: #0f172a !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(total).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; color: #16a34a !important; font-size: 14px !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">៛ ${Number(total * 4000).toLocaleString('en-US', {maximumFractionDigits: 0})}</td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; ${badgeStyle}">${status}</span>
-                            </td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                ${hasReceipt ? `<button onclick="viewReceipt('${tranId || orderId}')" style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block; cursor: pointer;">View PDF</button>` : `<span style="color: #6c757d; font-size: 11px;">No Receipt</span>`}
-                            </td>
-                            <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
-                                    <button class="btn-action" onclick="editReport('${tranId || orderId}', this)" title="កែប្រែ" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #3b82f6; color: white; cursor: pointer; transition: all 0.2s ease;">
-                                        <i data-lucide="pencil" style="width:14px;height:14px;"></i>
-                                    </button>
-                                    <button class="btn-action" onclick="deleteReport('${tranId || orderId}', this)" title="លុប" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #ef4444; color: white; cursor: pointer; transition: all 0.2s ease;">
-                                        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
-                                    </button>
-                                    <button class="btn-action" onclick="shareReport('${pdfUrl}', '${tranId || orderId}')" title="ចែករំលែក" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #8b5cf6; color: white; cursor: pointer; transition: all 0.2s ease;">
-                                        <i data-lucide="share-2" style="width:14px;height:14px;"></i>
-                                    </button>
-                                    <button class="btn-action" onclick="downloadReport('${pdfUrl}', '${filename}')" title="ទាញយក" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #0d9488; color: white; cursor: pointer; transition: all 0.2s ease;">
-                                        <i data-lucide="download" style="width:14px;height:14px;"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>`;
-                        
-                        // Child rows for remaining items
-                        for (let i = 1; i < parsedItems.length; i++) {
-                            const item = parsedItems[i];
-                            html += `<tr>
-                                <td style="background: #ffffff; text-align: center !important; font-weight: 500 !important; color: #1e293b !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${item.name}</td>
-                                <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${item.qty}</td>
-                                <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(item.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                                <td style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(item.qty * item.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                            </tr>`;
-                        }
-                        count++;
-                    });
-                    
-                    tbody.innerHTML = html;
-                    
-                    // Re-initialize lucide icons for the new buttons
-                    if (window.lucide) {
-                        window.lucide.createIcons();
-                    }
-                }
-            })
-            .catch(error => console.error('Error loading daily report:', error));
+        let html = '';
+        let count = 1;
+        orders.forEach((order) => {
+            const items = order.items ? (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) : [];
+            if (items.length === 0) return;
+            
+            // Parse items into consistent format
+            const parsedItems = items.map(item => ({
+                name: item.name || 'Unknown',
+                qty: item.qty || item.quantity || 0,
+                price: item.price || 0
+            }));
+            
+            const firstItem = parsedItems[0];
+            const total = order.total || 0;
+            const discount = order.discount || 0;
+            const status = order.status || 'pending';
+            const statusLower = status.toLowerCase();
+            const tranId = order.tran_id || (order.id ? order.id.slice(0, 8) : '');
+            const orderId = order.id || order.local_id || tranId;
+            const filename = 'invoice_' + (tranId || orderId) + '.pdf';
+            const pdfUrl = '/reports/view/' + filename;
+            
+            // Status badge styling
+            let badgeStyle = 'background: #fee2e2; color: #991b1b;';
+            if (['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'].includes(statusLower)) {
+                badgeStyle = 'background: #dcfce7; color: #166534;';
+            } else if (statusLower === 'pending') {
+                badgeStyle = 'background: #fef9c3; color: #854d0e;';
+            }
+            
+            const hasReceipt = ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'].includes(statusLower);
+            
+            // Format Time & Date
+            const dtStr = order.display_datetime || order.display_time || '';
+            const dtParts = dtStr.split(' ');
+            const datePart = dtParts[0] || '';
+            const timePart = dtParts[1] || '';
+            const ampmPart = dtParts[2] || '';
+            
+            html += `<tr>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                    <input type="checkbox" class="report-row-checkbox" value="${orderId}">
+                </td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${count}</td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
+                        <span style="font-weight: 600; color: #1e293b;">${timePart} ${ampmPart}</span>
+                        <span style="font-size: 11px; color: #64748b;">${datePart}</span>
+                    </div>
+                </td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                    <span style="background: #d81b60; color: white; padding: 6px 10px; border-radius: 4px; display: inline-block; font-family: monospace; font-size: 11px; font-weight: 700; word-break: break-all;">${tranId}</span>
+                </td>
+                <td style="background: #ffffff; text-align: center !important; font-weight: 500 !important; color: #1e293b !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${firstItem.name}</td>
+                <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${firstItem.qty}</td>
+                <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(firstItem.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                <td style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(firstItem.qty * firstItem.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; color: #dc2626 !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(discount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; font-size: 14px !important; color: #0f172a !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(total).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; color: #16a34a !important; font-size: 14px !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">៛ ${Number(total * 4000).toLocaleString('en-US', {maximumFractionDigits: 0})}</td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                    <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; ${badgeStyle}">${status}</span>
+                </td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                    ${hasReceipt ? `<button onclick="viewReceipt('${tranId || orderId}')" style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block; cursor: pointer;">View PDF</button>` : `<span style="color: #6c757d; font-size: 11px;">No Receipt</span>`}
+                </td>
+                <td rowspan="${parsedItems.length}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
+                        <button class="btn-action" onclick="editReport('${tranId || orderId}', this)" title="កែប្រែ" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #3b82f6; color: white; cursor: pointer; transition: all 0.2s ease;">
+                            <i data-lucide="pencil" style="width:14px;height:14px;"></i>
+                        </button>
+                        <button class="btn-action" onclick="deleteReport('${tranId || orderId}', this)" title="លុប" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #ef4444; color: white; cursor: pointer; transition: all 0.2s ease;">
+                            <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                        </button>
+                        <button class="btn-action" onclick="shareReport('${pdfUrl}', '${tranId || orderId}')" title="ចែករំលែក" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #8b5cf6; color: white; cursor: pointer; transition: all 0.2s ease;">
+                            <i data-lucide="share-2" style="width:14px;height:14px;"></i>
+                        </button>
+                        <button class="btn-action" onclick="downloadReport('${pdfUrl}', '${filename}')" title="ទាញយក" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 8px; background: #0d9488; color: white; cursor: pointer; transition: all 0.2s ease;">
+                            <i data-lucide="download" style="width:14px;height:14px;"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+            
+            // Child rows for remaining items
+            for (let i = 1; i < parsedItems.length; i++) {
+                const item = parsedItems[i];
+                html += `<tr>
+                    <td style="background: #ffffff; text-align: center !important; font-weight: 500 !important; color: #1e293b !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${item.name}</td>
+                    <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">${item.qty}</td>
+                    <td style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(item.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td style="background: #ffffff; text-align: center !important; font-weight: 700 !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">$ ${Number(item.qty * item.price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                </tr>`;
+            }
+            count++;
+        });
+        
+        tbody.innerHTML = html;
+        
+        // Re-initialize lucide icons for the new buttons
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
     }
 
     function editReport(reportId, btnElement) {
@@ -6523,6 +6546,100 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 });
+</script>
+
+<script>
+/* =====================================================================
+   LIVE PRODUCT-GRID REFRESH (stock sync after checkout)
+   ---------------------------------------------------------------------
+   The POS product grid is Jinja-rendered at page load, so its stock
+   numbers go stale the moment ANY sale completes (Cash, ABA, ACLEDA).
+   refreshProductGrid() re-fetches /api/products and updates every card's
+   data-stock attribute + visible Stock label IN PLACE — no page reload,
+   no re-ordering, search/filter untouched.
+   ===================================================================== */
+let productRefreshInFlight = false; // guard against overlapping fetches
+
+async function refreshProductGrid() {
+    const grid = document.getElementById('productGrid');
+    if (!grid || productRefreshInFlight) return;
+    productRefreshInFlight = true;
+
+    try {
+        const res = await fetch('/api/products', {
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message || 'Server error');
+
+        const byId = {};
+        (data.products || []).forEach(p => { byId[p.id] = p; });
+
+        // Update each rendered card in place: data-stock + Stock label.
+        document.querySelectorAll('#productGrid .pos-product-item').forEach(card => {
+            const pid = card.dataset.id;
+            const prod = byId[pid];
+            if (!prod) return;
+            const newStock = Number(prod.stock_quantity) || 0;
+
+            card.dataset.stock = String(newStock);
+
+            // The visible "Stock:" number is the last <span> inside the
+            // stock row (Barcode/Stock/Expiry block).
+            const stockSpan = card.querySelector('div[class*="border-t"] span.font-mono') ||
+                              card.querySelector('span.font-medium.text-green-600, span.font-medium.text-red-500, span.font-medium.text-orange-500');
+            if (stockSpan && stockSpan.parentElement && stockSpan.parentElement.textContent.indexOf('Stock:') !== -1) {
+                stockSpan.textContent = String(newStock);
+                stockSpan.className = 'font-medium ' + (
+                    newStock === 0 ? 'text-red-500' :
+                    newStock <= 5 ? 'text-red-500 font-bold' :
+                    newStock <= 10 ? 'text-orange-500 font-bold' :
+                    'text-green-600 font-bold'
+                );
+            }
+        });
+
+        // Keep the in-memory cart stock limits fresh too (prevents
+        // "out of stock" guards using stale Jinja values).
+        cart.forEach(item => {
+            const prod = byId[item.id];
+            if (prod) item.stock = Number(prod.stock_quantity) || 0;
+        });
+    } catch (err) {
+        console.warn('[refreshProductGrid] refresh failed (silent):', err);
+    } finally {
+        productRefreshInFlight = false;
+    }
+}
+
+/* After ANY checkout the page navigates away; when the cashier returns
+   to '/' the grid must show the freshly deducted stock. We run this on
+   DOMContentLoaded AND whenever a checkout transaction flag is left in
+   sessionStorage (set by invoice.html before redirecting home). */
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        if (sessionStorage.getItem('checkout_tran_id')) {
+            sessionStorage.removeItem('checkout_tran_id');
+        }
+    } catch (e) { /* private mode: ignore */ }
+    // Delayed slightly so the page paints first — refresh is non-blocking.
+    setTimeout(refreshProductGrid, 400);
+});
+
+/* Also refresh whenever the POS view becomes active again (e.g. after
+   viewing reports/manager, stock may have changed server-side). */
+(function patchShowViewForStockRefresh() {
+    if (typeof window.showView !== 'function') return;
+    const _origShowView = window.showView;
+    window.showView = function(viewId, element) {
+        const result = _origShowView(viewId, element);
+        if (viewId === 'posView') {
+            setTimeout(refreshProductGrid, 150);
+        }
+        return result;
+    };
+})();
 </script>
 </body>
 </html>

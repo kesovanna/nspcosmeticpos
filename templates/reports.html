@@ -262,7 +262,7 @@
                         <!-- Receipt -->
                         <td rowspan="{{ items|length }}" style="text-align: center !important; white-space: nowrap !important;">
                             {% set filename = "invoice_" + (order.tran_id or order.local_id)|string + ".pdf" %}
-                            {% if order.has_receipt and order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}
+                            {% if order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}
                                 <a href="/reports/view/{{ filename }}" target="_blank" 
                                    style="padding: 4px 8px; background: #059669; color: white; text-decoration: none; border-radius: 4px; font-size: 11px; white-space: nowrap; display: inline-block;">
                                     View PDF
@@ -614,9 +614,12 @@
         }
     }
 
-    // Whether a receipt PDF link should show for this order
+    // Whether a receipt PDF link should show for this order.
+    // All PAID orders get a "View PDF" link — the /reports/view/<filename>
+    // route generates the PDF on-demand if it doesn't exist yet, so even
+    // older ACLEDA/ABA QR orders (has_receipt=0) can open their receipt.
     function hasReceiptFor(order, group) {
-        return !!(order.has_receipt && (group === 'paid' || group === 'completed' || group === 'cash' || group === 'aba' || group === 'acleda'));
+        return !!(group === 'paid' || group === 'completed' || group === 'cash' || group === 'aba' || group === 'acleda');
     }
 
     // ----- Rebuild the table body (mirrors the Jinja template) -----

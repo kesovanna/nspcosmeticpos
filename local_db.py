@@ -903,33 +903,23 @@ def get_daily_sales_report(target_date):
     Get revenue, total orders, and top products for a specific date (YYYY-MM-DD).
     Also returns all orders for the table display.
 
-    NOTE: Rows are filtered by Cambodia ICT (UTC+7) date, so UTC-aware
-    timestamps (e.g. from Firestore) are correctly bucketed.
+    NOTE: Rows are filtered in SQL via strftime('%Y-%m-%d', created_at).
+    All local timestamps are stored as naive ICT wall-clock strings, so plain
+    strftime bucketing is correct (no timezone modifier needed).
     """
     conn = get_connection()
-    orders = conn.execute("SELECT * FROM orders").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM orders WHERE strftime('%Y-%m-%d', created_at) = ?",
+        (target_date,)
+    ).fetchall()
     conn.close()
-
-    # ICT date boundary for the requested day
-    try:
-        dt = datetime.strptime(target_date, '%Y-%m-%d')
-    except Exception:
-        dt = datetime.now()
-    start_dt = cambodia_time(datetime(dt.year, dt.month, dt.day))
-    end_dt = start_dt + timedelta(days=1)
 
     total_revenue = 0
     total_orders = 0
     item_summary = {}
     day_orders = []
 
-    for o in orders:
-        try:
-            created_at = cambodia_time(datetime.fromisoformat(o['created_at']))
-        except Exception:
-            continue
-        if not (start_dt <= created_at < end_dt):
-            continue
+    for o in rows:
         day_orders.append(o)
         if o['status'].strip().lower() in PAID_STATUSES:
             total_revenue += float(o['total'] or 0)
@@ -962,35 +952,23 @@ def get_monthly_sales_report(target_month):
     Get revenue, total orders, and top products for a specific month (YYYY-MM).
     Also returns all orders for the table display.
 
-    NOTE: Rows are filtered by Cambodia ICT (UTC+7) month.
+    NOTE: Rows are filtered in SQL via strftime('%Y-%m', created_at).
+    All local timestamps are stored as naive ICT wall-clock strings, so plain
+    strftime bucketing is correct (no timezone modifier needed).
     """
     conn = get_connection()
-    orders = conn.execute("SELECT * FROM orders").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM orders WHERE strftime('%Y-%m', created_at) = ?",
+        (target_month,)
+    ).fetchall()
     conn.close()
-
-    # ICT month boundary
-    try:
-        dt = datetime.strptime(target_month, '%Y-%m')
-    except Exception:
-        dt = datetime.now()
-    start_dt = cambodia_time(datetime(dt.year, dt.month, 1))
-    if dt.month == 12:
-        end_dt = cambodia_time(datetime(dt.year + 1, 1, 1))
-    else:
-        end_dt = cambodia_time(datetime(dt.year, dt.month + 1, 1))
 
     total_revenue = 0
     total_orders = 0
     item_summary = {}
     month_orders = []
 
-    for o in orders:
-        try:
-            created_at = cambodia_time(datetime.fromisoformat(o['created_at']))
-        except Exception:
-            continue
-        if not (start_dt <= created_at < end_dt):
-            continue
+    for o in rows:
         month_orders.append(o)
         if o['status'].strip().lower() in PAID_STATUSES:
             total_revenue += float(o['total'] or 0)
@@ -1022,32 +1000,23 @@ def get_annual_sales_report(target_year):
     Get revenue, total orders, and top products for a specific year (YYYY).
     Also returns all orders for the table display.
 
-    NOTE: Rows are filtered by Cambodia ICT (UTC+7) year.
+    NOTE: Rows are filtered in SQL via strftime('%Y', created_at).
+    All local timestamps are stored as naive ICT wall-clock strings, so plain
+    strftime bucketing is correct (no timezone modifier needed).
     """
     conn = get_connection()
-    orders = conn.execute("SELECT * FROM orders").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM orders WHERE strftime('%Y', created_at) = ?",
+        (str(target_year),)
+    ).fetchall()
     conn.close()
-
-    # ICT year boundary
-    try:
-        year = int(target_year)
-    except Exception:
-        year = datetime.now().year
-    start_dt = cambodia_time(datetime(year, 1, 1))
-    end_dt = cambodia_time(datetime(year + 1, 1, 1))
 
     total_revenue = 0
     total_orders = 0
     item_summary = {}
     year_orders = []
 
-    for o in orders:
-        try:
-            created_at = cambodia_time(datetime.fromisoformat(o['created_at']))
-        except Exception:
-            continue
-        if not (start_dt <= created_at < end_dt):
-            continue
+    for o in rows:
         year_orders.append(o)
         if o['status'].strip().lower() in PAID_STATUSES:
             total_revenue += float(o['total'] or 0)
