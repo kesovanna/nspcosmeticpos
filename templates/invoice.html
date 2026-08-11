@@ -7,59 +7,94 @@
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap');
-
-        /* Custom Font for PDF Rendering */
+        /* ========================================================
+           យុទ្ធសាស្ត្រជួសជុល Space ដោយប្រើ %20 
+           ======================================================== */
         @font-face {
-            font-family: 'Khmer OS Moul Light';
-            src: url('/static/fonts/KhmerOSmuollight.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
+            font-family: 'KhmerMoul';
+            src: url('file:///C:/Users/REAM%20KESOVANNA/Desktop/NSP_POS_29072026/NSP_Cosmetic_POS/static/fonts/KhmerOSmuollight.ttf') format('truetype');
+            font-weight: normal; font-style: normal;
         }
-        
         @font-face {
-            font-family: 'Khmer OS Battambang';
-            src: url('/static/fonts/KhmerOSbattambang.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
+            font-family: 'KhmerBody';
+            src: url('file:///C:/Users/REAM%20KESOVANNA/Desktop/NSP_POS_29072026/NSP_Cosmetic_POS/static/fonts/KhmerOSsiemreap.ttf') format('truetype');
+            font-weight: normal; font-style: normal;
         }
 
+        body.is-pdf, 
+        body.is-pdf table, 
+        body.is-pdf td, 
+        body.is-pdf th, 
+        body.is-pdf span, 
+        body.is-pdf div, 
+        body.is-pdf .info-label, 
+        body.is-pdf .info-value, 
+        body.is-pdf .total-label, 
+        body.is-pdf .footer-text {
+            font-family: 'KhmerBody', sans-serif !important;
+            font-style: normal !important;
+            line-height: 1.5 !important;
+        }
+
+        body.is-pdf h1, 
+        body.is-pdf .moul {
+            font-family: 'KhmerMoul', serif !important;
+            font-style: normal !important;
+        }
+
+        body:not(.is-pdf) {
+            font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+        }
+        body:not(.is-pdf) h1 {
+            font-family: 'Moul', serif !important;
+        }
+    </style>
+
+    <style>
         :root { --primary-color: #d81b60; --secondary-color: #ad144b; --bg-color: #f0f2f5; --card-bg: #ffffff; --text-main: #333333; --text-muted: #666666; --border-color: #eeeeee; }
-        body { font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; background-color: var(--bg-color); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; height: auto; }
-        .invoice-card { background: var(--card-bg); width: 100%; max-width: 450px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); position: relative; overflow: hidden; height: auto; }
+
+        body {
+            font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
+            background-color: var(--bg-color);
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center; align-items: flex-start;
+            height: auto; font-style: normal !important;
+        }
+
+        .invoice-card { background: var(--card-bg); width: 100%; max-width: 450px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); position: relative; overflow: hidden; height: auto; margin: 0 auto; }
         .invoice-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 8px; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); }
         .header { text-align: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px dashed var(--border-color); }
-        .logo { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 3px solid var(--bg-color); }
-        h1 { 
-            margin: 0; 
-            font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important; 
-            font-weight: normal; 
-            font-size: 20px; 
-            color: var(--primary-color); 
-            letter-spacing: 0.5px; 
+        .logo { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px; border: 3px solid var(--bg-color); display: block; }
+
+        h1 {
+            margin: 0; font-family: 'Khmer OS Moul Light', 'Moul', sans-serif !important;
+            font-weight: normal; font-size: 20px; color: var(--primary-color);
+            letter-spacing: 0.5px; font-style: normal !important; text-align: center;
         }
-        .invoice-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 5px; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+
+        .invoice-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 5px; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; font-style: normal !important; text-align: center; line-height: 1.4; }
         .info-section { margin-bottom: 20px; }
-        .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
-        .info-label { color: var(--text-muted); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        .info-value { font-weight: 700; color: var(--text-main); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        th { text-align: left; font-size: 12px; color: var(--text-muted); border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; text-transform: uppercase; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        td { padding: 12px 0; border-bottom: 1px solid var(--bg-color); font-size: 14px; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        .item-qty { text-align: center; color: var(--text-muted); }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-style: normal !important; }
+        .info-label { color: var(--text-muted); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; font-style: normal !important; }
+        .info-value { font-weight: 700; color: var(--text-main); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; font-style: normal !important; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; font-style: normal !important; }
+        th { text-align: left; font-size: 12px; color: var(--text-muted); border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; text-transform: uppercase; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; font-weight: bold; font-style: normal !important; }
+        td { padding: 12px 0; border-bottom: 1px solid var(--bg-color); font-size: 14px; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; font-style: normal !important; }
+        .item-qty { text-align: center; color: var(--text-muted); font-weight: bold; }
         .item-price { text-align: right; font-weight: 600; }
-        .total-section { background: var(--bg-color); padding: 15px; border-radius: 12px; margin-top: 10px; }
-        .total-row { display: flex; justify-content: space-between; align-items: center; }
-        .total-label { font-size: 16px; font-weight: 700; color: var(--text-main); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
-        .total-amount { font-size: 24px; font-weight: 800; color: var(--primary-color); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; }
+        .total-section { background: var(--bg-color); padding: 15px; border-radius: 12px; margin-top: 10px; font-style: normal !important; }
+        .total-row { display: flex; justify-content: space-between; align-items: center; font-style: normal !important; }
+        .total-label { font-size: 16px; font-weight: 700; color: var(--text-main); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; font-style: normal !important; }
+        .total-amount { font-size: 24px; font-weight: 800; color: var(--primary-color); font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; font-style: normal !important; }
         .btn-group { margin-top: 25px; display: flex; flex-direction: column; gap: 12px; }
         .btn { border: none; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; text-decoration: none; }
         .btn-aba { background: #005a9c; color: white; box-shadow: 0 4px 15px rgba(0, 90, 156, 0.2); }
         .btn-aba:hover { background: #004a80; transform: translateY(-2px); }
         .btn-print { background: white; color: var(--text-main); border: 1px solid #ddd; }
         .btn-print:hover { background: #f9f9f9; }
-        .btn-back { background: transparent; color: var(--text-muted); font-weight: 400; font-size: 13px; }
+        .btn-back { background: transparent; color: var(--text-muted); font-weight: 400; font-size: 13px; text-align: center; }
         .btn-back:hover { color: var(--text-main); text-decoration: underline; }
         .aba-qr-container { text-align: center; padding: 10px; }
         .aba-qr-img { width: 220px; height: 220px; margin: 0 auto 15px; border: 8px solid white; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -70,9 +105,6 @@
         .btn-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; border-radius: 50%; animation: btn-spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
         @keyframes btn-spin { to { transform: rotate(360deg); } }
         .qr-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px; }
-        /* SweetAlert2 must ALWAYS render above the payment modal (z-index 9999).
-           Default Swal z-index is ~1069, which would hide the success alert
-           behind the dark modal overlay. This forces Swal on top. */
         .swal2-container { z-index: 10000 !important; }
         .qr-modal { background: #fff; width: 100%; max-width: 760px; border-radius: 20px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-height: 92vh; overflow-y: auto; }
         .qr-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
@@ -83,148 +115,53 @@
         .qr-col { flex: 1; border: 1px solid #eee; border-radius: 14px; padding: 18px 14px; text-align: center; display: flex; flex-direction: column; align-items: center; }
         .qr-bank-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; color: #333; margin-bottom: 12px; }
         .qr-bank-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
         @media (max-width: 640px) {
             .qr-modal-grid { flex-direction: column; }
             .qr-col { width: 100%; }
         }
         @media (max-width: 600px) { h1, h2 { font-size: 1.5rem !important; text-align: center; } }
 
-        /* WeasyPrint & Thermal Printer Optimization */
-        @page {
-            size: 80mm 140mm;
-            margin: 4mm;
-        }
-        
-        /* Apply to both screen and print for WeasyPrint compatibility */
-        /* Jinja logic removed from CSS to fix linter errors */
-        * {
-            box-sizing: border-box;
-        }
-        html {
-            height: auto;
-        }
+        /* WeasyPrint PDF Config */
+        @page { size: 80mm auto; margin: 5mm 4mm; }
+        * { box-sizing: border-box; }
+        html { height: auto; }
+
         body.is-pdf {
-            background: white;
-            padding: 0 !important;
-            margin: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            height: auto;
-            font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            -webkit-font-smoothing: antialiased;
-            display: block;
-            overflow: hidden;
+            background: white !important; padding: 0 !important; margin: 0 !important;
+            width: 100% !important; max-width: 100% !important; height: auto;
+            font-family: 'Khmer OS Siemreap', 'Khmer OS Battambang', sans-serif !important;
+            -webkit-font-smoothing: antialiased; display: block; overflow: hidden;
+            font-style: normal !important;
         }
-        body.is-pdf .invoice-card {
-            box-shadow: none !important;
-            border-radius: 0;
-            padding: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            height: auto;
-            margin: 0 !important;
-            overflow: hidden;
-        }
-        body.is-pdf .invoice-card::before {
-            display: none;
-        }
-        body.is-pdf .btn-group, body.is-pdf .btn-back {
-            display: none !important;
-        }
-        body.is-pdf .total-section {
-            background: #f0f0f0 !important;
-        }
-        body.is-pdf .logo {
-            width: 50px;
-            height: 50px;
-        }
-        body.is-pdf h1 {
-            font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important;
-            font-size: 16px;
-        }
-        body.is-pdf table {
-            font-size: 12px;
-            table-layout: fixed;
-            width: 100%;
-        }
-        body.is-pdf td, body.is-pdf th {
-            word-break: break-word;
-        }
-        body.is-pdf .item-price {
-            font-size: 12px;
-        }
-        body.is-pdf #total-riel {
-            font-size: 20px !important;
-        }
+        body.is-pdf .invoice-card { box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; height: auto; margin: 0 !important; overflow: hidden; }
+        body.is-pdf .invoice-card::before { display: none !important; }
+        body.is-pdf .btn-group, body.is-pdf .btn-back { display: none !important; }
+        body.is-pdf .total-section { background: #f0f0f0 !important; padding: 10px !important; border-radius: 6px !important; }
+        body.is-pdf .logo { width: 50px !important; height: 50px !important; margin-bottom: 6px !important; }
+        body.is-pdf h1 { font-family: 'Khmer OS Moul Light', sans-serif !important; font-size: 15px !important; margin-bottom: 2px !important; font-style: normal !important; }
+        body.is-pdf .invoice-title { font-size: 10px !important; font-style: normal !important; }
+        body.is-pdf .info-row { font-size: 11px !important; margin-bottom: 4px !important; font-style: normal !important; }
+        body.is-pdf table { font-size: 11px !important; table-layout: fixed; width: 100% !important; margin: 12px 0 !important; font-style: normal !important; }
+        body.is-pdf td, body.is-pdf th { word-break: break-word; padding: 6px 0 !important; font-style: normal !important; }
+        body.is-pdf .item-qty { text-align: center !important; }
+        body.is-pdf .item-price { font-size: 11px !important; text-align: right !important; }
+        body.is-pdf .total-label { font-size: 13px !important; font-style: normal !important; }
+        body.is-pdf .total-amount { font-size: 15px !important; font-style: normal !important; }
+        body.is-pdf #total-riel { font-size: 18px !important; font-weight: bold !important; }
+        body.is-pdf #discount-riel { font-size: 15px !important; font-weight: bold !important; }
 
         @media print {
-            @page {
-                size: 80mm 140mm;
-                margin: 4mm;
-            }
-            html {
-                height: auto;
-            }
-            body {
-                background: white;
-                padding: 0;
-                margin: 0;
-                width: 100%;
-                height: auto;
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-                -webkit-font-smoothing: antialiased;
-                display: block;
-            }
-            .invoice-card {
-                box-shadow: none;
-                border-radius: 0;
-                padding: 0;
-                width: 100%;
-                max-width: 100%;
-                height: auto;
-                margin: 0;
-            }
-            .invoice-card::before {
-                display: none;
-            }
-            .btn-group, .btn-back {
-                display: none !important;
-            }
-            .total-section {
-                background: #f0f0f0 !important;
-                -webkit-print-color-adjust: exact;
-                color-adjust: exact;
-            }
-            .logo {
-                width: 50px;
-                height: 50px;
-            }
-            h1 {
-                font-family: 'Moul', 'Khmer OS Moul Light', sans-serif !important;
-                font-size: 16px;
-                -webkit-font-smoothing: antialiased;
-            }
-            table {
-                font-size: 12px;
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            td, th {
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            .item-price {
-                font-size: 12px;
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            #total-riel {
-                font-size: 20px !important;
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            .info-label, .info-value {
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
-            .total-label {
-                font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important;
-            }
+            @page { size: 80mm auto; margin: 4mm; }
+            html { height: auto; }
+            body { background: white; padding: 0; margin: 0; width: 100%; height: auto; font-family: 'Kantumruy Pro', 'Khmer OS Battambang', sans-serif !important; display: block; }
+            .invoice-card { box-shadow: none; border-radius: 0; padding: 0; width: 100%; max-width: 100%; height: auto; margin: 0; }
+            .invoice-card::before { display: none; }
+            .btn-group, .btn-back { display: none !important; }
+            .total-section { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; color-adjust: exact; }
+            .logo { width: 50px; height: 50px; }
+            h1 { font-family: 'Khmer OS Moul Light', sans-serif !important; font-size: 16px; }
+            table { font-size: 12px; }
         }
     </style>
 </head>
@@ -240,10 +177,10 @@
     </div>
     <div class="info-section">
         <div class="info-row"><span class="info-label">កាលបរិច្ឆេទ | Date</span><span class="info-value" id="current-date">{{ date }}</span></div>
-        <div class="info-row"><span class="info-label">លេខវិក្កយបត្រ | Inv #</span><span class="info-value">INV-{{ date.replace('/', '').replace(':', '').replace(' ', '') }}</span></div>
+        <div class="info-row"><span class="info-label">លេខវិក្កយបត្រ | Inv #</span><span class="info-value" style="color: #d81b60;">{{ order.tran_id if order else 'PENDING' }}</span></div>
     </div>
     <table>
-        <thead><tr><th>Item</th><th style="text-align: center;">Qty</th><th style="text-align: right;">Price</th></tr></thead>
+        <thead><tr><th style="width: 50%;">Item</th><th style="text-align: center; width: 15%;">Qty</th><th style="text-align: right; width: 35%;">Price</th></tr></thead>
         <tbody>
             {% for item in items %}
             {% set qty = item.quantity or item.qty or 1 %}
@@ -251,14 +188,14 @@
             {% set subtotal = price * qty %}
             <tr>
                 <td>
-                    {{ item.name }}<br>
-                    <small style="color:#28a745; font-size:12px; font-weight:bold;">៛ {{ "{:,.0f}".format(price * RIEL_RATE) }}</small> | 
-                    <small style="color:#d81b60; font-size:11px;">$ {{ "{:,.2f}".format(price) }}</small>
+                    <div style="font-weight: bold; color: #333;">{{ item.name }}</div>
+                    <small style="color:#28a745; font-size:11px; font-weight:bold;">៛ {{ "{:,.0f}".format(price * RIEL_RATE) }}</small> |
+                    <small style="color:#d81b60; font-size:10px;">$ {{ "{:,.2f}".format(price) }}</small>
                 </td>
-                <td class="item-qty">{{ qty }}</td>
-                <td class="item-price">
-                    <span style="color:#28a745; font-weight:bold; font-size:16px;">៛ {{ "{:,.0f}".format(subtotal * RIEL_RATE) }}</span><br>
-                    <small style="color:#d81b60; font-size:11px;">$ {{ "{:,.2f}".format(subtotal) }}</small>
+                <td class="item-qty" style="vertical-align: middle;">{{ qty }}</td>
+                <td class="item-price" style="vertical-align: middle;">
+                    <span style="color:#28a745; font-weight:bold; font-size:14px;">៛ {{ "{:,.0f}".format(subtotal * RIEL_RATE) }}</span><br>
+                    <small style="color:#d81b60; font-size:10px;">$ {{ "{:,.2f}".format(subtotal) }}</small>
                 </td>
             </tr>
             {% endfor %}
@@ -268,19 +205,19 @@
         {% set discount_amount = discount|float %}
         {% if discount_amount > 0 %}
         <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #ddd;">
-            <span class="total-label" style="color: #dc2626;">បញ្ចុះតម្លៃ | Discount</span>
-            <span id="discount-riel" style="font-size: 20px; font-weight: 800; color: #dc2626;">៛ {{ "{:,.0f}".format(discount_amount * RIEL_RATE) }}</span>
+            <span class="total-label" style="color: #dc2626; font-size: 13px;">បញ្ចុះតម្លៃ | Discount</span>
+            <span id="discount-riel" style="font-size: 16px; font-weight: 800; color: #dc2626;">៛ {{ "{:,.0f}".format(discount_amount * RIEL_RATE) }}</span>
         </div>
         <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 4px;">
-            <span class="total-label" style="color: #dc2626;">$ {{ "{:,.2f}".format(discount_amount) }}</span>
+            <span class="total-label" style="color: #dc2626; font-size: 11px;">$ {{ "{:,.2f}".format(discount_amount) }}</span>
         </div>
         {% endif %}
         <div class="total-row" style="flex-direction: column; align-items: flex-end; gap: 4px;">
             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
-                <span class="total-label">សរុប | Grand Total</span>
-                <span id="total-riel" style="font-size: 26px; font-weight: 800; color: #28a745;">៛ {{ "{:,.0f}".format(total|float * RIEL_RATE) }}</span>
+                <span class="total-label" style="font-size: 14px;">សរុប | Grand Total</span>
+                <span id="total-riel" style="font-size: 20px; font-weight: 800; color: #28a745;">៛ {{ "{:,.0f}".format(total|float * RIEL_RATE) }}</span>
             </div>
-            <div class="total-amount" style="font-size: 16px; color: #d81b60; font-weight: 600;">$ {{ "{:,.2f}".format(total|float) }}</div>
+            <div class="total-amount" style="font-size: 13px; color: #d81b60; font-weight: 600;">$ {{ "{:,.2f}".format(total|float) }}</div>
         </div>
     </div>
     <div class="btn-group">
@@ -300,20 +237,15 @@
     </div>
 </div>
 
-<!-- ============ QR PAYMENT MODAL (ABA + ACLEDA) ============ -->
 <div id="paymentModal" class="qr-modal-overlay" style="display:none;" onclick="if(event.target===this) closePaymentModal()">
-    <div class="qr-modal" role="dialog" aria-modal="true" aria-label="QR Code Payment">
+    <div class="qr-modal" role="dialog" aria-modal="true">
         <div class="qr-modal-header">
             <h3>ទូទាត់តាម QR Code | Scan to Pay</h3>
-            <button type="button" class="qr-modal-close" onclick="closePaymentModal()" aria-label="Close">&times;</button>
+            <button type="button" class="qr-modal-close" onclick="closePaymentModal()">&times;</button>
         </div>
         <div class="qr-modal-grid">
-            <!-- COLUMN 1: ABA Mobile (dynamic) -->
             <div class="qr-col">
-                <div class="qr-bank-title">
-                    <span class="qr-bank-dot" style="background:#005a9c;"></span>
-                    ABA Mobile
-                </div>
+                <div class="qr-bank-title"><span class="qr-bank-dot" style="background:#005a9c;"></span>ABA Mobile</div>
                 <div class="aba-qr-container" style="padding: 5px;">
                     <div id="qrcode"></div>
                     <div style="font-weight:800; color:#28a745; font-size:24px; margin: 6px 0;" id="amount">៛ 0</div>
@@ -322,13 +254,8 @@
                     <div id="polling-status" style="font-size:13px; color:#005a9c; margin-top:12px; font-weight:bold; animation: pulse 2s infinite;">🔄 កំពុងរង់ចាំការបង់ប្រាក់...</div>
                 </div>
             </div>
-
-            <!-- COLUMN 2: ACLEDA ToanChet (static placeholder) -->
             <div class="qr-col">
-                <div class="qr-bank-title">
-                    <span class="qr-bank-dot" style="background:#ED1C24;"></span>
-                    ACLEDA ToanChet
-                </div>
+                <div class="qr-bank-title"><span class="qr-bank-dot" style="background:#ED1C24;"></span>ACLEDA ToanChet</div>
                 <img src="/static/images/acleda_qr.png" alt="ACLEDA QR" style="width: 100%; max-width: 200px; border-radius: 10px; margin: 0 auto; display: block;">
                 <p style="font-size:12px; color:#666; margin:10px 0 0;">ស្កេនជាមួយ <b>ACLEDA ToanChet</b> រួចបញ្ជាក់ការទូទាត់ខាងក្រោម</p>
                 <button type="button" id="acledaConfirmBtn" onclick="confirmAcledaPayment()" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (Manual Confirm)</button>
@@ -338,32 +265,23 @@
 </div>
 
 <script>
-    let pollingInterval; 
+    let pollingInterval;
 
-    // The ACTIVE transaction ID for this checkout session.
-    //
-    // Set by payWithABA() when it creates the pending order ("TX" + UUID),
-    // and persisted to sessionStorage so a page refresh keeps the same ID.
-    // confirmAcledaPayment() reads this SAME ID instead of minting a brand-new
-    // ACL- UUID — otherwise the QR flow creates a duplicate pending row
-    // and the original order stays stuck as 'pending' forever.
+    const uiPaymentSuccessSound = new Audio('/static/sounds/successsound.m4a');
+    function playPaymentSuccessSound() {
+        uiPaymentSuccessSound.currentTime = 0;
+        uiPaymentSuccessSound.play().catch(e => console.warn("Success sound blocked:", e));
+    }
+
     let activeTranId = sessionStorage.getItem('checkout_tran_id') || null;
-
     const TOTAL_AMOUNT = "{{ total }}";
     const CART_ITEMS = {{ items | tojson }};
-    // RIEL_RATE is already defined in Jinja, we don't need to redefine it as const if it causes issues, 
-    // but since it's inside a script tag, it's fine. The linter error was likely about the CSS Jinja block.
     const JS_RIEL_RATE = {{ RIEL_RATE }};
-    const PAYMENT_METHOD = "{{ payment_method|lower }}";
     const DISCOUNT_AMOUNT = {{ discount|float }};
 
-    // Discount: use Jinja value first, then fall back to localStorage/sessionStorage
-    // (e.g. when the page is refreshed and the discount was saved by the POS view)
     const storedDiscount = localStorage.getItem('checkout_discount') || sessionStorage.getItem('checkout_discount');
     const finalDiscount = DISCOUNT_AMOUNT > 0 ? DISCOUNT_AMOUNT : (storedDiscount ? parseFloat(storedDiscount) : 0);
 
-    // Keep the printed discount row in sync if it was rendered server-side as 0
-    // but a stored discount actually exists (dynamic fallback for direct URL access)
     if (finalDiscount > 0) {
         const discountRielEl = document.getElementById('discount-riel');
         if (discountRielEl) {
@@ -371,55 +289,36 @@
         }
     }
 
-    // Table is now rendered by Jinja2 for PDF compatibility
-    // We only need to handle fallback if Jinja variables are empty (e.g. page refresh)
     if (!CART_ITEMS || CART_ITEMS.length === 0) {
-        const savedCart = sessionStorage.getItem('checkout_cart');
-        const savedTotal = sessionStorage.getItem('checkout_total');
-        if (savedCart && savedTotal) {
-            // If we have session data but no Jinja data, we need to reload with the data
-            // or just let the user go back to shop since this is a direct URL access
-            window.location.href = '/'; 
-        } else {
-            window.location.href = '/'; 
-        }
+        window.location.href = '/';
     }
 
-    // Cash Payment Handler
     async function confirmCashPayment() {
         try {
-            Swal.fire({ 
-                title: 'កំពុងដំណើរការ... | Processing...', 
+            Swal.fire({
+                title: 'កំពុងដំណើរការ... | Processing...',
                 text: 'សូមរង់ចាំបន្តិច | Please wait',
-                allowOutsideClick: false, 
-                didOpen: () => { Swal.showLoading(); } 
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
             });
 
-            // Get items from cart or sessionStorage
             const itemsToProcess = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
             const totalAmount = parseFloat(TOTAL_AMOUNT);
 
-            // PILLAR 2: Collision-free, crypto-secure transaction ID.
-            // crypto.randomUUID() (RFC 4122 v4, CSPRNG-backed) guarantees offline
-            // computer sales never collide with online tablet sales.
-            const tran_id = 'CASH-' + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
-
-            // Call /checkout API to save the order
             const response = await fetch('/checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     items: itemsToProcess,
                     total: totalAmount.toFixed(2),
-                    discount: finalDiscount,
-                    tran_id: tran_id
+                    discount: finalDiscount
                 })
             });
 
             const data = await response.json();
 
             if (response.ok && data.status === 'success') {
-                // Order saved successfully
+                playPaymentSuccessSound();
                 Swal.fire({
                     icon: 'success',
                     title: 'ការលក់ជោគជ័យ! | Payment Confirmed!',
@@ -428,85 +327,59 @@
                     showConfirmButton: false
                 });
 
-                // Clear cart from sessionStorage
                 sessionStorage.removeItem('checkout_cart');
                 sessionStorage.removeItem('checkout_total');
                 sessionStorage.removeItem('checkout_discount');
 
-                // Redirect to home after success
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 2500);
+                setTimeout(() => { window.location.href = '/'; }, 2500);
             } else {
-                Swal.fire('បញ្ហា | Error', data.message || 'មិនអាចដំណើរការបានទេ | Unable to process payment', 'error');
+                Swal.fire('បញ្ហា | Error', data.message || 'មិនអាចដំណើរការបានទេ', 'error');
             }
         } catch (error) {
-            console.error("confirmCashPayment error:", error);
-            Swal.fire('បញ្ហា | Error', 'ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា | Server connection failed', 'error');
+            Swal.fire('បញ្ហា | Error', 'ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា', 'error');
         }
     }
 
     async function payWithABA() {
         try {
             Swal.fire({ title: 'កំពុងរៀបចំ... | Preparing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-            
-            // PILLAR 2: Collision-free, crypto-secure transaction ID.
-            const tran_id = "TX" + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
 
-            // Share this exact ID with the whole checkout session so the
-            // ACLEDA manual-confirm button confirms THE SAME order (never
-            // a duplicate). Persisted to sessionStorage for reload safety.
-            activeTranId = tran_id;
-            sessionStorage.setItem('checkout_tran_id', tran_id);
-            
-            // Get items for the backend
             const itemsToSend = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
-
-            const response = await fetch('/create-aba-payment', { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ 
+            const response = await fetch('/create-aba-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     items: itemsToSend,
                     total: parseFloat(TOTAL_AMOUNT),
-                    discount: finalDiscount,
-                    tran_id: tran_id 
-                }) 
+                    discount: finalDiscount
+                })
             });
 
             const data = await response.json();
-            
+
             if (data.status === "success") {
-                showQRPopup(tran_id);
+                const serverTranId = data.tran_id;
+                activeTranId = serverTranId;
+                sessionStorage.setItem('checkout_tran_id', serverTranId);
+                showQRPopup(serverTranId);
             } else {
                 Swal.fire("បញ្ហា", data.message || "មិនអាចបង្កើតការបង់ប្រាក់បានទេ", "error");
             }
-        } catch (error) { 
-            console.error("payWithABA error:", error);
-            Swal.fire("បញ្ហា", "ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា", "error"); 
+        } catch (error) {
+            Swal.fire("បញ្ហា", "ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា", "error");
         }
     }
 
-    // Build a deterministic ABA deep-link (EMVCo-style) that generates the same
-    // QR for the same (tran_id, amount) — the Telegram listener matches by amount.
     function buildABALink(tran_id) {
         const amount = parseFloat(TOTAL_AMOUNT).toFixed(2);
-        const payload = [
-            '000201',
-            '010212',
-            '52040000',
-            '5303704',
-            '5802KH',
+        return [
+            '000201', '010212', '52040000', '5303704', '5802KH',
             '00' + String('00' + tran_id.length).slice(-2) + tran_id,
             '54' + String('00' + amount.length).slice(-2) + amount,
-            '5802KH',
-            '6304'
+            '5802KH', '6304'
         ].join('');
-        return payload;
     }
 
-    // ============ CUSTOMER FACING DISPLAY (CFD) SYNC ============
-    // Pushes the current state to /api/cfd/set so the tablet's /cfd page
-    // switches instantly between the product slideshow and the QR view.
     function sendCFDState(status, extraData) {
         const payload = {
             status: status,
@@ -514,152 +387,72 @@
                 total: parseFloat(TOTAL_AMOUNT),
                 amount_riel: Math.round(parseFloat(TOTAL_AMOUNT) * JS_RIEL_RATE),
                 usd_amount: parseFloat(TOTAL_AMOUNT),
-                // Bulletproof: work whether the cart lives in `cart` or `CART_ITEMS`
-                items: (typeof cart !== 'undefined' ? cart : (typeof CART_ITEMS !== 'undefined' ? CART_ITEMS : [])).map(it => ({
-                    name: it.name || it.product_name || 'Item',
-                    price: it.price || it.unit_price || 0,
-                    qty: it.quantity || it.qty || 1,
-                    image: it.image || ''
+                items: (typeof CART_ITEMS !== 'undefined' ? CART_ITEMS : []).map(it => ({
+                    name: it.name || 'Item', price: it.price || 0, qty: it.quantity || it.qty || 1, image: it.image || ''
                 })),
                 discount: finalDiscount
             }
         };
         if (extraData) Object.assign(payload.data, extraData);
-        try {
-            fetch('/api/cfd/set', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).catch(() => {});
-        } catch (e) { console.warn('CFD sync failed:', e); }
+        fetch('/api/cfd/set', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {});
     }
 
     function openPaymentModal() {
         document.getElementById('paymentModal').style.display = 'flex';
-        // Tell the CFD tablet to switch to the checkout QR view
         sendCFDState('payment');
     }
 
     function closePaymentModal() {
         document.getElementById('paymentModal').style.display = 'none';
-        // Tell the CFD tablet to switch back to the product slideshow
         sendCFDState('idle');
     }
 
-    // ============ ACLEDA MANUAL CONFIRMATION (R7: TWO-STAGE DIRECT SYNCHRONOUS FLOW) ============
-    // ACLEDA has no Telegram auto-verification; the cashier confirms manually.
-    //
-    // STAGE 1 (INSTANT — 0 seconds): The QR modal opens with the static
-    // ACLEDA ToanChet QR. NO backend call, NO PDF, NO stock deduction, NO
-    // loading spinner — the modal is pure HTML/CSS and appears immediately.
-    //
-    // STAGE 2 (SYNCHRONOUS): The cashier scans the QR, then clicks
-    // "បញ្ជាក់ការទូទាត់ (Manual Confirm)". THIS is the ONLY moment the
-    // backend creates the order, deducts stock, and generates the PDF — all
-    // synchronously in ONE request. The PDF physically exists on disk before
-    // the success popup appears. NO background /api/archive-pdf fetch
-    // (browser redirects abort background fetches → missing PDFs / 404).
     async function confirmAcledaPayment() {
         const btn = document.getElementById('acledaConfirmBtn');
         const originalBtnHTML = btn ? btn.innerHTML : '';
-        // Button spinner (NOT a global blocking Swal) — the modal stays visible
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="btn-spinner"></span>កំពុងដំណើរការ... | Processing...';
-        }
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span>កំពុងដំណើរការ...'; }
         try {
-            // Reuse the ABA-minted tran_id if present (shared checkout session),
-            // otherwise mint a fresh ACL- ID. Persisted for reload safety.
-            let tran_id = (typeof activeTranId !== 'undefined' ? activeTranId : null) || sessionStorage.getItem('checkout_tran_id');
+            let tran_id = activeTranId || sessionStorage.getItem('checkout_tran_id');
+            const itemsToSend = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
 
-            if (!tran_id) {
-                tran_id = "ACL-" + (window.crypto?.randomUUID?.() || ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16); }))).toUpperCase();
-                if (typeof activeTranId !== 'undefined') activeTranId = tran_id;
-                sessionStorage.setItem('checkout_tran_id', tran_id);
-            }
-
-            const itemsToSend = (typeof CART_ITEMS !== 'undefined' ? CART_ITEMS : null) || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
-            const totalAmount = parseFloat(typeof TOTAL_AMOUNT !== 'undefined' ? TOTAL_AMOUNT : sessionStorage.getItem('checkout_total') || 0);
-            const discountAmount = parseFloat(typeof finalDiscount !== 'undefined' ? finalDiscount : sessionStorage.getItem('checkout_discount') || 0);
-
-            // STAGE 2: ONE synchronous request — the backend creates the order
-            // (if missing), deducts stock, generates the PDF, and verifies the
-            // file exists on disk BEFORE returning success.
             const response = await fetch('/confirm-acleda', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     tran_id: tran_id,
                     items: itemsToSend,
-                    total: totalAmount,
-                    discount: discountAmount
+                    total: parseFloat(TOTAL_AMOUNT),
+                    discount: parseFloat(finalDiscount)
                 })
             });
 
             const data = await response.json();
+            if (data.success !== true && data.status !== "success") throw new Error(data.message || 'មិនអាចបញ្ជាក់ការទូទាត់បានទេ');
 
-            if (data.success !== true && data.status !== "success") {
-                throw new Error(data.message || 'មិនអាចបញ្ជាក់ការទូទាត់បានទេ');
-            }
-
-            const confirmedTranId = (data.tran_id && String(data.tran_id).trim())
-                ? String(data.tran_id).trim()
-                : tran_id;
-
-            // Stop any ABA polling loop
-            try {
-                if (typeof pollingInterval !== 'undefined' && pollingInterval) {
-                    clearInterval(pollingInterval);
-                    pollingInterval = null;
-                }
-            } catch (e) { console.warn("Polling clear skipped"); }
-
-            // Close the payment modal + CFD BEFORE the success alert so the
-            // overlay (z-index 9999) never covers the popup.
-            try {
-                if (typeof closePaymentModal === 'function') closePaymentModal();
-            } catch (e) { console.warn("closePaymentModal skipped:", e); }
+            const confirmedTranId = data.tran_id || tran_id;
+            if (pollingInterval) clearInterval(pollingInterval);
+            closePaymentModal();
             document.querySelectorAll('.swal2-container').forEach(el => el.remove());
 
-            // SUCCESS ALERT — 30s timer + OK button
+            playPaymentSuccessSound();
+
             await Swal.fire({
-                icon: 'success',
-                title: 'ការទូទាត់ជោគជ័យ!',
+                icon: 'success', title: 'ការទូទាត់ជោគជ័យ!',
                 text: 'ប្រព័ន្ធបានកត់ត្រា និងបង្កើតវិក្កយបត្ររួចរាល់! (' + confirmedTranId + ')',
-                timer: 30000,
-                timerProgressBar: true,
-                showConfirmButton: true,
-                confirmButtonText: 'យល់ព្រម (OK)',
-                allowOutsideClick: false
+                timer: 30000, timerProgressBar: true, showConfirmButton: true, confirmButtonText: 'យល់ព្រម (OK)', allowOutsideClick: false
             });
 
-            // Cleanup session data and return home safely
-            sessionStorage.removeItem('checkout_cart');
-            sessionStorage.removeItem('checkout_total');
-            sessionStorage.removeItem('checkout_discount');
-            sessionStorage.removeItem('checkout_tran_id');
-            if (typeof activeTranId !== 'undefined') activeTranId = null;
-
+            sessionStorage.removeItem('checkout_cart'); sessionStorage.removeItem('checkout_total');
+            sessionStorage.removeItem('checkout_discount'); sessionStorage.removeItem('checkout_tran_id');
             window.location.replace('/');
-
         } catch (error) {
-            console.error("confirmAcledaPayment error:", error);
-            // Re-enable the button so the cashier can retry
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = originalBtnHTML;
-            }
-            const friendlyMsg = (error && error.message && !String(error.message).includes('Failed to fetch'))
-                ? error.message
-                : 'ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា';
-            Swal.fire('បញ្ហា', friendlyMsg, 'error');
+            if (btn) { btn.disabled = false; btn.innerHTML = originalBtnHTML; }
+            Swal.fire('បញ្ហា', error.message || 'ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា', 'error');
         }
     }
+
     function showQRPopup(tran_id) {
         const rielTotal = (parseFloat(TOTAL_AMOUNT) * JS_RIEL_RATE).toLocaleString();
-        const discountRiel = (finalDiscount * JS_RIEL_RATE).toLocaleString();
-
-        // Populate the dynamic ABA container inside the modal (IDs: qrcode / amount / usd_amount)
         const amountEl = document.getElementById('amount');
         if (amountEl) amountEl.textContent = '៛ ' + rielTotal;
         const usdEl = document.getElementById('usd_amount');
@@ -669,58 +462,27 @@
         if (qrEl) {
             qrEl.innerHTML = '';
             if (typeof QRCode !== 'undefined') {
-                new QRCode(qrEl, {
-                    text: buildABALink(tran_id),
-                    width: 200,
-                    height: 200,
-                    correctLevel: QRCode.CorrectLevel.M
-                });
-            } else {
-                qrEl.innerHTML = '<img src="/static/images/aba_qr.jpg" class="aba-qr-img" style="width:200px; height:200px;">';
+                new QRCode(qrEl, { text: buildABALink(tran_id), width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
             }
         }
-
-        // Close the "Preparing..." loading Swal shown by payWithABA()
-        if (typeof Swal !== 'undefined') {
-            try { Swal.close(); } catch (e) {}
-            // SweetAlert2 can leave a stuck .swal2-loading popup behind when
-            // close() runs mid-showLoading — force-remove any lingering overlay.
-            document.querySelectorAll('.swal2-container').forEach(el => el.remove());
-        }
-
-        // Open the modal (ABA auto-verifies via Telegram listener + polling)
+        document.querySelectorAll('.swal2-container').forEach(el => el.remove());
         openPaymentModal();
-
-        // Send the real tran_id to the CFD so the tablet's ABA QR matches
-        // the one on the POS (both are generated from the same payload).
         sendCFDState('payment', { tran_id: tran_id });
-
         startPolling(tran_id);
     }
 
     function startPolling(tran_id) {
         if (pollingInterval) clearInterval(pollingInterval);
-        
-        // This loop runs every 3 seconds
         pollingInterval = setInterval(async () => {
             try {
                 const response = await fetch(`/check-status?tran_id=${tran_id}`);
                 const data = await response.json();
-
-                // Check if the server returned 'paid'
-                if (data.status === "paid" || data.status === "completed" || data.code === "00") { 
-                    // STOP the loop so it doesn't keep running
+                if (data.status === "paid" || data.status === "completed" || data.code === "00") {
                     clearInterval(pollingInterval);
-
-                    // Payment completed → send the CFD back to the idle slideshow
                     sendCFDState('idle');
-                    
-                    // REDIRECT the user to the success page
                     window.location.href = `/success?tran_id=${tran_id}`;
                 }
-            } catch (error) {
-                console.error("Polling error:", error);
-            }
+            } catch (error) {}
         }, 3000);
     }
 </script>

@@ -4,287 +4,273 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>វិក្កយបត្រ - NSP Cosmetic Store</title>
-    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&family=Moul&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap');
-
-        /* Custom Khmer Fonts for PDF Rendering */
-        {% if is_pdf %}
-        @font-face {
-            font-family: 'Khmer OS Moul Light';
-            src: url('file:///C:/Users/REAM KESOVANNA/Desktop/NSP_POS_29072026/NSP_Cosmetic_POS/static/fonts/KhmerOSmuollight.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Khmer OS Battambang';
-            src: url('file:///C:/Users/REAM KESOVANNA/Desktop/NSP_POS_29072026/NSP_Cosmetic_POS/static/fonts/KhmerOSbattambang.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
-        {% else %}
-        @font-face {
-            font-family: 'Khmer OS Moul Light';
-            src: url('/static/fonts/KhmerOSmuollight.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
-        @font-face {
-            font-family: 'Khmer OS Battambang';
-            src: url('/static/fonts/KhmerOSbattambang.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
-        {% endif %}
-
-        @page {
-            size: A6 portrait;
-            margin: 8mm 6mm 8mm 6mm;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Khmer OS Battambang', sans-serif;
-            font-size: 11px;
+            font-family: 'Kantumruy Pro', sans-serif;
+            background-color: #f1f5f9;
             color: #1e293b;
-            margin: 0;
-            padding: 0;
-            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 15px;
         }
-        .moul {
-            font-family: 'Khmer OS Moul Light', sans-serif;
-        }
-        .receipt-header {
-            text-align: center;
-            margin-bottom: 10px;
-            border-bottom: 1px dashed #cbd5e1;
-            padding-bottom: 6px;
-        }
-        .info-section {
-            margin-bottom: 10px;
-            font-size: 10.5px;
-        }
-        .info-row {
-            margin-bottom: 4px;
-        }
-        .info-label {
-            color: #64748b;
-            display: inline-block;
-            width: 90px;
-        }
-        .info-value {
-            font-weight: bold;
-            color: #0f172a;
-        }
-        .tran-id-badge {
-            font-family: monospace;
-            font-size: 10px;
-            word-break: break-all;
-            display: block;
-            margin-top: 2px;
-            color: #d81b60;
-        }
-        table {
+
+        /* កុងទីន័រមេសម្រាប់វិក្កយបត្រ និងប៊ូតុងបិទ */
+        .aba-receipt-wrapper {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-            margin-bottom: 8px;
+            max-width: 420px;
+            margin: 0 auto;
+            position: relative !important; 
+            z-index: 10;
         }
-        th {
-            font-family: 'Khmer OS Battambang', sans-serif;
-            font-weight: bold;
-            background-color: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 6px 4px;
-            text-align: left;
-            font-size: 10px;
+
+        /* ជួសជុលទីតាំងប៊ូតុងបិទ "X" ឱ្យមកខិតកៀកលើបន្ទាត់កោងនៃក្បាលវិក្កយបត្រ */
+        .btn-close-page {
+            position: absolute;
+            top: 12px;     /* ខិតចុះមកក្រោមបន្តិចឱ្យចំខ្សែបន្ទាត់កោង */
+            right: 12px;   /* ខិតចូលក្នុងបន្តិចឱ្យស្អាតសមសួន */
+            width: 36px;
+            height: 36px;
+            background-color: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            text-decoration: none;
+            z-index: 1000;
         }
-        td {
-            padding: 6px 4px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: top;
-            font-size: 10.5px;
+        
+        @media (max-width: 480px) {
+            .btn-close-page { width: 32px; height: 32px; top: 10px; right: 10px; }
+            .btn-close-page svg { width: 16px !important; height: 16px !important; }
         }
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
-        .price-col { font-weight: 600; }
-        .total-section {
-            margin-top: 6px;
-            border-top: 1px dashed #cbd5e1;
-            padding-top: 6px;
-        }
-        .total-row {
-            display: table;
-            width: 100%;
-            margin-bottom: 4px;
-            font-size: 11px;
-        }
-        .total-label {
-            display: table-cell;
-            text-align: left;
-        }
-        .total-value {
-            display: table-cell;
-            text-align: right;
-            font-weight: 700;
-        }
-        .grand-total-box {
-            background-color: #f8fafc;
-            padding: 6px;
-            border-radius: 6px;
-            border: 1px solid #e2e8f0;
-            margin-top: 4px;
-        }
-        .footer-text {
-            text-align: center;
-            font-size: 9.5px;
-            color: #64748b;
-            margin-top: 15px;
-            font-style: italic;
+
+        .btn-close-page:hover { background-color: #dc2626; transform: scale(1.05); border-color: #b91c1c; }
+        .btn-close-page svg { width: 18px; height: 18px; stroke: #64748b; stroke-width: 3; transition: stroke 0.2s ease; }
+        .btn-close-page:hover svg { stroke: #ffffff; }
+
+        /* ABA Receipt Card Style */
+        .aba-card { background: #ffffff; border-radius: 24px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); position: relative; overflow: hidden; padding: 28px 24px; width: 100%; }
+        .aba-header { text-align: center; margin-bottom: 20px; }
+        .aba-logo-wrapper { width: 75px; height: 75px; margin: 0 auto 12px; border-radius: 50%; background: #ffffff; display: flex; align-items: center; justify-content: center; border: 2px solid #fbcfe8; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .aba-logo { width: 100%; height: 100%; object-fit: cover; }
+        .aba-amount-usd { font-size: 32px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
+        .aba-shop-name { font-family: 'Moul', cursive; font-size: 16px; color: #d81b60; margin-top: 4px; }
+        .aba-sub-title { font-size: 11.5px; color: #64748b; margin-top: 4px; line-height: 1.5; }
+        .ticket-divider-container { position: relative; margin: 18px -24px; height: 20px; display: flex; align-items: center; }
+        .ticket-notch-left { position: absolute; left: 0; width: 16px; height: 24px; background-color: #f1f5f9; border-radius: 0 12px 12px 0; z-index: 2; }
+        .ticket-notch-right { position: absolute; right: 0; width: 16px; height: 24px; background-color: #f1f5f9; border-radius: 12px 0 0 12px; z-index: 2; }
+        .dashed-line { width: 100%; border-top: 2px dashed #cbd5e1; margin: 0 16px; }
+        .aba-details { display: flex; flex-direction: column; gap: 11px; font-size: 13px; }
+        .aba-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .aba-label { color: #64748b; font-weight: 500; flex-shrink: 0; }
+        .aba-value { color: #0f172a; font-weight: 700; text-align: right; word-break: break-word; }
+        .aba-value.highlight-id { font-family: monospace; color: #d81b60; font-size: 14.5px; text-transform: uppercase; }
+        .aba-value.highlight-riel { color: #059669; font-weight: 800; font-size: 14.5px; }
+        .items-box { background: #f8fafc; border-radius: 14px; padding: 12px 14px; margin-top: 6px; border: 1px solid #f1f5f9; }
+        .items-title { font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; text-transform: uppercase; }
+        .item-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+        .item-row:last-child { margin-bottom: 0; }
+        .item-name-qty { color: #334155; font-weight: 600; }
+        .item-price-total { color: #0f172a; font-weight: 700; }
+        .aba-footer { text-align: center; margin-top: 18px; padding-top: 12px; border-top: 1px dashed #e2e8f0; font-size: 10.5px; color: #64748b; line-height: 1.5; }
+        .action-buttons { margin-top: 25px; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 420px; }
+        .btn-action { width: 100%; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; transition: all 0.2s ease; font-family: 'Kantumruy Pro', sans-serif; }
+        .btn-download { background: #005a9c; color: #ffffff; box-shadow: 0 4px 14px rgba(0, 90, 156, 0.25); }
+        .btn-download:hover { background: #004680; transform: translateY(-1px); }
+        .btn-print { background: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; }
+        .btn-print:hover { background: #f8fafc; }
+
+        @media print {
+            body { background: white; padding: 0; display: block; }
+            .aba-receipt-wrapper { margin: 0 auto; box-shadow: none; max-width: 100%; }
+            .action-buttons, .btn-close-page { display: none !important; }
+            .aba-card { box-shadow: none; border-radius: 0; padding: 10px; border: none; }
+            .ticket-notch-left, .ticket-notch-right { display: none; }
+            .dashed-line { border-top-style: solid; color: #ccc; }
         }
     </style>
 </head>
 <body>
 
-<div class="receipt-header">
-        <div style="margin-bottom: 4px;">
-            <img src="{{ url_for('static', filename='images/nsp_logo.png') }}" alt="NSP Logo" style="width: 50px; height: 50px; object-fit: contain; margin: 0 auto;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/924/924514.png';">
+<div class="aba-receipt-wrapper">
+    
+    <a href="#" class="btn-close-page" title="ត្រឡប់ទៅរបាយការណ៍លក់" onclick="returnToReportsView(event)">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    </a>
+
+    <div class="aba-card" id="abaReceiptCard">
+        
+        {% set total_amount = order.total|default(0)|float %}
+        {% set discount_amount = order.discount|default(0)|float %}
+        {% set subtotal_amount = total_amount + discount_amount %}
+        {% set exchange_rate = RIEL_RATE|default(4000)|float %}
+        
+        <div class="aba-header">
+            <div class="aba-logo-wrapper">
+                <img src="{{ url_for('static', filename='images/nsp_logo.png') }}" class="aba-logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/924/924514.png';">
+            </div>
+            <div class="aba-amount-usd">${{ "%.2f"|format(total_amount) }}</div>
+            <div class="aba-shop-name">ហាងគ្រឿងសម្អាង NSP</div>
+            <div class="aba-sub-title">
+                ផ្សារស្វាយជ្រំ, ស្រុកស្វាយជ្រំ, ខេត្តស្វាយរៀង<br>
+                📱 088 6999606 / 096 888 1857
+            </div>
         </div>
 
-        <h1 class="moul" style="margin: 0 0 2px 0; font-size: 16px; color: #db2777; font-weight: normal; line-height: 1.2; text-align: center;">
-            ហាងគ្រឿងសម្អាង NSP
-        </h1>
-
-        <div style="font-size: 9px; letter-spacing: 1px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; text-align: center;">
-            OFFICIAL RECEIPT
+        <div class="ticket-divider-container">
+            <div class="ticket-notch-left"></div>
+            <div class="dashed-line"></div>
+            <div class="ticket-notch-right"></div>
         </div>
 
-        <div style="text-align: center; font-size: 9.5px; color: #4b5563; line-height: 1.4;">
-            <div style="margin-bottom: 1px;">ផ្សារស្វាយជ្រំ, ឃុំស្វាយជ្រំ, ស្រុកស្វាយជ្រំ, ខេត្តស្វាយរៀង</div>
-            <div style="font-weight: bold; color: #1e293b;">088 6999606 / 096 888 1857</div>
-        </div>
-    </div>
+        <div class="aba-details">
+            <div class="aba-row">
+                <span class="aba-label">លេខប្រតិបត្តិការ (Trx. ID)</span>
+                <span class="aba-value highlight-id">{{ order.tran_id | replace('nsp-', 'NSP-') }}</span>
+            </div>
 
-    <div class="info-section">
-        <div class="info-row">
-            <span class="info-label">កាលបរិច្ឆេទ | Date</span>
-            <span class="info-value">{{ format_ict_str(order.get('created_at')) }}</span>
-        </div>
-        <div class="info-row" style="margin-top: 4px;">
-            <span class="info-label" style="vertical-align: top;">លេខប្រតិបត្តិការ</span>
-            <span class="info-value" style="display: inline-block; width: 150px; line-height: 1.2; word-break: break-all;">
-                {{ order.tran_id }}
-            </span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">អ្នកលក់ | Cashier</span>
-            <span class="info-value">{{ order.get('user') or 'reamkesovanna' }}</span>
-        </div>
-    </div>
+            <div class="aba-row">
+                <span class="aba-label">កាលបរិច្ឆេទ (Date)</span>
+                <span class="aba-value">{{ format_ict_str(order.get('created_at')) }}</span>
+            </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 55%;">ITEM</th>
-                <th class="text-center" style="width: 15%;">QTY</th>
-                <th class="text-right" style="width: 30%;">PRICE</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in order['items'] %}
-            {% set qty = item.get('quantity') or item.get('qty') or 0 %}
-            <tr>
-                <td>
-                    <div style="font-weight: 600; color: #0f172a;">{{ item['name'] }}</div>
-                    <div style="font-size: 9px; color: #64748b; margin-top: 1px;">
-                        ${{ "{:,.2f}".format(item['price']) }} | ៛{{ "{:,.0f}".format(item['price'] * (RIEL_RATE|default(4000)|float)) }}
+            <div class="aba-row">
+                <span class="aba-label">អ្នកគិតលុយ (Cashier)</span>
+                <span class="aba-value">{{ order.get('user') or 'NSP Cashier' }}</span>
+            </div>
+
+            <div class="aba-row">
+                <span class="aba-label">សរុបដើម (Subtotal)</span>
+                <span class="aba-value">${{ "%.2f"|format(subtotal_amount) }}</span>
+            </div>
+
+            {% if discount_amount > 0 %}
+            <div class="aba-row" style="color: #dc2626;">
+                <span class="aba-label" style="color: #dc2626;">បញ្ចុះតម្លៃ (Discount)</span>
+                <span class="aba-value" style="color: #dc2626;">-${{ "%.2f"|format(discount_amount) }}</span>
+            </div>
+            {% endif %}
+
+            <div class="aba-row">
+                <span class="aba-label">សរុបជាប្រាក់រៀល (Grand Total KHR)</span>
+                <span class="aba-value highlight-riel">៛ {{ "{:,}".format((total_amount * exchange_rate)|int) }}</span>
+            </div>
+
+            <div class="items-box">
+                <div class="items-title">មុខទំនិញដែលបានទិញ (Items Purchased)</div>
+                {% for item in order['items'] %}
+                    {% set qty = item.get('quantity') or item.get('qty') or 1 %}
+                    {% set price = item.get('price', 0)|float %}
+                    <div class="item-row">
+                        <span class="item-name-qty">{{ item.name }} (x{{ qty }})</span>
+                        <span class="item-price-total">${{ "%.2f"|format(price * qty|int) }}</span>
                     </div>
-                </td>
-                <td class="text-center" style="vertical-align: middle; font-weight: 600;">{{ qty }}</td>
-                <td class="text-right price-col" style="vertical-align: middle;">
-                    ${{ "{:,.2f}".format(qty * item['price']) }}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <div class="total-section">
-        {% set discount_val = order.discount|default(0)|float %}
-        {% set total_usd = order.total|default(0)|float %}
-        {% set subtotal_usd = total_usd + discount_val %}
-
-        <div class="total-row">
-            <div class="total-label">សរុបដើម | Subtotal</div>
-            <div class="total-value">${{ "{:,.2f}".format(subtotal_usd) }}</div>
+                {% endfor %}
+            </div>
         </div>
 
-        <div class="total-row" style="color: #dc2626;">
-            <div class="total-label">បញ្ចុះតម្លៃ | Discount</div>
-            <div class="total-value">-${{ "{:,.2f}".format(discount_val) }}</div>
-        </div>
-
-        <div class="grand-total-box">
-            <div class="total-row" style="margin-bottom: 2px;">
-                <div class="total-label" style="font-weight: bold; font-size: 11.5px;">សរុបជារួម | Grand Total</div>
-                <div class="total-value" style="color: #16a34a; font-size: 12px;">${{ "{:,.2f}".format(total_usd) }}</div>
-            </div>
-            <div class="total-row" style="margin-bottom: 0;">
-                <div class="total-label" style="color: #16a34a; font-size: 11px; font-weight: bold;">សរុបជាប្រាក់រៀល</div>
-                <div class="total-value" style="color: #16a34a; font-size: 11.5px;">៛{{ "{:,.0f}".format(total_usd * (RIEL_RATE|default(4000)|float)) }}</div>
-            </div>
+        <div class="aba-footer">
+            សូមអរគុណសម្រាប់ការគាំទ្រ! រាល់ការប្តូរទំនិញ ក្នុងកំឡុងពេល ៣ថ្ងៃ<br>
+            Thank you for shopping with us!
         </div>
     </div>
 
-    <div class="footer-text">
-        សូមអរគុណសម្រាប់ការគាំទ្រ! | Thank you for your purchase!
+    <div class="action-buttons">
+        <button class="btn-action btn-download" onclick="downloadReceiptImage()">
+            📥 ទាញយកជារូបភាព (Save Image)
+        </button>
+        <button class="btn-action btn-print" onclick="window.print()">
+            🖨️ បោះពុម្ពវិក្កយបត្រ (Print)
+        </button>
     </div>
 </div>
 
 <script>
-    window.onload = async function() {
-        console.log("Success page loaded. Initializing flows...");
-        
-        const tranId = "{{ order.tran_id or order.local_id }}";
-        
-        // 1. Play success sound
+    window.addEventListener('DOMContentLoaded', () => {
         try {
-            const audio = new Audio('https://www.soundjay.com/buttons/sounds/button-3.mp3');
-            audio.play().catch(e => console.warn("Sound blocked: " + e));
-        } catch (e) { console.error("Audio playback error:", e); }
+            const successAudio = new Audio('/static/sounds/successsound.m4a');
+            successAudio.play().catch(e => console.log("Autoplay audio handled"));
+        } catch(e) {}
+    });
 
-        // 2. GUARANTEED VISUAL ALERT: SweetAlert2 Success Popup
-        if (typeof Swal !== 'undefined') {
-            await Swal.fire({
+    // ឡូជីខលចាកចេញ៖ ត្រឡប់ទៅផ្ទាំងរបាយការណ៍ និងបង្ខំឱ្យ Refresh ទិន្នន័យ
+    function returnToReportsView(event) {
+        event.preventDefault();
+        
+        // ករណីទី ១៖ ប្រសិនបើផ្ទាំងនេះបើកចេញជា Tab ថ្មី (ដាច់ដោយឡែក)
+        if (window.opener && !window.opener.closed) {
+            try {
+                // ហៅមុខងារប្តូរផ្ទាំងទៅកាន់របាយការណ៍លក់របស់ទំព័រមេ
+                if (typeof window.opener.showView === 'function') {
+                    const reportBtn = window.opener.document.getElementById('sidebarReportsBtn');
+                    window.opener.showView('reportsView', reportBtn);
+                }
+                // បង្ខំឱ្យទំព័រមេហៅទិន្នន័យ Refresh ឡើងវិញ
+                if (typeof window.opener.changeReportDateHome === 'function') {
+                    const currentDate = window.opener.document.getElementById('reportDatePickerHome').value;
+                    window.opener.changeReportDateHome(currentDate);
+                } else {
+                    window.opener.location.reload();
+                }
+            } catch (e) {
+                console.log("Cross-origin or function issue handled");
+            }
+            window.close(); // បិទ Tab បច្ចុប្បន្នចោល
+        } else {
+            // ករណីទី ២៖ ប្រសិនបើរត់លើទំព័រដដែល បញ្ជូនរង្វាស់ query parameter ទៅកាន់ទំព័រដើម
+            window.location.href = "/?view=reports";
+        }
+    }
+
+    function downloadReceiptImage() {
+        const receiptCard = document.getElementById('abaReceiptCard');
+        Swal.fire({
+            title: 'កំពុងបង្កើតរូបភាព...',
+            text: 'សូមរង់ចាំមួយភ្លែត | Generating Image...',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+
+        html2canvas(receiptCard, {
+            scale: 3, 
+            useCORS: true,
+            backgroundColor: '#ffffff'
+        }).then(canvas => {
+            Swal.close();
+            const link = document.createElement('a');
+            const tranId = "{{ order.tran_id or 'Receipt' }}".replace('nsp-', 'NSP-');
+            link.download = `NSP_Receipt_${tranId}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click(); 
+            
+            Swal.fire({
                 icon: 'success',
-                title: 'ការទូទាត់ជោគជ័យ!',
-                text: 'ប្រព័ន្ធបានកត់ត្រា និងបង្កើតវិក្កយបត្ររួចរាល់ | Confirmed & Archived',
-                timer: 2800,
-                timerProgressBar: true,
+                title: 'ទាញយករួចរាល់!',
+                text: 'រូបភាពវិក្កយបត្រត្រូវបានរក្សាទុកក្នុងឧបករណ៍របស់អ្នក',
+                timer: 2000,
                 showConfirmButton: false
             });
-        }
-
-        // 3. Trigger backend PDF generation via ACLEDA or general archive API
-        console.log(`Archiving PDF for transaction ${tranId}...`);
-        
-        // Call /confirm-acleda fallback or /api/archive-pdf to make sure backend writes PDF
-        fetch('/confirm-acleda', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tran_id: tranId })
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log("Backend PDF trigger response:", data);
-        })
-        .catch(err => console.error("❌ PDF background trigger failed:", err));
-
-        // 4. Redirect home after the alert finishes
-        setTimeout(function() {
-            window.location.href = '/';
-        }, 200);
-    };
+        }).catch(err => {
+            console.error('Error generating receipt image:', err);
+            Swal.fire('បញ្ហា', 'មិនអាចបង្កើតរូបភាពបានទេ', 'error');
+        });
+    }
 </script>
+
 </body>
 </html>

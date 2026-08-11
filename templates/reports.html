@@ -506,7 +506,10 @@
    - Light polling every 30s while the tab is visible & focused
    ===================================================================== */
 (function () {
-    const RIEL_RATE = Number({{ RIEL_RATE|default(4000) }} || 4000);
+    // Quote the Jinja expression so the raw template parses as valid JS
+    // ({{ }} inside an expression position breaks the editor's parser).
+    // Rendered output is unchanged: Number('4000' || 4000) === 4000.
+    const RIEL_RATE = Number('{{ RIEL_RATE|default(4000) }}' || 4000);
 
     // ----- Current report scope from URL (mirrors the server route) -----
     function getReportScope() {

@@ -573,6 +573,39 @@ def validate_and_deduct_stock_local(cart_items):
         conn.close()
 
 # --- Order Operations ---
+def next_sequential_tran_id(prefix='nsp'):
+    """Generate the next sequential transaction ID: ``{prefix}-{7-digit}``.
+
+    Queries the ``orders`` table for the current maximum numeric suffix
+    among IDs matching ``{prefix}-%``, increments it, and formats the
+    result zero-padded to 7 digits (e.g. ``nsp-0000001``).
+
+    Concurrency backstop: ``add_order()`` enforces the UNIQUE index on
+    ``tran_id`` (``idx_orders_tran_id``), so even if two requests race and
+    mint the same ID, only one row is created and the loser is served the
+    existing ``local_id``.
+    """
+    prefix = str(prefix or 'nsp').strip().lower()
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        # MAX on the numeric suffix of matching IDs: extract the digits
+        # after the last '-' and cast to integer (safe — only digits).
+        cursor.execute(
+            "SELECT MAX(CAST(SUBSTR(tran_id, ?) AS INTEGER)) AS max_seq "
+            "FROM orders WHERE tran_id LIKE ?",
+            (len(prefix) + 2, f"{prefix}-%")
+        )
+        row = cursor.fetchone()
+        max_seq = row['max_seq'] if row and row['max_seq'] is not None else 0
+        next_seq = int(max_seq) + 1
+        # Safety cap: wrap around instead of producing a longer string.
+        if next_seq > 9999999:
+            next_seq = 1
+        return f"{prefix}-{next_seq:07d}"
+    finally:
+        conn.close()
+
 def add_order(order_data):
     """Save order locally with synced=0.
 

@@ -97,59 +97,23 @@ function executeCategorySave(categoryName, activeSelect) {
 window.handleCategoryChange = handleCategoryChange;
 window.executeCategorySave = executeCategorySave;
 
-// Luxury UI Sounds
-const clickSound = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-const successSound = new Audio('https://www.soundjay.com/buttons/sounds/button-3.mp3');
-const popSound = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3');
+// --- TARGET 3: GLOBAL AUDIO SYSTEM ---
+// បង្ខំប្រភពសំឡេងឱ្យទៅរក File ដែលបងបានដាក់ (ដាក់អក្សរតូចធំឱ្យត្រូវតាម File ពិតរបស់បង)
+const uiClickSound = new Audio('/static/sounds/clicksound.m4a');
+const uiSuccessSound = new Audio('/static/sounds/successsound.mp3');
 
-try {
-    clickSound.load();
-    successSound.load();
-    popSound.load();
-} catch (e) {
-    console.log("Audio preloading failed", e);
-}
-
-function playClick() {
-    if (clickSound) {
-        clickSound.currentTime = 0;
-        clickSound.play().catch(e => console.log("Sound blocked by browser policy"));
-    }
-}
-
-function playSuccess() {
-    if (successSound) {
-        successSound.currentTime = 0;
-        successSound.play().catch(e => console.log("Sound blocked by browser policy"));
-    }
-}
-
-function playPop() {
-    if (popSound) {
-        popSound.currentTime = 0;
-        popSound.play().catch(e => console.log("Sound blocked by browser policy"));
-    }
-}
-
-document.addEventListener('click', (e) => {
-    const target = e.target.closest('button, a, .card, .menu-item, .btn-login, .btn-order, .btn-scan');
-    if (target) {
-        playClick();
-    }
+// មុខងារលេងសំឡេងចុច globally លើគ្រប់ការ Click ទាំងអស់
+window.addEventListener('click', () => {
+    uiClickSound.currentTime = 0;
+    uiClickSound.play().catch(err => console.log("Click sound error:", err));
 });
 
-if (typeof Swal !== 'undefined') {
-    const originalFire = Swal.fire;
-    Swal.fire = function(...args) {
-        const result = originalFire.apply(this, args);
-        playPop();
-        return result;
-    };
+// មុខងារសម្រាប់លេងសំឡេងជោគជ័យ
+function playSuccessSound() {
+    uiSuccessSound.currentTime = 0;
+    uiSuccessSound.play().catch(err => console.log("Success sound error:", err));
 }
-
-window.playLuxuryClick = playClick;
-window.playLuxurySuccess = playSuccess;
-window.playLuxuryPop = playPop;
+window.playSuccessSound = playSuccessSound;
 
 /**
  * --- SUPREME SINGLE PAGE APPLICATION (SPA) VIEW SWITCHER ---

@@ -2,16 +2,16 @@ import sys
 import random
 import os
 import uuid
-import webbrowser            # <-- 1. Add this near your top imports
-from threading import Timer  # <-- 2. Add this near your top imports
+import webbrowser           
+from threading import Timer 
+
 # Fix for PyInstaller --windowed mode crashing with Firebase/Google Cloud loggers
 if sys.stdout is None:
     sys.stdout = open(os.devnull, 'w', encoding='utf-8')
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w', encoding='utf-8')
+
 import base64
-import os
-from dotenv import load_dotenv
 import json
 import smtplib
 import urllib.request
@@ -25,29 +25,18 @@ from email.mime.text import MIMEText
 ICT_TZ = timezone(timedelta(hours=7), name='ICT')
 
 def cambodia_time(dt):
-    """Normalize any datetime (naive or aware, UTC or local) to Cambodia ICT (UTC+7).
-
-    - Naive datetimes are assumed to already be Cambodia local time
-      (legacy rows written by datetime.now().isoformat() on this server).
-    - Aware datetimes (e.g. Firestore Timestamps serialized with +00:00 / Z)
-      are converted to the ICT timezone.
-    Returns the ICT-aware datetime.
-    """
     if dt is None:
         return None
     if dt.tzinfo is None:
-        # Legacy naive value: treat as already-ICT wall clock
         return dt.replace(tzinfo=ICT_TZ)
     return dt.astimezone(ICT_TZ)
 
 def format_ict(dt, fmt):
-    """Format a datetime as ICT string, safe for naive or aware input."""
     if dt is None:
         return ''
     return cambodia_time(dt).strftime(fmt)
 
 def format_ict_str(iso_str, fmt='%d/%m/%Y %I:%M:%S %p'):
-    """Format an ISO datetime string as Cambodia ICT (UTC+7). Safe for any input."""
     if not iso_str:
         return ''
     try:
@@ -56,22 +45,6 @@ def format_ict_str(iso_str, fmt='%d/%m/%Y %I:%M:%S %p'):
         return str(iso_str)
 
 def parse_ict_datetime(iso_str):
-    """Parse ANY stored `created_at` value into an ICT-aware datetime (UTC+7).
-
-    Central conversion point for every order-serving route so the sales
-    report table can NEVER display a raw UTC / Firestore timestamp:
-
-    - None / empty / unparseable  -> returns None (caller skips the row).
-    - Naive strings (legacy local rows, e.g. '2026-08-08T12:16:39' written by
-      datetime.now().strftime(...)) are assumed to already BE Cambodia
-      wall-clock and are pinned to ICT (+07:00) with NO hour shift.
-    - Aware strings (e.g. Firestore serialized '2026-08-08T04:16:39+00:00' or
-      '...Z') represent a true UTC instant and are converted with the exact
-      +7h offset to the correct Cambodia wall-clock time.
-
-    Returns the ICT-aware datetime, or None when the input cannot be parsed
-    (so routes can skip bad rows instead of crashing the whole report).
-    """
     if not iso_str:
         return None
     try:
@@ -80,13 +53,6 @@ def parse_ict_datetime(iso_str):
         return None
 
 def enrich_order_display_times(order):
-    """Attach display_time / display_datetime / created_at_raw to an order row.
-
-    Reads `order['created_at']` (raw DB string), converts it with
-    parse_ict_datetime() (fromisoformat + cambodia_time -> ICT), and writes
-    the formatted display fields the report table consumes. A row that fails
-    to parse gets empty display fields instead of a raw UTC leak or a crash.
-    """
     try:
         dt = parse_ict_datetime(order.get('created_at', ''))
         if dt is None:
@@ -111,42 +77,24 @@ from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from firebase_functions import https_fn
-from weasyprint import HTML, CSS
-from io import BytesIO
 
 import local_db
 import sync
 
-# --- PILLAR 2: COLLISION-FREE, CRYPTO-SECURE TRANSACTION IDs ---
-def new_tran_id(prefix='CASH'):
-    """
-    Generate a globally unique, cryptographically-secure transaction ID.
-
-    Uses ``secrets.token_hex`` (OS-level CSPRNG) instead of sequential
-    integers or ``Date.now()`` timestamps so that:
-      - Offline sales on the local computer can NEVER collide with online
-        sales from tablets (the entropy space is effectively collision-free).
-      - IDs are not guessable/predictable, preventing ID enumeration attacks.
-      - Legacy prefixes (CASH/TX/NSP) are preserved for display compatibility.
-    """
-    import secrets
-    return f"{prefix}-{secrets.token_hex(8).upper()}"
+# --- PILLAR 2: SEQUENTIAL TRANSACTION IDs ---
+def new_tran_id(prefix='NSP'):
+    return local_db.next_sequential_tran_id(prefix)
 
 # --- PORTABLE PATH LOGIC ---
 def get_resource_path(relative_path):
-    """
-    Get absolute path to resource, works for dev and for PyInstaller.
-    """
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
-        # If not running in a bundle, use the directory of the current script
         base_path = os.path.dirname(os.path.abspath(__file__))
-
     return os.path.join(base_path, relative_path)
 
 # Load environment variables from portable path
+from dotenv import load_dotenv
 load_dotenv(get_resource_path('.env'))
 
 # --- CONFIGURATION VALIDATION ---
@@ -169,7 +117,6 @@ OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 EMAIL_APP_PASSWORD = os.environ.get("EMAIL_APP_PASSWORD")
 
 def notify_owner_by_email(new_username):
-    # ... (rest of the function)
     try:
         msg = MIMEText(f"មានអ្នកប្រើប្រាស់ថ្មីឈ្មោះ: {new_username} បានចុះឈ្មោះ។ សូមចូលទៅកាន់ Firebase ដើម្បីប្តូរ status ពី 'pending' ទៅ 'active' ដើម្បីអនុញ្ញាត។")
         msg['Subject'] = 'New POS User Signup Approval Required'
@@ -202,17 +149,15 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# Make ICT timezone helpers available to all templates (Jinja globals)
+# Make ICT timezone helpers available to all templates
 app.jinja_env.globals['cambodia_time'] = cambodia_time
 app.jinja_env.globals['format_ict'] = format_ict
 app.jinja_env.globals['format_ict_str'] = format_ict_str
 
 # --- CSRF PROTECTION ---
 csrf = CSRFProtect(app)
-# Exempt API endpoints that use JSON (they are protected by login_required + SameSite cookies)
-# CSRF token is still required for all HTML form POST submissions
 app.config['WTF_CSRF_CHECK_DEFAULT'] = True
-app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 hour token validity
+app.config['WTF_CSRF_TIME_LIMIT'] = 3600  
 
 # --- SECURITY HEADERS ---
 @app.after_request
@@ -221,20 +166,15 @@ def set_security_headers(response):
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    # Prevent caching of sensitive pages
     if request.endpoint and request.endpoint not in ['static']:
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
     return response
 
-# Make CSRF token available to all templates (for AJAX requests)
 @app.context_processor
 def inject_csrf_token():
     return dict(csrf_token=generate_csrf)
 
-# RBAC: keep session['role'] in sync with the authenticated user's role.
-# This guarantees templates using `session.get('role')` always reflect the
-# current role (covers role changes and sessions created before this hook).
 @app.before_request
 def sync_session_role():
     if current_user.is_authenticated:
@@ -243,150 +183,8 @@ def sync_session_role():
     else:
         session.pop('role', None)
         session.pop('username', None)
-# Ensure reports directory exists
-if not os.path.exists('reports'):
-    os.makedirs('reports')
-
-@app.route('/save-report', methods=['POST'])
-@csrf.exempt # Exempting API endpoint, protected by other means if needed
-def save_report():
-    if 'file' not in request.files:
-        return jsonify({"status": "error", "message": "No file part"}), 400
-    file = request.files['file']
-    tran_id = request.form.get('tran_id')
-    
-    if file.filename == '':
-        return jsonify({"status": "error", "message": "No selected file"}), 400
-        
-    if file:
-        # SECURITY: Strict filename validation to prevent path traversal
-        filename = secure_filename(file.filename)
-        if not filename:
-            return jsonify({"status": "error", "message": "Invalid filename"}), 400
-            
-        # Ensure reports directory exists
-        reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
-        if not os.path.exists(reports_dir):
-            os.makedirs(reports_dir)
-            
-        # SECURITY: Ensure the final path is actually inside the reports directory
-        final_path = os.path.abspath(os.path.join(reports_dir, filename))
-        if not final_path.startswith(reports_dir):
-            return jsonify({"status": "error", "message": "Path traversal detected"}), 403
-            
-        file.save(final_path)
-        
-        # Update database status if tran_id is provided
-        if tran_id:
-            local_db.update_order_receipt_status(tran_id, 1)
-            
-        return jsonify({"status": "success", "message": "Report archived and database updated"})
-    return jsonify({"status": "error"}), 400
-
-@app.route('/api/archive-pdf/<tran_id>', methods=['POST'])
-@csrf.exempt # Exempting API endpoint
-def archive_pdf(tran_id):
-    """
-    Generate PDF from success.html using weasyprint with proper Khmer text rendering (CTL support).
-    Saves PDF to reports folder and updates database.
-    """
-    try:
-        # SECURITY: Validate tran_id format (alphanumeric, dash, underscore only)
-        if not isinstance(tran_id, str) or not all(c.isalnum() or c in '-_' for c in tran_id):
-            return jsonify({"status": "error", "message": "Invalid transaction ID format"}), 400
-        
-        # Fetch the order from the database
-        order = local_db.get_order(tran_id)
-        if order is None:
-            return jsonify({"status": "error", "message": f"Order not found: {tran_id}"}), 404
-        
-        # Get currency rate
-        riel_rate = get_riel_rate()
-        
-        # Render the success.html template as a string with order data and PDF flag for absolute font paths
-        html_content = render_template('success.html', order=order, RIEL_RATE=riel_rate, is_pdf=True)
-        
-        # Convert HTML to PDF using weasyprint (supports CTL for Khmer text)
-        pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
-        
-        # SECURITY: Ensure reports directory exists with absolute path
-        reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
-        if not os.path.exists(reports_dir):
-            os.makedirs(reports_dir)
-        
-        # SECURITY: Strict filename validation to prevent path traversal
-        pdf_filename = secure_filename(f"invoice_{tran_id}.pdf")
-        if not pdf_filename or not pdf_filename.endswith('.pdf'):
-            return jsonify({"status": "error", "message": "Invalid filename generated"}), 400
-        
-        # SECURITY: Ensure final path is within reports directory
-        pdf_filepath = os.path.abspath(os.path.join(reports_dir, pdf_filename))
-        if not pdf_filepath.startswith(reports_dir):
-            return jsonify({"status": "error", "message": "Path traversal detected"}), 403
-        
-        with open(pdf_filepath, 'wb') as f:
-            f.write(pdf_bytes)
-        
-        # Update database to mark receipt as archived
-        local_db.update_order_receipt_status(tran_id, 1)
-        
-        return jsonify({
-            "status": "success",
-            "message": "PDF archived successfully",
-            "filename": pdf_filename
-        })
-        
-    except Exception as e:
-        print(f"❌ PDF Generation Error for {tran_id}: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"PDF generation failed: {str(e)}"
-        }), 500
-
-def render_pdf_receipt(tran_id):
-    """SYNCHRONOUS PDF receipt generator — optimized to prevent single-thread HTTP deadlocks."""
-    try:
-        if not isinstance(tran_id, str) or not all(c.isalnum() or c in '-_' for c in tran_id):
-            return False, "Invalid transaction ID format", None
-
-        order = local_db.get_order(tran_id)
-        if order is None:
-            return False, f"Order not found: {tran_id}", None
-
-        riel_rate = get_riel_rate()
-        html_content = render_template('success.html', order=order, RIEL_RATE=riel_rate, is_pdf=True)
-
-        # FIX: Use the local file system path instead of request.host_url to prevent single-thread network deadlocks
-        static_dir_path = os.path.abspath(os.path.join(os.getcwd(), 'static'))
-        pdf_bytes = HTML(string=html_content, base_url=static_dir_path).write_pdf()
-
-        reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
-        if not os.path.exists(reports_dir):
-            os.makedirs(reports_dir)
-
-        pdf_filename = secure_filename(f"invoice_{tran_id}.pdf")
-        if not pdf_filename or not pdf_filename.endswith('.pdf'):
-            return False, "Invalid filename generated", None
-
-        pdf_filepath = os.path.abspath(os.path.join(reports_dir, pdf_filename))
-        if not pdf_filepath.startswith(reports_dir):
-            return False, "Path traversal detected", None
-
-        with open(pdf_filepath, 'wb') as f:
-            f.write(pdf_bytes)
-
-        local_db.update_order_receipt_status(tran_id, 1)
-        print(f"✅ PDF receipt generated synchronously via local assets for order: {tran_id}")
-        return True, "PDF archived successfully", pdf_filename
-
-    except Exception as e:
-        print(f"❌ PDF Generation Error for {tran_id}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False, f"PDF generation failed: {str(e)}", None
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-# Firebase Cloud Functions cookie handling
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_DEBUG', 'False').lower() != 'true'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -399,7 +197,7 @@ app.config['REMEMBER_COOKIE_SECURE'] = os.environ.get('FLASK_DEBUG', 'False').lo
 # Master PIN for password resets
 MASTER_RECOVERY_PIN = os.environ.get('MASTER_RECOVERY_PIN')
 
-# Currency Conversion Rate
+# Currency Conversion Rate Cache
 _cached_riel_rate = 4100
 _last_fetch_time = None
 
@@ -420,7 +218,6 @@ def get_acleda_riel_rate():
     return None
 
 def get_riel_rate():
-    # 1. Check local DB settings for a manually set rate
     manual_rate = local_db.get_setting('exchange_rate')
     if manual_rate:
         try:
@@ -438,7 +235,7 @@ def get_riel_rate():
     return _cached_riel_rate
 
 @app.route('/add_category_endpoint', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def add_custom_category():
     data = request.get_json()
@@ -456,7 +253,7 @@ def add_custom_category():
         return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/api/settings/exchange-rate', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint, CSRF not applicable to programmatic clients
+@csrf.exempt  
 @login_required
 def update_exchange_rate():
     if current_user.role != 'admin':
@@ -464,20 +261,20 @@ def update_exchange_rate():
 
     data = request.get_json()
     if not data or 'exchange_rate' not in data:
-        return jsonify({"status": "error", "message": "Missing exchange_rate parameters in request body"}), 400
+        return jsonify({"status": "error", "message": "Missing exchange_rate parameters"}), 400
 
     try:
         new_rate = int(data['exchange_rate'])
         if new_rate <= 0:
             return jsonify({"status": "error", "message": "Rate magnitude must be greater than zero"}), 400
 
-        # Execute data write layer
         local_db.update_setting('exchange_rate', str(new_rate))
         return jsonify({"status": "success", "message": "Exchange rate updated successfully", "new_rate": new_rate})
     except ValueError:
         return jsonify({"status": "error", "message": "Invalid number format provided"}), 400
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Database transactional crash: {str(e)}"}), 500
+        return jsonify({"status": "error", "message": f"Database error: {str(e)}"}), 500
+
 @app.context_processor
 def inject_riel_rate():
     rate = get_riel_rate()
@@ -530,7 +327,6 @@ def admin_required(f):
 
 @app.route('/setup-admin')
 def setup_admin():
-    # SECURITY: Require the master PIN to run setup
     pin = request.args.get('pin')
     if not pin or pin != MASTER_RECOVERY_PIN:
         return "Unauthorized", 403
@@ -539,7 +335,6 @@ def setup_admin():
     users_ref = db.collection('users')
     existing = users_ref.document('admin').get()
     if not existing.exists:
-        # SECURITY: Generate a random password instead of hardcoding
         import secrets
         import string
         alphabet = string.ascii_letters + string.digits
@@ -566,13 +361,11 @@ def signup():
         if not username or not password:
             return jsonify({"status": "error", "message": "Missing info"}), 400
 
-        # SECURITY: Validate username format (alphanumeric, underscore, dash, dot only)
         if len(username) < 3 or len(username) > 50:
             return jsonify({"status": "error", "message": "Username must be 3-50 characters"}), 400
         if not all(c.isalnum() or c in '_.-' for c in username):
             return jsonify({"status": "error", "message": "Username contains invalid characters"}), 400
 
-        # SECURITY: Validate password strength
         if len(password) < 6:
             return jsonify({"status": "error", "message": "Password must be at least 6 characters"}), 400
 
@@ -590,9 +383,7 @@ def signup():
         }
         db.collection('users').document(username).set(new_user)
         
-        # We don't save to local_db yet, as we only pull approved users during sync
         notify_owner_by_email(username)
-        
         return jsonify({"status": "success", "message": "គណនីបានបង្កើត! សូមរង់ចាំការអនុញ្ញាតពីម្ចាស់ហាង។"})
     except Exception as e:
         print(f"Signup error: {e}")
@@ -603,10 +394,8 @@ def signup():
 def get_users():
     if current_user.role != 'admin':
         return jsonify({"status": "error", "message": "Unauthorized: Admin access required"}), 403
-    
     try:
         users_list = local_db.get_all_users()
-        # Sanitize: Remove sensitive information and format for the frontend
         sanitized_users = []
         for u in users_list:
             sanitized_users.append({
@@ -614,40 +403,33 @@ def get_users():
                 "role": u.get('role', 'user'),
                 "status": u.get('status', 'active'),
                 "profile_image": u.get('profile_image'),
-                "display_name": u.get('username') # Using username as display name as no separate field exists
+                "display_name": u.get('username')
             })
-        
         return jsonify({"status": "success", "data": sanitized_users})
     except Exception as e:
         print(f"Error fetching users: {e}")
         return jsonify({"status": "error", "message": "Failed to retrieve staff data"}), 500
 
 @app.route('/api/users/create', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def create_user():
     if current_user.role != 'admin':
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
-    
     try:
         data = request.get_json()
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
         role = data.get('role', 'user')
 
-        # SECURITY: Validate inputs
         if not username or not password:
             return jsonify({"status": "error", "message": "Missing username or password"}), 400
-
         if len(username) < 3 or len(username) > 50:
             return jsonify({"status": "error", "message": "Username must be 3-50 characters"}), 400
         if not all(c.isalnum() or c in '_.-' for c in username):
             return jsonify({"status": "error", "message": "Username contains invalid characters"}), 400
-
         if len(password) < 6:
             return jsonify({"status": "error", "message": "Password must be at least 6 characters"}), 400
-
-        # SECURITY: Whitelist allowed roles
         if role not in ['admin', 'user']:
             return jsonify({"status": "error", "message": "Invalid role"}), 400
 
@@ -659,157 +441,115 @@ def create_user():
             "username": username,
             "password": generate_password_hash(password),
             "role": role, 
-            "status": "active", # Admins create active users
+            "status": "active",
             "profile_pic": "default.jpg",
             "created_at": firestore.SERVER_TIMESTAMP
         }
         db.collection('users').document(username).set(new_user)
-        
-        # Sync locally to update SQLite
         sync.pull_from_firestore()
-        
         return jsonify({"status": "success", "message": "បុគ្គលិកថ្មីត្រូវបានបង្កើតដោយជោគជ័យ! (Staff created successfully)"})
     except Exception as e:
         print(f"Create user error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/users/<username>/delete', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def delete_user(username):
     if current_user.role != 'admin':
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
     if username == current_user.username:
         return jsonify({"status": "error", "message": "អ្នកមិនអាចលុបគណនីផ្ទាល់ខ្លួនបានទេ (You cannot delete your own account)"}), 400
-    
     try:
         db = get_db()
         db.collection('users').document(username).delete()
-        # Sync locally
         sync.pull_from_firestore()
         local_db.delete_user_local(username)
         return jsonify({"status": "success", "message": f"គណនី {username} ត្រូវបានលុប (Account deleted)"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/users/<username>/approve', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def approve_user(username):
     if current_user.role != 'admin':
         return jsonify({"error": "Unauthorized"}), 403
     try:
-        # Update Firestore
         db = get_db()
         db.collection('users').document(username).update({"status": "active"})
-        # Sync locally
         sync.pull_from_firestore()
         return jsonify({"status": "success", "message": f"{username} approved"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/users/<username>/set-role', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def set_user_role(username):
     if current_user.role != 'admin':
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
-    
-    # SECURITY: Prevent admins from changing their own role
     if username == current_user.username:
         return jsonify({"status": "error", "message": "Cannot modify your own role"}), 400
-    
     try:
         data = request.get_json()
         new_role = data.get('role', '').strip()
-        
-        # SECURITY: Whitelist allowed roles
         if new_role not in ['admin', 'user']:
             return jsonify({"status": "error", "message": "Invalid role"}), 400
-        
-        # Update Firestore
         db = get_db()
         db.collection('users').document(username).update({"role": new_role})
-        # Sync locally
         sync.pull_from_firestore()
         return jsonify({"status": "success", "message": f"Role updated to {new_role}"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/sync', methods=['POST', 'GET'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def manual_sync():
-    import traceback
-    from sync import sync_all
-
-    # យន្តការដោះសោរការពារសោរគាំង (Anti-lock Mechanism)
     global is_syncing
     if 'is_syncing' in globals() and is_syncing:
-        is_syncing = False  # ដោះសោរដោយបង្ខំ
-
+        is_syncing = False  
     try:
-        # ពិនិត្យទិន្នន័យ Payload (ប្រសិនបើមាន)
         if request.method == 'POST' and request.get_data():
             data = request.get_json(silent=True)
             if data is None or not isinstance(data, dict):
                 return jsonify({"status": "warning", "message": "Invalid JSON, but continuing"}), 200
 
-        # រត់មុខងារ Sync ពេញលេញ
-        res = sync_all()
-        
-        # ត្រឡប់លទ្ធផល (ប្តូរ 500 មក 200 ដើម្បីកុំឱ្យ Console លោតក្រហម)
+        res = sync.sync_all()
         if isinstance(res, dict) and res.get('success'):
-            return jsonify({
-                "status": "success", 
-                "message": "Sync successful",
-                "details": res
-            }), 200
+            return jsonify({"status": "success", "message": "Sync successful", "details": res}), 200
         else:
             msg = res.get('message') if isinstance(res, dict) else "Sync temporary busy"
-            return jsonify({
-                "status": "warning", 
-                "message": msg,
-                "details": res
-            }), 200
-
+            return jsonify({"status": "warning", "message": msg, "details": res}), 200
     except Exception as e:
         print("=== SYNC SERVER EXCEPTION ===")
         traceback.print_exc()
-        print("==============================")
-        # ប្តូរពី 500 មក 200 ដើម្បី Bypass error លើ Frontend
-        return jsonify({
-            "status": "warning",
-            "message": f"Sync auto-recovered: {str(e)}"
-        }), 200
+        return jsonify({"status": "warning", "message": f"Sync auto-recovered: {str(e)}"}), 200
+
 @app.route('/api/get-sync-status', methods=['GET'])
 def get_sync_status():
-    """Returns the current background sync status"""
     return jsonify(sync.sync_status)
 
 @app.route('/api/upload-user-image', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def upload_user_image():
     try:
         data = request.get_json()
         image_data = data.get('image_data')
-        user_type = data.get('type') # 'profile' or 'cover'
+        user_type = data.get('type') 
         target_username = (data.get('username') or '').strip() or current_user.username
         
         if not image_data or not user_type:
             return jsonify({'status': 'error', 'message': 'Missing data'}), 400
-
-        # SECURITY: Only admins may change another user's photo
         if target_username != current_user.username and current_user.role != 'admin':
             return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
-
-        # SECURITY: Prevent users from modifying another user's images
         if target_username != current_user.username:
             existing = local_db.get_user(target_username)
             if not existing:
                 return jsonify({'status': 'error', 'message': 'User not found'}), 404
 
-        # Update local database
         if user_type == 'profile':
             local_db.update_user_images(target_username, profile_image=image_data)
         elif user_type == 'cover':
@@ -817,21 +557,18 @@ def upload_user_image():
         else:
             return jsonify({'status': 'error', 'message': 'Invalid type'}), 400
         
-        # Schedule auto-sync to push to Firestore
         sync.trigger_auto_sync(delay=2)
-        
         return jsonify({'status': 'success', 'message': 'Saved successfully'})
     except Exception as e:
         print(f"Error in upload: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/users/update', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def update_user():
     if current_user.role != 'admin':
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
-
     try:
         data = request.get_json()
         old_username = (data.get('old_username') or '').strip()
@@ -839,7 +576,6 @@ def update_user():
         role = data.get('role', 'user')
         password = data.get('password')
 
-        # SECURITY: Validate inputs
         if not old_username or not username:
             return jsonify({"status": "error", "message": "Missing username"}), 400
         if len(username) < 3 or len(username) > 50:
@@ -848,19 +584,14 @@ def update_user():
             return jsonify({"status": "error", "message": "Username contains invalid characters"}), 400
         if role not in ['admin', 'user']:
             return jsonify({"status": "error", "message": "Invalid role"}), 400
-
-        # SECURITY: Prevent demoting/deleting yourself
         if old_username == current_user.username and role != 'admin':
             return jsonify({"status": "error", "message": "អ្នកមិនអាចប្តូរតួនាទីខ្លួនឯងបានទេ (You cannot change your own role)"}), 400
 
         db = get_db()
-
-        # Rename document if username changed
         if old_username != username:
             old_doc = db.collection('users').document(old_username).get()
             if not old_doc.exists:
                 return jsonify({"status": "error", "message": "User not found"}), 404
-            # Check target doesn't already exist
             if db.collection('users').document(username).get().exists:
                 return jsonify({"status": "error", "message": "ឈ្មោះអ្នកប្រើប្រាស់នេះមានរួចហើយ (Username already exists)"}), 400
 
@@ -881,9 +612,7 @@ def update_user():
             if update_data:
                 db.collection('users').document(username).update(update_data)
 
-        # Sync locally to update SQLite
         sync.pull_from_firestore()
-
         return jsonify({"status": "success", "message": "ព័ត៌មានបុគ្គលិកត្រូវបានកែប្រែ (Staff updated successfully)"})
     except Exception as e:
         print(f"Update user error: {e}")
@@ -896,7 +625,7 @@ def get_user_covers_api():
     return jsonify({'status': 'success', 'covers': covers})
 
 @app.route('/api/upload-cover-gallery', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def upload_cover_gallery():
     try:
@@ -914,7 +643,7 @@ def upload_cover_gallery():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/delete-cover/<int:cover_id>', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def delete_cover_api(cover_id):
     try:
@@ -933,8 +662,6 @@ def login():
         password = data.get('password')
         if not username or not password:
             return jsonify({"status": "error", "message": "សូមបំពេញព័ត៌មាន!"}), 400
-
-        # SECURITY: Validate username format (prevent injection)
         if not all(c.isalnum() or c in '_.-@' for c in username):
             return jsonify({"status": "error", "message": "Invalid username format"}), 400
 
@@ -945,7 +672,6 @@ def login():
             if check_password_hash(user_data.get('password', ''), password):
                 user = User(username, username, user_data.get('role', 'user'), user_data.get('profile_image'), user_data.get('cover_image')) 
                 login_user(user, remember=True)
-                # RBAC: persist role in session so templates/APIs can gate admin-only UI
                 session['role'] = user_data.get('role', 'user')
                 session['username'] = username
                 return jsonify({"status": "success", "message": "ចូលប្រព័ន្ធបានជោគជ័យ!"})
@@ -964,18 +690,11 @@ def logout():
     return redirect(url_for('login'))
 
 def get_merged_categories():
-    """Fetches categories from both products and custom categories table, then merges, deduplicates, and sorts them."""
     try:
         products = local_db.get_products() or []
         product_categories = list(set([p.get('category') for p in products if p.get('category')]))
-
         custom_categories = local_db.get_categories() or []
-        # assuming custom_categories is a list of strings based on local_db.get_categories() implementation
-        # row['name'] for row in rows
-        
-        # Merge, deduplicate, and sort
-        merged_categories = sorted(list(set(product_categories + custom_categories)))
-        return merged_categories
+        return sorted(list(set(product_categories + custom_categories)))
     except Exception as e:
         print(f"Error merging categories: {e}")
         return []
@@ -988,19 +707,16 @@ def home():
         current_riel_rate = get_riel_rate()
         merged_categories = get_merged_categories()
         
-        # --- NEW: Dynamic Popular Product Promotions ---
         chosen_promos = []
         try:
             with open('popular_products.json', 'r', encoding='utf-8') as f:
                 all_promos = json.load(f)
-                # Pick 2 or 3 random promos
                 num_to_pick = random.randint(2, 3) if len(all_promos) >= 2 else len(all_promos)
                 chosen_promos = random.sample(all_promos, min(len(all_promos), num_to_pick))
         except Exception as promo_err:
             print(f"Error loading promos: {promo_err}")
             chosen_promos = ["Welcome to NSP Cosmetic POS!"]
 
-        # --- NEW: Fetch Daily Report Data for Integrated View ---
         now = datetime.now()
         target_date = request.args.get('date', now.strftime('%Y-%m-%d'))
         try:
@@ -1010,8 +726,6 @@ def home():
             start_date = datetime(now.year, now.month, now.day)
             
         end_date = start_date + timedelta(days=1)
-        
-        # Timezone-safe day boundaries in ICT (UTC+7)
         start_date_ict = start_date.replace(tzinfo=ICT_TZ)
         end_date_ict = end_date.replace(tzinfo=ICT_TZ)
         
@@ -1024,8 +738,6 @@ def home():
         for data in all_orders:
             created_at = cambodia_time(datetime.fromisoformat(data['created_at']))
             if start_date_ict <= created_at < end_date_ict:
-                # Canonical paid set shared with local_db (see PAID_STATUSES):
-                # 'paid by cash' / 'paid by aba' / 'paid by acleda' / 'paid' / 'completed'
                 if str(data.get('status', '')).strip().lower() in ('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed'):
                     total_revenue += float(data.get('total', 0))
                     total_orders += 1
@@ -1039,27 +751,19 @@ def home():
                         else:
                             item_summary[name] = {'qty': qty, 'total': (qty * price)}
                 
-                # Add all orders to the filtered list for the table display
-                # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
                 enrich_order_display_times(data)
                 filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
-
-        # JSON-safe top products for the SPA (list of dicts, avoids Jinja-in-template syntax issues)
         top_products_json = [{'name': name, 'qty': data['qty']} for name, data in sorted_items[:10]]
 
-        # --- NEW: SPA Data - Fetch all page data for integrated views ---
-        # Activities data
+        activities_list = []
         try:
             activities_list = local_db.get_activities() if hasattr(local_db, 'get_activities') else []
         except:
-            activities_list = []
+            pass
 
-        # Notifications data (placeholder - can be enhanced later)
         notifications_list = []
-
-        # Users/Staff data (for admin only)
         staff_list = []
         if current_user.role == 'admin':
             try:
@@ -1071,9 +775,7 @@ def home():
                     staff_list.append(user_data)
             except Exception as e:
                 print(f"Error fetching staff: {e}")
-                staff_list = []
 
-        # Print barcodes data
         barcode_products = items_list
 
         return render_template('index.html', 
@@ -1083,74 +785,47 @@ def home():
                              riel_rate=current_riel_rate, 
                              user_role=current_user.role, 
                              chosen_promos=chosen_promos,
-                             # Report data
                              selected_date=target_date,
                              today_revenue=total_revenue,
                              transaction_count=total_orders,
                              top_items=sorted_items[:10],
                              top_products_json=top_products_json,
                              orders=filtered_orders,
-                             # SPA integrated views data
                              activities=activities_list,
                              notifications=notifications_list,
                              staff=staff_list,
                              barcode_products=barcode_products)
     except Exception as e:
         print(f"Error loading POS Home: {e}")
-        return render_template('index.html', items=[], products=[], categories=[], riel_rate=4025, user_role=current_user.role, chosen_promos=[], selected_date=datetime.now().strftime('%Y-%m-%d'), today_revenue=0, transaction_count=0, top_items=[], top_products_json=[], orders=[], activities=activities_list, notifications=[], staff=[], barcode_products=[])
+        return render_template('index.html', items=[], products=[], categories=[], riel_rate=4025, user_role=current_user.role, chosen_promos=[], selected_date=datetime.now().strftime('%Y-%m-%d'), today_revenue=0, transaction_count=0, top_items=[], top_products_json=[], orders=[], activities=[], notifications=[], staff=[], barcode_products=[])
 
 def process_stock_deduction(cart_items):
-    """
-    Handles stock deduction for both SQLite and Firestore.
-    Uses an atomic Firestore transaction to ensure data integrity
-    across concurrent sales from multiple devices.
-    """
-    # 1. Update SQLite locally (Primary source for the local register)
-    # This includes the safety check for sufficient local stock.
     local_success, local_msg = local_db.validate_and_deduct_stock_local(cart_items)
     if not local_success:
         return False, local_msg
 
-    # 2. Update Firestore using a Transactional Read-Update pattern
     try:
         db = get_db()
-        
         @firestore.transactional
         def deduct_stock_transaction(transaction, items):
             for item in items:
                 prod_id = item.get('id')
                 qty_to_deduct = int(item.get('quantity', 0) or item.get('qty', 0))
-                
                 doc_ref = db.collection('items').document(prod_id)
                 snapshot = doc_ref.get(transaction=transaction)
-                
                 if not snapshot.exists:
                     raise Exception(f"Product {prod_id} not found in Firestore.")
-                
                 current_stock = snapshot.get('stock_quantity') or 0
-                
                 if current_stock < qty_to_deduct:
-                    # This raises an exception which automatically rolls back the transaction
-                    raise Exception(f"Insufficient Cloud stock for {snapshot.get('name')}. Available: {current_stock}")
-                
-                # Apply the deduction
-                transaction.update(doc_ref, {
-                    'stock_quantity': current_stock - qty_to_deduct
-                })
-            
+                    raise Exception(f"Insufficient Cloud stock for {snapshot.get('name')}.")
+                transaction.update(doc_ref, {'stock_quantity': current_stock - qty_to_deduct})
             return True
 
-        # Execute the transaction
         transaction = db.transaction()
         deduct_stock_transaction(transaction, cart_items)
-        
-        return True, "Stock deducted successfully across both databases."
-
+        return True, "Stock deducted successfully."
     except Exception as e:
         print(f"Cloud Transaction Error: {e}")
-        # In a hybrid system, if local DB is updated but cloud fails, 
-        # we log the error but allow the sale to proceed locally.
-        # The 'sync.py' logic can later reconcile the cloud state.
         return True, f"Stock updated locally. Cloud reconciliation pending: {str(e)}"
 
 @app.route('/manager')
@@ -1164,11 +839,6 @@ def manager():
 @login_required
 @admin_required
 def api_dashboard_stats():
-    """
-    Executive dashboard JSON endpoint for the SPA managerView.
-    Aggregates today's revenue/profit, low-stock count, 7-day revenue
-    series, top categories, recent invoices and recent stock movements.
-    """
     try:
         riel_rate = get_riel_rate() or 4000
         stats = local_db.get_dashboard_stats(riel_rate=riel_rate)
@@ -1180,20 +850,12 @@ def api_dashboard_stats():
         return jsonify(stats)
     except Exception as e:
         print(f"[dashboard-stats] Error: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
+        return jsonify({'status': 'error', 'message': str(e), 'timestamp': datetime.now().isoformat()}), 500
 
 @app.route('/api/admin/category-summary', methods=['GET'])
-@csrf.exempt  # SECURITY: API endpoint (JSON, protected by login_required + role check)
+@csrf.exempt  
 @login_required
 def admin_category_summary():
-    """
-    RBAC-protected Category Product/Stock Summary endpoint (admin only).
-    Groups products by category and returns item count + total stock.
-    """
     if session.get('role') != 'admin':
         return jsonify({"status": "error", "message": "Unauthorized: Admin access required"}), 403
     try:
@@ -1218,18 +880,15 @@ def admin_category_summary():
 @admin_required
 def add_product():
     if request.method == 'POST':
-        # 1. Defensive String Extraction & Cleaning
         name = (request.form.get('product_name') or '').strip()
         category = (request.form.get('category') or 'more').strip()
         barcode = (request.form.get('barcode') or '').strip()
         
-        # Auto-generate barcode if empty
         if not barcode:
             barcode = local_db.get_next_barcode()
             
         expiry_date = request.form.get('expiry_date') or None
         
-        # 2. Secure Numeric Parsing with Defaults
         try:
             raw_price = request.form.get('price', '0')
             price_riel = int(float(raw_price)) if raw_price else 0
@@ -1251,80 +910,51 @@ def add_product():
         except (ValueError, TypeError):
             low_stock_level = 5
 
-        # 3. Currency Conversion (Riel to USD base)
-        riel_rate = get_riel_rate() or 4000  # Fallback to 4000 if rate is 0 or None
+        riel_rate = get_riel_rate() or 4000  
         price = float(price_riel) / riel_rate
 
-        # 4. Image Payload Handling
         delete_image_flag = request.form.get('delete_current_image') == 'true'
         if delete_image_flag:
             filename = "default.jpg"
         else:
-            # Check if a file was uploaded via the standard file input
             if 'image' in request.files and request.files['image'].filename != '':
                 file = request.files['image']
-                # Extract original extension
-                ext = os.path.splitext(file.filename)[1]
-                if not ext:
-                    ext = '.jpg' # Default extension if none provided
-                # Generate a guaranteed unique filename
+                ext = os.path.splitext(file.filename)[1] or '.jpg'
                 filename = f"{uuid.uuid4().hex}{ext}"
-                
-                # Ensure static/images directory exists
                 images_dir = os.path.join(app.static_folder, 'images')
                 if not os.path.exists(images_dir):
                     os.makedirs(images_dir)
-                    
-                # Save the file
-                file_path = os.path.join(images_dir, filename)
-                file.save(file_path)
+                file.save(os.path.join(images_dir, filename))
             else:
-                # Fallback to base64 if provided (e.g., from modal)
                 image_base64 = request.form.get('image_base64')
                 filename = image_base64 if image_base64 else "default.jpg"
 
-        # 5. Data Structuring
         prod_data = {
-            'name': name,
-            'price': price,
-            'image': filename,
-            'category': category,
-            'barcode': barcode,
-            'stock_quantity': stock_quantity,
-            'expiry_date': expiry_date,
-            'cost_price': cost_price,
-            'low_stock_level': low_stock_level,
-            'createdAt': datetime.now()
+            'name': name, 'price': price, 'image': filename, 'category': category,
+            'barcode': barcode, 'stock_quantity': stock_quantity, 'expiry_date': expiry_date,
+            'cost_price': cost_price, 'low_stock_level': low_stock_level, 'createdAt': datetime.now()
         }
 
-        # Validate mandatory fields
         if not name or category == 'all':
-            # Basic validation failure handling
-            return "Error: Product Name and a valid Category are required.", 400
+            return "Error: Product Name and Category are required.", 400
 
         local_id = str(uuid.uuid4())
-
-        # 6. Storage & Sync Execution
         try:
             db = get_db()
             _, doc_ref = db.collection('items').add(prod_data)
             local_id = doc_ref.id
         except Exception as e:
-            print(f"Immediate Firebase update failed, background sync will retry: {e}")
+            print(f"Cloud write fallback: {e}")
 
-        # Add to Local DB immediately for instant update
         prod_data['id'] = local_id
         if isinstance(prod_data['createdAt'], datetime):
             prod_data['createdAt'] = prod_data['createdAt'].isoformat()
         local_db.add_product(local_id, prod_data)
         
-        # Log initial stock if > 0
         if stock_quantity > 0:
             local_db.add_stock_history(local_id, stock_quantity, 'Initial Stock')
 
-        # Schedule auto-sync to Firebase
         sync.trigger_auto_sync(delay=5)
-
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
             return jsonify({"status": "success", "message": "Product saved successfully", "product_id": local_id})
         return redirect(url_for('manager'))
@@ -1342,7 +972,6 @@ def edit_product(product_id):
         return "Not Found", 404
 
     if request.method == 'POST':
-        # ... (rest of the post logic)
         delete_image_flag = request.form.get('delete_current_image') == 'true'
         if delete_image_flag:
             filename = "default.jpg"
@@ -1352,7 +981,6 @@ def edit_product(product_id):
             if image_base64:
                 filename = image_base64
 
-        # Convert Riel input to USD base
         raw_price = request.form.get('price', '0')
         price_riel = int(float(raw_price))
         riel_rate = get_riel_rate()
@@ -1372,159 +1000,95 @@ def edit_product(product_id):
         old_stock = product.get('stock_quantity', 0)
 
         update_data = {
-            'name': request.form.get('name'),
-            'price': price,
-            'image': filename,
-            'category': request.form.get('category', 'more'),
-            'barcode': request.form.get('barcode', '').strip(),
-            'stock_quantity': new_stock,
-            'expiry_date': request.form.get('expiry_date') or None,
-            'cost_price': cost_price,
-            'low_stock_level': low_stock_level
+            'name': request.form.get('name'), 'price': price, 'image': filename,
+            'category': request.form.get('category', 'more'), 'barcode': request.form.get('barcode', '').strip(),
+            'stock_quantity': new_stock, 'expiry_date': request.form.get('expiry_date') or None,
+            'cost_price': cost_price, 'low_stock_level': low_stock_level
         }
         
-        # 1. Update Local DB immediately for offline support
         existing = local_db.get_product(product_id)
         if existing:
             existing.update(update_data)
             local_db.add_product(product_id, existing)
-            
-            # Log stock change if it was modified manually
             if new_stock != old_stock:
-                change = new_stock - old_stock
-                local_db.add_stock_history(product_id, change, 'Manual Edit')
+                local_db.add_stock_history(product_id, new_stock - old_stock, 'Manual Edit')
             
-        # 2. Update Firestore
         try:
             db = get_db()
             db.collection('items').document(product_id).update(update_data)
         except Exception as e:
-            print(f"Immediate Firebase update failed, background sync will retry: {e}")
+            print(f"Cloud update fallback: {e}")
         
-        # Schedule auto-sync to pull changes back locally and ensure consistency
         sync.trigger_auto_sync(delay=5)
-        
         return redirect(url_for('manager'))
         
     merged_categories = get_merged_categories()
     return render_template('edit.html', product=product, product_id=product_id, categories=merged_categories)
 
 @app.route('/delete_product/<product_id>', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 @admin_required
 def delete_product(product_id):
-    # 1. Track deletion in local log (for sync retry if offline)
     local_db.add_to_deletion_log(product_id)
-
-    # 2. Delete Local SQLite immediately (for UI responsiveness)
     local_db.delete_product(product_id)
-
-    # 3. Attempt immediate Firestore delete
     try:
         db = get_db()
         db.collection('items').document(product_id).delete()
-        # If successful, we could optionally remove from log, 
-        # but the sync process will handle it either way.
     except Exception as e:
-        print(f"Immediate Firestore delete failed, sync will retry: {e}")
+        print(f"Cloud delete fallback: {e}")
 
-    # Schedule auto-sync to ensure everything is consistent
     sync.trigger_auto_sync(delay=2)
-
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Accept') == 'application/json':
         return jsonify({"status": "success", "message": "Product deleted successfully"})
     return redirect(url_for('manager'))
 
 @app.route('/api/delete-multiple-products', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 @admin_required
 def delete_products_bulk():
-    """
-    Bulk delete products from the local SQLite database and log them 
-    for background synchronization to Cloud Firestore.
-    """
     try:
         data = request.get_json()
         if not data or 'ids' not in data:
-            return jsonify({'status': 'error', 'message': 'Invalid request: No product IDs provided'}), 400
-
+            return jsonify({'status': 'error', 'message': 'No product IDs provided'}), 400
         product_ids = data['ids']
-        if not isinstance(product_ids, list):
-            return jsonify({'status': 'error', 'message': 'Invalid request: "ids" must be a list'}), 400
 
-        # We use standard sqlite3 execution calls within a single transaction
         conn = local_db.get_connection()
         deleted_count = 0
-        
         try:
             cursor = conn.cursor()
-            # The transaction ensures that either ALL deletions/logs succeed or NONE do.
             for product_id in product_ids:
-                # 1. Execute the SQL command to delete the product from the local products table.
                 cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
-                
-                # 2. Execute a secondary SQL command to insert a record into the deleted_products table.
-                # We use the existing schema (id, deleted_at) found in local_db.py to maintain sync compatibility.
-                cursor.execute(
-                    "INSERT OR REPLACE INTO deleted_products (id, deleted_at) VALUES (?, ?)",
-                    (product_id, datetime.now().isoformat())
-                )
+                cursor.execute("INSERT OR REPLACE INTO deleted_products (id, deleted_at) VALUES (?, ?)", (product_id, datetime.now().isoformat()))
                 deleted_count += 1
-            
-            # Commit the transaction only after all items have been successfully processed and logged.
             conn.commit()
-            
-            # Trigger background sync to update Firestore
             sync.trigger_auto_sync(delay=2)
-            
-            return jsonify({
-                'status': 'success',
-                'message': f'Successfully deleted and logged {deleted_count} products for sync.'
-            })
-            
+            return jsonify({'status': 'success', 'message': f'Successfully deleted {deleted_count} products.'})
         except Exception as e:
             conn.rollback()
-            print(f"Bulk delete transaction failed: {e}")
-            return jsonify({'status': 'error', 'message': f'Database error: {str(e)}'}), 500
+            return jsonify({'status': 'error', 'message': str(e)}), 500
         finally:
             conn.close()
-            
     except Exception as e:
-        print(f"Bulk delete error: {e}")
-        return jsonify({'status': 'error', 'message': f'Server error: {str(e)}'}), 500
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# --- INVENTORY API ROUTES ---
 @app.route('/api/products', methods=['GET'])
 @csrf.exempt
 @login_required
 def api_products():
-    """Return all products as JSON (id, name, price, barcode, stock_quantity).
-
-    Used by the POS homepage to refresh the product grid live after a
-    checkout without a full page reload — the grid is Jinja-rendered at
-    page load, and this endpoint lets refreshProductGrid() re-render it
-    with the freshest stock numbers.
-    """
     try:
         products = local_db.get_products()
         payload = []
         for p in products:
             payload.append({
-                'id': p.get('id'),
-                'name': p.get('name'),
-                'price': p.get('price'),
-                'barcode': p.get('barcode', ''),
-                'image': p.get('image', ''),
-                'category': p.get('category', 'more'),
-                'stock_quantity': p.get('stock_quantity', 0),
-                'expiry_date': p.get('expiry_date'),
-                'low_stock_level': p.get('low_stock_level')
+                'id': p.get('id'), 'name': p.get('name'), 'price': p.get('price'),
+                'barcode': p.get('barcode', ''), 'image': p.get('image', ''),
+                'category': p.get('category', 'more'), 'stock_quantity': p.get('stock_quantity', 0),
+                'expiry_date': p.get('expiry_date'), 'low_stock_level': p.get('low_stock_level')
             })
         return jsonify({'status': 'success', 'products': payload})
     except Exception as e:
-        print(f"❌ /api/products error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/products/<product_id>/restock', methods=['POST'])
@@ -1532,11 +1096,9 @@ def api_products():
 @login_required
 @admin_required
 def restock_product(product_id):
-    """Restock a product and log the transaction"""
     try:
         data = request.get_json()
         quantity = int(data.get('quantity', 0))
-        
         if quantity <= 0:
             return jsonify({'success': False, 'error': 'Quantity must be greater than 0'})
             
@@ -1545,19 +1107,13 @@ def restock_product(product_id):
             return jsonify({'success': False, 'error': 'Product not found'})
             
         new_stock = product.get('stock_quantity', 0) + quantity
-        
-        # Update local DB and log history
         local_db.update_product_stock(product_id, new_stock, 'Restock')
         
-        # Update Firestore (PILLAR 1: atomic transaction to prevent lost updates
-        # when multiple devices restock/sell simultaneously)
         try:
             db = get_db()
             item_ref = db.collection('items').document(product_id)
             snapshot = item_ref.get()
             if snapshot.exists:
-                cloud_stock = snapshot.get('stock_quantity') or 0
-                # Read-modify-write inside a transaction to avoid lost updates
                 @firestore.transactional
                 def restock_transaction(transaction):
                     snap = item_ref.get(transaction=transaction)
@@ -1569,11 +1125,9 @@ def restock_product(product_id):
             else:
                 item_ref.set({'stock_quantity': quantity}, merge=True)
         except Exception as e:
-            print(f"Firebase update failed for restock: {e}")
+            print(f"Firebase restock sync exception: {e}")
             
-        # Trigger sync
         sync.trigger_auto_sync(delay=2)
-        
         return jsonify({'success': True, 'new_stock': new_stock})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -1582,7 +1136,6 @@ def restock_product(product_id):
 @login_required
 @admin_required
 def get_product_history(product_id):
-    """Get stock history for a product"""
     try:
         history = local_db.get_stock_history(product_id)
         return jsonify({'success': True, 'history': history})
@@ -1621,28 +1174,21 @@ def reports():
         item_summary = {}
         filtered_orders = []
 
-        # End date for filtering
         if report_type == 'daily':
             end_date = start_date + timedelta(days=1)
         elif report_type == 'monthly':
-            if now.month == 12:
-                end_date = datetime(now.year + 1, 1, 1)
-            else:
-                end_date = datetime(now.year, now.month + 1, 1)
+            end_date = datetime(now.year + 1, 1, 1) if now.month == 12 else datetime(now.year, now.month + 1, 1)
         elif report_type == 'annually':
             end_date = datetime(now.year + 1, 1, 1)
         else:
             end_date = now + timedelta(days=1)
 
-        # Timezone-safe day/month/year boundaries in ICT (UTC+7)
         start_date_ict = start_date.replace(tzinfo=ICT_TZ)
         end_date_ict = end_date.replace(tzinfo=ICT_TZ)
 
         for data in all_orders:
             created_at = cambodia_time(datetime.fromisoformat(data['created_at']))
             if start_date_ict <= created_at < end_date_ict:
-                # Canonical paid set shared with local_db (see PAID_STATUSES):
-                # 'paid by cash' / 'paid by aba' / 'paid by acleda' / 'paid' / 'completed'
                 if str(data.get('status', '')).strip().lower() in ('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed'):
                     total_revenue += float(data.get('total', 0))
                     total_orders += 1
@@ -1656,214 +1202,24 @@ def reports():
                         else:
                             item_summary[name] = {'qty': qty, 'total': (qty * price)}
                 
-                # Add all orders to the filtered list for the table display
-                # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
                 enrich_order_display_times(data)
                 filtered_orders.append(data)
 
         sorted_items = sorted(item_summary.items(), key=lambda x: x[1]['qty'], reverse=True)
         
-        # Define report_files to avoid NameError
-        report_files = os.listdir('reports') if os.path.exists('reports') else []
-        
-        # We provide both the requested names and the existing ones to maintain compatibility
         return render_template('reports.html', 
                              title=title, 
                              type=report_type, 
                              selected_date=target_date,
                              total_revenue=total_revenue, 
-                             today_revenue=total_revenue, # Requested name
+                             today_revenue=total_revenue, 
                              total_orders=total_orders, 
-                             transaction_count=total_orders, # Requested name
+                             transaction_count=total_orders, 
                              top_items=sorted_items, 
-                             orders=filtered_orders,
-                             report_files=report_files)
+                             orders=filtered_orders)
     except Exception as e:
-        print(f"Report Error: {e}")
         flash(f"Error generating report: {e}", 'error')
         return redirect(url_for('manager'))
-
-# This route allows the browser to actually download/view the file
-@app.route('/reports/view/<filename>')
-@login_required
-@admin_required
-def view_report(filename):
-    # SECURITY: Validate filename to prevent path traversal
-    filename = secure_filename(filename)
-    if not filename or '..' in filename or filename.startswith('/'):
-        return "Invalid filename", 400
-    
-    # Use absolute path to the 'reports' directory
-    reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
-    
-    # SECURITY: Ensure the requested file is actually inside reports_dir
-    requested_path = os.path.abspath(os.path.join(reports_dir, filename))
-    if not requested_path.startswith(reports_dir):
-        return "Access denied", 403
-    
-    # Check if file exists before trying to send
-    if not os.path.exists(requested_path):
-        # On-demand fallback: generate the PDF synchronously if the order exists.
-        # This covers ACLEDA/ABA QR orders whose PDF was never archived
-        # (e.g. older orders with has_receipt=0 but status 'paid by acleda').
-        tran_id = filename[len('invoice_'):-len('.pdf')] if filename.startswith('invoice_') and filename.endswith('.pdf') else None
-        if tran_id:
-            ok, msg, gen_filename = render_pdf_receipt(tran_id)
-            if ok and gen_filename:
-                requested_path = os.path.abspath(os.path.join(reports_dir, gen_filename))
-                if requested_path.startswith(reports_dir) and os.path.exists(requested_path):
-                    return send_from_directory(reports_dir, gen_filename)
-        return "File not found", 404
-        
-    return send_from_directory(reports_dir, filename)
-
-@app.route('/api/receipt/download/<tran_id>')
-@login_required
-def download_receipt(tran_id):
-    """
-    On-Demand Fallback for PDF generation.
-    Checks if PDF exists. If not, generates it synchronously.
-    """
-    try:
-        # SECURITY: Validate tran_id format
-        if not isinstance(tran_id, str) or not all(c.isalnum() or c in '-_' for c in tran_id):
-            return jsonify({"status": "error", "message": "Invalid transaction ID format"}), 400
-            
-        filename = f"invoice_{tran_id}.pdf"
-        reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
-        pdf_filepath = os.path.abspath(os.path.join(reports_dir, filename))
-        
-        # If file doesn't exist, generate it synchronously
-        if not os.path.exists(pdf_filepath):
-            order = local_db.get_order(tran_id)
-            if not order:
-                return jsonify({"status": "error", "message": "Order not found"}), 404
-
-            # Derive payment method from the order status so the PDF renders
-            # the correct label (ACLEDA/ABA/Cash), not a hardcoded 'cash'.
-            status_lower = str(order.get('status', '')).lower()
-            if 'acleda' in status_lower:
-                payment_method = 'acleda'
-            elif 'aba' in status_lower:
-                payment_method = 'aba'
-            else:
-                payment_method = 'cash'
-
-            riel_rate = get_riel_rate()
-            html_content = render_template('success.html',
-                                         order=order,
-                                         RIEL_RATE=riel_rate,
-                                         is_pdf=True)
-
-            if not os.path.exists(reports_dir):
-                os.makedirs(reports_dir)
-
-            pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
-            with open(pdf_filepath, 'wb') as f:
-                f.write(pdf_bytes)
-
-            local_db.update_order_receipt_status(tran_id, 1)
-            
-        return jsonify({
-            "status": "success", 
-            "url": f"/reports/view/{filename}"
-        })
-    except Exception as e:
-        print(f"Error in on-demand PDF generation: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/delete-report/<report_id>', methods=['DELETE'])
-@csrf.exempt
-@login_required
-@admin_required
-def delete_report(report_id):
-    """Delete a report/transaction by its ID"""
-    try:
-        print(f"[DELETE REPORT] Attempting to delete report_id: {report_id}")
-        
-        # Validate report_id is not empty
-        if not report_id or report_id.strip() == '':
-            print(f"[DELETE REPORT] Error: Empty report_id provided")
-            return jsonify({
-                'status': 'error',
-                'message': 'Report ID cannot be empty'
-            }), 400
-        
-        # Attempt to delete from local database
-        success = local_db.delete_order(report_id)
-        print(f"[DELETE REPORT] Delete result: success={success}")
-        
-        if success:
-            return jsonify({
-                'status': 'success',
-                'message': f'Report {report_id} deleted successfully'
-            }), 200
-        else:
-            return jsonify({
-                'status': 'error',
-                'message': f'Report {report_id} not found or already deleted'
-            }), 404
-    except Exception as e:
-        print(f"[DELETE REPORT] Exception error deleting report {report_id}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'status': 'error',
-            'message': f'Error deleting report: {str(e)}'
-        }), 500
-
-@app.route('/api/edit-report/<report_id>', methods=['PUT', 'POST'])
-@csrf.exempt
-@login_required
-@admin_required
-def edit_report(report_id):
-    """Update a report/transaction details"""
-    try:
-        print(f"[EDIT REPORT] Attempting to edit report_id: {report_id}")
-        print(f"[EDIT REPORT] Request method: {request.method}")
-        print(f"[EDIT REPORT] Content-Type: {request.content_type}")
-        print(f"[EDIT REPORT] Request data raw: {request.data}")
-        
-        # Validate report_id is not empty
-        if not report_id or report_id.strip() == '':
-            print(f"[EDIT REPORT] Error: Empty report_id provided")
-            return jsonify({
-                'status': 'error',
-                'message': 'Report ID cannot be empty'
-            }), 400
-        
-        # Parse JSON data with silent=True to prevent raising 400 before we log
-        data = request.get_json(silent=True)
-        print(f"[EDIT REPORT] Parsed JSON data: {data}")
-        
-        if not data:
-            print(f"[EDIT REPORT] Error: No JSON data provided")
-            return jsonify({
-                'status': 'error',
-                'message': 'No data provided or invalid JSON format'
-            }), 400
-        
-        success, message = local_db.update_order(report_id, data)
-        print(f"[EDIT REPORT] Update result: success={success}, message={message}")
-        
-        if success:
-            return jsonify({
-                'status': 'success',
-                'message': message
-            }), 200
-        else:
-            return jsonify({
-                'status': 'error',
-                'message': message
-            }), 400
-    except Exception as e:
-        print(f"[EDIT REPORT] Exception error editing report {report_id}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'status': 'error',
-            'message': f'Error editing report: {str(e)}'
-        }), 500
 
 @app.route('/notifications')
 @login_required
@@ -1891,7 +1247,6 @@ def print_barcodes():
         all_products = local_db.get_products()
         selected_products = [p for p in all_products if p['id'] in product_ids]
         
-        # Add riel price for display
         riel_rate = get_riel_rate()
         for p in selected_products:
             p['price_riel'] = int(p['price'] * riel_rate)
@@ -1924,7 +1279,7 @@ def live_orders():
     return render_template('orders.html', active_orders=active_orders)
 
 @app.route('/complete_order/<order_id>', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def complete_order(order_id):
     if order_id.startswith('local_'):
@@ -1933,7 +1288,6 @@ def complete_order(order_id):
     else:
         db = get_db()
         db.collection('orders').document(order_id).update({'status': 'completed'})
-        # Find local and update too
         for o in local_db.get_all_orders():
             if o.get('firestore_id') == order_id:
                 local_db.update_order_status(o['local_id'], 'completed')
@@ -1941,109 +1295,62 @@ def complete_order(order_id):
     return redirect(url_for('live_orders'))
 
 def classify_inventory_status(stock_qty):
-    """
-    Dynamically maps each item's current stock count to a status payload 
-    containing Khmer/English labels, color tokens, and warning icons.
-    """
     if stock_qty <= 0:
         return {
-            "status": "out_of_stock",
-            "label_km": "អស់ពីស្តុក",
-            "label_en": "Out of Stock",
-            "message_km": "អស់ពីស្តុកហើយ!",
-            "message_en": "Out of stock!",
-            "color": "#dc3545", # High-severity Red
-            "bg_color": "rgba(220, 53, 69, 0.1)",
-            "icon": "alert-circle",
-            "severity": "high"
+            "status": "out_of_stock", "label_km": "អស់ពីស្តុក", "label_en": "Out of Stock",
+            "message_km": "អស់ពីស្តុកហើយ!", "message_en": "Out of stock!",
+            "color": "#dc3545", "bg_color": "rgba(220, 53, 69, 0.1)", "icon": "alert-circle", "severity": "high"
         }
     elif stock_qty <= 5:
         return {
-            "status": "low_stock",
-            "label_km": "ស្កុកទាប",
-            "label_en": "Low Stock",
-            "message_km": f"មាននៅសល់តែ {stock_qty} ប៉ុណ្ណោះ។",
-            "message_en": f"Only {stock_qty} left in stock.",
-            "color": "#fd7e14", # Warning Amber/Orange
-            "bg_color": "rgba(253, 126, 20, 0.1)",
-            "icon": "alert-triangle",
-            "severity": "medium"
+            "status": "low_stock", "label_km": "ស្កុកទាប", "label_en": "Low Stock",
+            "message_km": f"មាននៅសល់តែ {stock_qty} ប៉ុណ្ណោះ។", "message_en": f"Only {stock_qty} left.",
+            "color": "#fd7e14", "bg_color": "rgba(253, 126, 20, 0.1)", "icon": "alert-triangle", "severity": "medium"
         }
     else:
         return {
-            "status": "in_stock",
-            "label_km": "មានក្នុងស្តុក",
-            "label_en": "In Stock",
-            "color": "#198754",
-            "bg_color": "rgba(25, 135, 84, 0.1)",
-            "icon": "check-circle",
-            "severity": "low"
+            "status": "in_stock", "label_km": "មានក្នុងស្តុក", "label_en": "In Stock",
+            "color": "#198754", "bg_color": "rgba(25, 135, 84, 0.1)", "icon": "check-circle", "severity": "low"
         }
 
 @app.route('/api/notifications', methods=['GET'])
 @login_required
 def get_notifications():
-    """Aggregates all active system notifications/alerts."""
     notifications = []
-    
-    # 1. Inventory Alerts (Out of Stock & Low Stock)
     inventory_items = local_db.get_low_stock_products(5)
     for item in inventory_items:
         status_info = classify_inventory_status(item['stock_quantity'])
         notifications.append({
-            "id": f"inv-{item['id']}",
-            "type": status_info['status'],
-            "severity": status_info['severity'],
+            "id": f"inv-{item['id']}", "type": status_info['status'], "severity": status_info['severity'],
             "title": f"{status_info['label_km']} ({status_info['label_en']})",
-            "message": f"{item['name']} {status_info['message_km']}",
-            "time": "Just now",
-            "icon": status_info['icon'],
-            "color": status_info['color'],
-            "bg_color": status_info['bg_color'],
+            "message": f"{item['name']} {status_info['message_km']}", "time": "Just now",
+            "icon": status_info['icon'], "color": status_info['color'], "bg_color": status_info['bg_color'],
             "stock_quantity": item['stock_quantity']
         })
     
-    # 2. Info: New User Pending (Admin only)
     if current_user.role == 'admin':
         users = local_db.get_all_users()
         pending_users = [u for u in users if u.get('status') == 'pending']
         for u in pending_users:
             notifications.append({
-                "id": f"new-user-{u['username']}",
-                "type": "info",
-                "severity": "medium",
-                "title": "អ្នកប្រើប្រាស់ថ្មី (New User)",
-                "message": f"{u['username']} កំពុងរង់ចាំការអនុញ្ញាត។",
-                "time": "Action Required",
-                "icon": "user-plus",
-                "color": "#0d6efd",
-                "bg_color": "rgba(13, 110, 253, 0.1)"
+                "id": f"new-user-{u['username']}", "type": "info", "severity": "medium",
+                "title": "អ្នកប្រើប្រាស់ថ្មី (New User)", "message": f"{u['username']} កំពុងរង់ចាំការអនុញ្ញាត។",
+                "time": "Action Required", "icon": "user-plus", "color": "#0d6efd", "bg_color": "rgba(13, 110, 253, 0.1)"
             })
             
-    # Success Placeholder removed or kept as low priority
-    # Sort: high severity first
     severity_map = {"high": 0, "medium": 1, "low": 2}
     notifications.sort(key=lambda x: severity_map.get(x.get('severity', 'low'), 2))
-
-    return jsonify({
-        "status": "success",
-        "notifications": notifications,
-        "count": len(notifications)
-    })
+    return jsonify({"status": "success", "notifications": notifications, "count": len(notifications)})
 
 @app.route('/api/low-stock-alerts', methods=['GET'])
 @login_required
 def low_stock_alerts():
     threshold = request.args.get('threshold', 5, type=int)
     low_stock_items = local_db.get_low_stock_products(threshold)
-    return jsonify({
-        "status": "success",
-        "products": low_stock_items,
-        "count": len(low_stock_items)
-    })
+    return jsonify({"status": "success", "products": low_stock_items, "count": len(low_stock_items)})
 
 @app.route('/api/restock', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 @admin_required
 def restock():
@@ -2052,10 +1359,9 @@ def restock():
         product_id = data.get('product_id')
         quantity = int(data.get('quantity', 0))
         if not product_id or quantity <= 0:
-            return jsonify({"status": "error", "message": "Invalid data (product_id or quantity missing)"}), 400
+            return jsonify({"status": "error", "message": "Invalid parameters"}), 400
         
         local_db.add_product_stock(product_id, quantity)
-        # Schedule auto-sync to push updated stock to Firestore
         sync.trigger_auto_sync(delay=5)
         return jsonify({"status": "success", "message": f"Successfully added {quantity} units to stock."})
     except Exception as e:
@@ -2068,17 +1374,9 @@ def daily_report_api():
     try:
         target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
         report_data = local_db.get_daily_sales_report(target_date)
-        
-        # Enrich orders with display_datetime for the JS table
-        # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
         for order in report_data.get('orders', []):
             enrich_order_display_times(order)
-                
-        return jsonify({
-            "status": "success",
-            "date": target_date,
-            "data": report_data
-        })
+        return jsonify({"status": "success", "date": target_date, "data": report_data})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2089,17 +1387,9 @@ def monthly_report_api():
     try:
         target_month = request.args.get('month', datetime.now().strftime('%Y-%m'))
         report_data = local_db.get_monthly_sales_report(target_month)
-        
-        # Enrich orders with display_datetime for the JS table
-        # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
         for order in report_data.get('orders', []):
             enrich_order_display_times(order)
-                
-        return jsonify({
-            "status": "success",
-            "month": target_month,
-            "data": report_data
-        })
+        return jsonify({"status": "success", "month": target_month, "data": report_data})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2110,17 +1400,9 @@ def annually_report_api():
     try:
         target_year = request.args.get('year', datetime.now().strftime('%Y'))
         report_data = local_db.get_annual_sales_report(target_year)
-        
-        # Enrich orders with display_datetime for the JS table
-        # (fromisoformat + cambodia_time -> ICT, never a raw UTC leak)
         for order in report_data.get('orders', []):
             enrich_order_display_times(order)
-                
-        return jsonify({
-            "status": "success",
-            "year": target_year,
-            "data": report_data
-        })
+        return jsonify({"status": "success", "year": target_year, "data": report_data})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2128,17 +1410,6 @@ def annually_report_api():
 @login_required
 @admin_required
 def unified_report_api():
-    """
-    Unified report endpoint.
-
-    Query params:
-      ?type=daily&date=2026-08-09   -> daily report for that date
-      ?type=monthly&date=2026-08    -> monthly report for that month
-      ?type=yearly&date=2026        -> yearly report for that year
-
-    Returns the same shape as the individual endpoints:
-      {status, type, date, data: {revenue, order_count, top_products, orders}}
-    """
     try:
         report_type = request.args.get('type', 'daily').strip().lower()
         date_param = request.args.get('date', '').strip()
@@ -2152,26 +1423,19 @@ def unified_report_api():
                 date_param = datetime.now().strftime('%Y')
             report_data = local_db.get_annual_sales_report(date_param)
         else:
-            # default: daily
             if not date_param:
                 date_param = datetime.now().strftime('%Y-%m-%d')
             report_data = local_db.get_daily_sales_report(date_param)
 
-        # Enrich orders with display_datetime for the JS table
         for order in report_data.get('orders', []):
             enrich_order_display_times(order)
 
-        return jsonify({
-            "status": "success",
-            "type": report_type,
-            "date": date_param,
-            "data": report_data
-        })
+        return jsonify({"status": "success", "type": report_type, "date": date_param, "data": report_data})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/checkout', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def checkout_endpoint():
     try:
@@ -2179,129 +1443,47 @@ def checkout_endpoint():
         items = data.get('items', [])
         total = data.get('total')
         discount = data.get('discount', 0)
-        # PILLAR 2: Collision-free crypto UUID (fallback if frontend omitted it)
-        tran_id = data.get('tran_id') or new_tran_id('CASH')
+        tran_id = new_tran_id('NSP')
 
-        # PILLAR 3 (IDEMPOTENCY): If this tran_id already exists locally,
-        # return the existing record WITHOUT re-deducting stock or duplicating.
         existing_order = local_db.get_order(tran_id)
         if existing_order:
             return jsonify({
-                'status': 'success',
-                'message': 'Order already recorded (duplicate request ignored)',
-                'local_id': existing_order['local_id'],
-                'tran_id': tran_id,
-                'duplicate': True
+                'status': 'success', 'message': 'Order already recorded',
+                'local_id': existing_order['local_id'], 'tran_id': tran_id, 'duplicate': True
             }), 200
 
-        # PILLAR 1: Atomic stock deduction across BOTH databases.
-        # - SQLite: single read-validate-update transaction (local register)
-        # - Firestore: atomic @firestore.transactional read-update (tablets)
         success, msg = process_stock_deduction(items)
         if not success:
             return jsonify({'status': 'error', 'message': msg}), 400
 
-        # 2. Save to local database with 'paid' status (Synchronous - fast operation)
         order_data = {
-            'items': items,
-            'total': total,
-            'discount': discount,
-            'status': 'paid',
-            'tran_id': tran_id,
+            'items': items, 'total': total, 'discount': discount, 'status': 'paid', 'tran_id': tran_id,
             'user': current_user.username if hasattr(current_user, 'username') else 'guest',
-            # FIX: The server PC is ALREADY on Cambodia local time (GMT+7).
-            # datetime.now() gives the exact local wall-clock. Use strftime with
-            # a fixed format — NOT .isoformat() (microseconds) and NOT
-            # cambodia_time() (would double-shift +7h: 9 AM -> 4 PM).
             'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
-
         local_id = local_db.add_order(order_data)
 
-        # 2.5 SYNCHRONOUS PDF GENERATION — the PDF must physically exist on
-        #     disk the moment payment succeeds, so the reports page shows
-        #     "View PDF" (has_receipt=1) immediately. No background thread,
-        #     no race with the frontend's /api/archive-pdf call.
-        pdf_ok, pdf_msg, pdf_filename = render_pdf_receipt(tran_id)
-        if not pdf_ok:
-            print(f"⚠️ Synchronous PDF generation failed for cash order {tran_id}: {pdf_msg}")
-
-        # 3. Trigger background tasks for non-critical operations
-        # PDF Generation - Move to background thread to avoid blocking
-        def generate_pdf_background(tran_id, local_id):
-            try:
-                # Get currency rate for PDF
-                riel_rate = get_riel_rate()
-                
-                # Fetch the order from the database
-                order = local_db.get_order(tran_id)
-                if order is None:
-                    order = local_db.get_order(local_id)
-                
-                if order:
-                    # Render the invoice template as a string with order data and PDF flag
-                    html_content = render_template('invoice.html', 
-                                                 items=order.get('items', []),
-                                                 total=order.get('total', 0),
-                                                 discount=order.get('discount', 0),
-                                                 date=format_ict(cambodia_time(datetime.fromisoformat(order.get('created_at', datetime.now().isoformat()))), "%d/%m/%Y %H:%M:%S"),
-                                                 payment_method='cash',
-                                                 RIEL_RATE=riel_rate,
-                                                 is_pdf=True)
-                    
-                    # Convert HTML to PDF using weasyprint (supports CTL for Khmer text)
-                    pdf_bytes = HTML(string=html_content, base_url=request.host_url).write_pdf()
-                    
-                    # SECURITY: Ensure reports directory exists with absolute path
-                    reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
-                    if not os.path.exists(reports_dir):
-                        os.makedirs(reports_dir)
-                    
-                    # SECURITY: Strict filename validation to prevent path traversal
-                    pdf_filename = secure_filename(f"invoice_{tran_id}.pdf")
-                    if pdf_filename and pdf_filename.endswith('.pdf'):
-                        # SECURITY: Ensure final path is within reports directory
-                        pdf_filepath = os.path.abspath(os.path.join(reports_dir, pdf_filename))
-                        if pdf_filepath.startswith(reports_dir):
-                            with open(pdf_filepath, 'wb') as f:
-                                f.write(pdf_bytes)
-                            
-                            # Update database to mark receipt as archived
-                            local_db.update_order_receipt_status(tran_id, 1)
-                            print(f"✅ PDF receipt generated for cash order: {tran_id}")
-            except Exception as pdf_error:
-                print(f"⚠️ PDF generation warning for {tran_id}: {str(pdf_error)}")
-                # Don't fail the checkout if PDF generation fails, just log the warning
-
-        # 4. Trigger Auto-Sync in background (non-blocking)
         def sync_background():
             try:
                 sync.trigger_auto_sync(delay=5)
             except Exception as sync_error:
-                print(f"⚠️ Background sync warning: {str(sync_error)}")
+                print(f"Background sync fallback warning: {sync_error}")
 
-        # Start background tasks
         import threading
-        pdf_thread = threading.Thread(target=generate_pdf_background, args=(tran_id, local_id), daemon=True)
-        sync_thread = threading.Thread(target=sync_background, daemon=True)
-        
-        pdf_thread.start()
-        sync_thread.start()
+        threading.Thread(target=sync_background, daemon=True).start()
 
-        # Return immediate response - UI can continue while background tasks run
         return jsonify({
             'status': 'success',
             'message': 'Checkout successful',
             'local_id': local_id,
             'tran_id': tran_id
         })
-
     except Exception as e:
         print(f"❗ Checkout Error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/create-aba-payment', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def create_aba_payment():
     try:
@@ -2309,306 +1491,152 @@ def create_aba_payment():
         items = data.get('items', [])
         total = data.get('total')
         discount = data.get('discount', 0)
-        # PILLAR 2: Collision-free crypto UUID (fallback if frontend omitted it)
-        tran_id = data.get('tran_id') or new_tran_id('ABA')
+        tran_id = new_tran_id('NSP')
 
-        # PILLAR 3 (IDEMPOTENCY): Never create a duplicate pending order on retry
         if local_db.order_exists(tran_id):
-            return jsonify({
-                'status': 'success',
-                'message': 'Order already created (duplicate request ignored)',
-                'tran_id': tran_id,
-                'duplicate': True
-            })
+            return jsonify({'status': 'success', 'message': 'Order already created', 'tran_id': tran_id, 'duplicate': True})
 
-        # PILLAR 1: Atomic stock deduction across BOTH databases.
-        # The ABA order is created as 'pending' and the Telegram listener
-        # later flips it to 'paid' — but the stock must be reserved NOW so
-        # the product cards show the reduced quantity immediately and other
-        # cashiers cannot oversell the same units.
         success, msg = process_stock_deduction(items)
         if not success:
             return jsonify({'status': 'error', 'message': msg}), 400
 
-        # Save to local database with 'pending' status
-        # aba_listener.py will look for 'pending' orders with matching amount
         order_data = {
-            'items': items,
-            'total': total,
-            'discount': discount,
-            'status': 'pending',
-            'tran_id': tran_id,
+            'items': items, 'total': total, 'discount': discount, 'status': 'pending', 'tran_id': tran_id,
             'user': current_user.username if hasattr(current_user, 'username') else 'guest',
-            # FIX: server PC is ALREADY on Cambodia local time (GMT+7). Capture
-            # the exact local wall-clock — NOT .isoformat() (microseconds) and
-            # NOT cambodia_time() (would double-shift +7h again).
             'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
-        
         local_db.add_order(order_data)
-        
-        print(f"✅ Order saved as pending locally. Tran ID: {tran_id} | Amount: ${total}")
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Order created and pending payment',
-            'tran_id': tran_id
-        })
-
+        return jsonify({'status': 'success', 'message': 'Order created and pending payment', 'tran_id': tran_id})
     except Exception as e:
-        print(f"❌ Backend Error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/create-acleda-payment', methods=['POST'])
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def create_acleda_payment():
-    """Create a PENDING ACLEDA order (mirrors /create-aba-payment).
-
-    ACLEDA has NO Telegram auto-verification, so the cashier manually
-    confirms later. The order is saved as 'pending' with an ACL- tran_id.
-    When the cashier clicks "Confirm ACLEDA", /confirm-acleda flips THIS
-    exact row to 'paid by acleda' — never a brand-new duplicate row.
-    """
     try:
         data = request.json
         items = data.get('items', [])
         total = data.get('total')
         discount = data.get('discount', 0)
-        # PILLAR 2: Collision-free crypto UUID (fallback if frontend omitted it)
         tran_id = data.get('tran_id') or new_tran_id('ACL')
 
-        # PILLAR 3 (IDEMPOTENCY): Never create a duplicate pending order on retry
         if local_db.order_exists(tran_id):
-            return jsonify({
-                'status': 'success',
-                'message': 'Order already created (duplicate request ignored)',
-                'tran_id': tran_id,
-                'duplicate': True
-            })
+            return jsonify({'status': 'success', 'message': 'Order already created', 'tran_id': tran_id, 'duplicate': True})
 
-        # PILLAR 1: Atomic stock deduction across BOTH databases.
-        # Same rule as the ABA flow: the ACLEDA order is created 'pending'
-        # and manually confirmed later, but the stock is reserved NOW so the
-        # product cards show the reduced quantity immediately. /confirm-acleda
-        # only flips the status — it must NEVER re-deduct (success.html also
-        # POSTs to /confirm-acleda for PDF archiving, which would double-deduct).
         success, msg = process_stock_deduction(items)
         if not success:
             return jsonify({'status': 'error', 'message': msg}), 400
 
-        # Save to local database with 'pending' status
         order_data = {
-            'items': items,
-            'total': total,
-            'discount': discount,
-            'status': 'pending',
-            'tran_id': tran_id,
+            'items': items, 'total': total, 'discount': discount, 'status': 'pending', 'tran_id': tran_id,
             'user': current_user.username if hasattr(current_user, 'username') else 'guest',
-            # FIX: server PC is ALREADY on Cambodia local time. Capture the
-            # exact local wall-clock — NO cambodia_time() (would add +7h again).
             'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
-
         local_db.add_order(order_data)
-
-        print(f"✅ ACLEDA order saved as pending locally. Tran ID: {tran_id} | Amount: ${total}")
-
-        return jsonify({
-            'status': 'success',
-            'message': 'ACLEDA order created and pending manual confirmation',
-            'tran_id': tran_id
-        })
-
+        return jsonify({'status': 'success', 'message': 'ACLEDA order created and pending confirmation', 'tran_id': tran_id})
     except Exception as e:
-        print(f"❌ Backend Error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
 
 @app.route('/confirm-acleda', methods=['POST'])
 @csrf.exempt
 def confirm_acleda():
-    """R7: TWO-STAGE DIRECT SYNCHRONOUS ACLEDA CONFIRMATION.
-
-    STAGE 1 (frontend): The QR modal opens INSTANTLY — zero backend calls,
-    zero PDF generation, zero stock deduction. Pure static HTML/CSS.
-
-    STAGE 2 (THIS ROUTE — called ONLY when the cashier clicks
-    "បញ្ជាក់ការទូទាត់ (Manual Confirm)"):
-      1. If the order does NOT exist yet → create it NOW with 'paid by acleda'
-         status AND deduct stock (atomic, across SQLite + Firestore).
-      2. If the order EXISTS and is still 'pending' (e.g. created earlier via
-         /create-acleda-payment or the shared ABA tran_id) → flip THIS exact
-         row to 'paid by acleda'. NEVER re-deduct (success.html also POSTs
-         here as a PDF trigger, so re-deducting would double-deduct stock).
-      3. Generate the PDF SYNCHRONOUSLY via render_pdf_receipt() — no
-         background thread, no /api/archive-pdf race (browser redirects
-         abort background fetches → missing PDFs / 404).
-      4. VERIFY the PDF physically exists on disk BEFORE returning success.
-
-    Returns { success: true, status: 'success', tran_id, pdf_filename }.
-    """
     try:
         data = request.json or {}
         tran_id = (data.get('tran_id') or '').strip()
         if not tran_id:
             return jsonify({'status': 'error', 'success': False, 'message': 'Missing tran_id'}), 400
 
-        # 1. Look up the order — if it does not exist, CREATE it now
-        #    (Stage 2 owns both order creation and stock deduction so the
-        #    Manual Confirm click is the SINGLE synchronous commit point).
         order = local_db.get_order(tran_id)
         if order is None:
             items = data.get('items', [])
             total = data.get('total')
             discount = data.get('discount', 0)
             if not items:
-                return jsonify({'status': 'error', 'success': False, 'message': 'Order not found and no items provided'}), 404
+                return jsonify({'status': 'error', 'success': False, 'message': 'Order payload required'}), 404
 
-            # PILLAR 1: Atomic stock deduction across BOTH databases — this
-            # is the ONLY stock deduction for the ACLEDA flow (Stage 1 never
-            # touches stock, and an existing pending order already deducted).
             success, msg = process_stock_deduction(items)
             if not success:
                 return jsonify({'status': 'error', 'success': False, 'message': msg}), 400
 
             order_data = {
-                'items': items,
-                'total': total,
-                'discount': discount,
-                'status': 'paid by acleda',
-                'tran_id': tran_id,
+                'items': items, 'total': total, 'discount': discount, 'status': 'paid by acleda', 'tran_id': tran_id,
                 'user': current_user.username if hasattr(current_user, 'username') else 'guest',
-                # FIX: server PC is ALREADY on Cambodia local time. Capture the
-                # exact local wall-clock — NO cambodia_time() (would add +7h again).
                 'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
             }
             local_db.add_order(order_data)
-            print(f"✅ ACLEDA order {tran_id} CREATED + stock deducted at confirm time (Stage 2)")
         else:
-            # 1.5 Only flip status if the order is still 'pending'. ABA orders
-            #     are already 'paid' (aba_listener flipped them) — this route
-            #     doubles as the success.html PDF trigger, so it must NOT
-            #     re-label an ABA order as 'paid by acleda' (that would corrupt
-            #     the reports status badge). And NEVER re-deduct stock.
             current_status = str(order.get('status', '') or '').strip().lower()
             if current_status in ('pending', '', 'unpaid'):
-                local_db.update_order_status_and_time(
-                    tran_id,
-                    'paid by acleda',
-                    datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-                )
-                print(f"✅ ACLEDA order {tran_id} flipped pending -> paid by acleda")
-            else:
-                print(f"ℹ️ Order {tran_id} already '{order.get('status')}' — status preserved (PDF trigger only)")
+                local_db.update_order_status_and_time(tran_id, 'paid by acleda', datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
 
-        # 2. SYNCHRONOUS PDF GENERATION — the PDF must physically exist on
-        #    disk the moment payment succeeds, so the reports page shows
-        #    "View PDF" (has_receipt=1) immediately. No background thread,
-        #    no race with any frontend /api/archive-pdf call.
-        pdf_ok, pdf_msg, pdf_filename = render_pdf_receipt(tran_id)
-
-        # 2.5 HARD VERIFICATION: confirm the PDF file exists on disk BEFORE
-        #     declaring success — a missing file means a 404 in reports.
-        pdf_filepath = None
-        if pdf_ok and pdf_filename:
-            reports_dir = os.path.abspath(os.path.join(os.getcwd(), 'reports'))
-            candidate = os.path.abspath(os.path.join(reports_dir, pdf_filename))
-            if candidate.startswith(reports_dir) and os.path.exists(candidate):
-                pdf_filepath = candidate
-
-        if pdf_filepath is None:
-            print(f"❌ ACLEDA {tran_id}: PDF file missing on disk after generation ({pdf_msg})")
-            return jsonify({
-                'status': 'error',
-                'success': False,
-                'message': f'Payment recorded but PDF generation failed: {pdf_msg}',
-                'tran_id': tran_id
-            }), 500
-
-        print(f"✅ ACLEDA {tran_id}: PDF verified on disk ({os.path.getsize(pdf_filepath)} bytes)")
-
-        # 3. Background auto-sync to Firestore (NOT PDF-related — this is the
-        #    cloud data sync, safe to run asynchronously).
         def sync_background():
             try:
                 sync.trigger_auto_sync(delay=3)
-            except Exception:
+            except:
                 pass
 
         import threading
-        sync_thread = threading.Thread(target=sync_background, daemon=True)
-        sync_thread.start()
+        threading.Thread(target=sync_background, daemon=True).start()
 
-        # 4. Return success — both shapes for backward compatibility
-        #    (old frontend checks status; new R7 frontend checks success).
         return jsonify({
             'status': 'success',
             'success': True,
             'message': 'ACLEDA payment confirmed',
-            'tran_id': tran_id,
-            'pdf_filename': pdf_filename
+            'tran_id': tran_id
         })
     except Exception as e:
-        print(f"❗ Confirm ACLEDA Error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'status': 'error', 'success': False, 'message': str(e)}), 500
 
 @app.route('/check-status')
-@csrf.exempt  # SECURITY: API endpoint
+@csrf.exempt  
 @login_required
 def check_status():
     tran_id = request.args.get('tran_id')
-    # Fixed: Use get_order(tran_id) to look up by the string transaction ID
     order = local_db.get_order(tran_id) 
-    
     if order:
         return jsonify({"status": order['status']})
-    
-    # Crucial: Always return JSON, even if not found
     return jsonify({"status": "pending"})
 
+@app.route('/success')
 @app.route('/success')
 def success():
     tran_id = request.args.get('tran_id')
     print(f"DEBUG: Attempting to load success page for ID: {tran_id}")
     
     try:
-        # SECURITY: Validate tran_id to prevent XSS via error messages
         if not tran_id or not all(c.isalnum() or c in '-_' for c in tran_id):
             return render_template('ai_green.html', message="Invalid transaction ID"), 400
         
-        # Fetch the order from the database
         order = local_db.get_order(tran_id)
-        
         if order is None:
-            # SECURITY: Don't reflect raw user input in error response
             return render_template('ai_green.html', message="Order not found"), 404
             
+        # ជួសជុលចំណុចស្លាប់៖ បំប្លែង items ពី String JSON ឱ្យទៅជាបញ្ជី (List) ពិតប្រាកដ
+        if 'items' in order and isinstance(order['items'], str):
+            try:
+                order['items'] = json.loads(order['items'])
+            except Exception as json_err:
+                print(f"⚠️ JSON Parse warning for items: {json_err}")
+                order['items'] = []
+                
         riel_rate = get_riel_rate()
-        
-        # If this line is the problem, the terminal will tell us
         return render_template('success.html', order=order, RIEL_RATE=riel_rate)
         
     except Exception as e:
-        # This print statement is the most important part
-        print(f"❌ CRASH DETECTED: {e}") 
-        # SECURITY: Don't expose internal error details to the user
+        print(f"❌ CRASH DETECTED IN SUCCESS ROUTE: {e}") 
+        import traceback
+        traceback.print_exc()
         return render_template('ai_green.html', message="System Error: Unable to load order"), 500
-
 @app.route('/invoice', methods=['GET', 'POST'])
 @login_required
 def invoice():
-    # SECURITY: Extract data from GET or POST
     if request.method == 'POST':
-        # CSRF token validation is automatic with Flask-WTF when using render_template
         cart_json = request.form.get('cart', '[]')
         total = request.form.get('total', '0')
         discount = request.form.get('discount', '0')
         payment_method = request.form.get('payment_method', 'qr')
     else:
-        # GET request (backward compatibility)
         cart_json = request.args.get('cart', '[]')
         total = request.args.get('total', '0')
         discount = request.args.get('discount', '0')
@@ -2616,12 +1644,10 @@ def invoice():
     
     date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     
-    # SECURITY: Safely parse JSON and validate structure
     try:
         items_list = json.loads(cart_json) if cart_json else []
         if not isinstance(items_list, list):
             items_list = []
-        # Sanitize each item to only allow expected fields
         sanitized_items = []
         for item in items_list:
             if isinstance(item, dict):
@@ -2635,21 +1661,18 @@ def invoice():
                     'image': str(item.get('image', 'default.jpg'))[:500]
                 })
         items_list = sanitized_items
-    except (json.JSONDecodeError, ValueError, TypeError):
+    except:
         items_list = []
     
-    # SECURITY: Validate total and discount are numbers
     try:
         total = str(float(total))
-    except (ValueError, TypeError):
+    except:
         total = '0'
-    
     try:
         discount = str(float(discount))
-    except (ValueError, TypeError):
+    except:
         discount = '0'
-    
-    # SECURITY: Validate payment_method is whitelisted
+        
     if payment_method not in ['cash', 'qr']:
         payment_method = 'qr'
     
@@ -2663,33 +1686,21 @@ def not_found_error(error):
 def internal_error(error):
     return render_template('ai_green.html', message="មានបញ្ហាបច្ចេកទេស (Internal Server Error)"), 500
 
-# Firebase Cloud Function export
-# Replace your previous nsp_cosmetic_store_pos line with this:
-
-@https_fn.on_request()
-def nsp_cosmetic_store_pos(req: https_fn.Request) -> https_fn.Response:
-    with app.request_context(req.environ):
-        return app.full_dispatch_request()
-
 # ============================================================
 # CUSTOMER FACING DISPLAY (CFD) — shared global state
-# The tablet polls /api/cfd/status every 1.5s; the POS pushes
-# updates via /api/cfd/set when the payment modal opens/closes.
 # ============================================================
 cfd_state = {
-    'status': 'idle',           # 'idle' | 'payment'
-    'data': {}                  # {total, amount_riel, tran_id, items, ...}
+    'status': 'idle',           
+    'data': {}                  
 }
 
 @app.route('/api/cfd/status', methods=['GET'])
 def cfd_status():
-    """GET the current CFD state (polled by the tablet)."""
     return jsonify(cfd_state)
 
 @app.route('/api/cfd/set', methods=['POST'])
-@csrf.exempt  # SECURITY: JSON API endpoint (mirrors other /api/* POST routes)
+@csrf.exempt  
 def cfd_set():
-    """POST a new CFD state from the POS (status + payload)."""
     global cfd_state
     try:
         data = request.get_json(silent=True) or {}
@@ -2697,7 +1708,6 @@ def cfd_set():
         if new_status not in ('idle', 'payment'):
             return jsonify({'status': 'error', 'message': 'Invalid status'}), 400
         payload = data.get('data') or {}
-        # Only keep JSON-serializable keys to keep the state lean and safe
         allowed = ('total', 'amount_riel', 'usd_amount', 'tran_id', 'items', 'discount', 'shop_name', 'inv_no')
         cfd_state = {
             'status': new_status,
@@ -2710,62 +1720,42 @@ def cfd_set():
 
 @app.route('/cfd')
 def cfd_page():
-    """Serve the Customer Facing Display page."""
     return render_template('cfd.html')
 
 @app.route('/api/cfd/products', methods=['GET'])
 def cfd_products():
-    """Random product selection for the idle slideshow."""
     try:
         products = local_db.get_products()
         if not products:
             return jsonify({'products': []})
         random.shuffle(products)
-        # Return a rotating sample (cap at 12) with only the fields the CFD needs
         sample = []
         for p in products[:12]:
             sample.append({
-                'id': p.get('id'),
-                'name': p.get('name'),
-                'price': p.get('price'),
-                'image': p.get('image')
+                'id': p.get('id'), 'name': p.get('name'), 'price': p.get('price'), 'image': p.get('image')
             })
         return jsonify({'products': sample})
     except Exception as e:
-        print(f"❌ CFD products error: {e}")
         return jsonify({'products': []}), 500
 
 def open_browser():
     webbrowser.open_new('http://127.0.0.1:5000/')
+
 if __name__ == '__main__':
-    # Initialize the local database
     local_db.init_db()
-    
-    # Initial Sync
     print("Performing initial sync...")
     sync.sync_all()
-    
-    # Start background sync service (every 30 seconds)
-    # sync.start_background_sync(interval=30)
-    
-    # Wait 1.5 seconds for the server to start, then open the browser
     Timer(1.5, open_browser).start()
-    
-    # Start the server (debug=True enables auto-reload of templates)
     port = int(os.environ.get('PORT', 5000))
-    # បិទការបង្កើតម៉ាស៊ីនទី២ (use_reloader=False) ឱ្យដាច់ស្រឡះ ដើម្បីការពារការគាំង Database
     app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
-# --- FIREBASE CLOUD FUNCTIONS WRAPPER ---
-from firebase_functions import https_fn
-from firebase_admin import initialize_app
 
-# Initialize the Firebase Admin SDK (safely)
+# --- FIREBASE CLOUD FUNCTIONS WRAPPER ---
+from firebase_admin import initialize_app
 try:
     initialize_app()
 except ValueError:
     pass 
 
-# Expose the Flask app to Firebase HTTPS routing
 @https_fn.on_request()
 def nsp_pos_server(req: https_fn.Request) -> https_fn.Response:
     return https_fn.wsgi_app(app, req)
