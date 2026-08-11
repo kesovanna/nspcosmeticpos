@@ -1611,10 +1611,10 @@
                     </div>
                     <div>
                         <button id="btnBulkPrint" onclick="printSelectedReports()" style="margin-right: 10px; padding: 8px 20px; background: #0ea5e9; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-                            <i data-lucide="printer"></i> បោះពុម្ពឯកសារជ្រើសរើស
+                            <i data-lucide="printer"></i> បោះពុម្ពដែលបានជ្រើសរើស
                         </button>
-                        <button onclick="window.print()" style="background: #059669; color: white; border: 1px solid rgba(255,255,255,0.2); padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-                            <i data-lucide="printer"></i> បោះពុម្ព
+                        <button id="btnBulkDelete" onclick="deleteSelectedReports()" style="margin-right: 10px; padding: 8px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                            <i data-lucide="trash-2"></i> លុបដែលបានជ្រើសរើស
                         </button>
                     </div>
                 </div>
@@ -2258,21 +2258,16 @@
                             <option value="admin">Admin</option>
                         </select>
                     </div>
-                    <!-- Staff Profile Photo Upload -->
-                    <div style="text-align: left; margin-bottom: 20px; display: flex; align-items: center; gap: 15px;">
-                        <img id="new_profile_preview" src="/static/images/default.jpg"
-                             onerror="this.src='/static/images/default.jpg'"
-                             style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid #e2e8f0; background: white;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: 500;">រូបថត (Profile Photo)</label>
-                            <button type="button" onclick="document.getElementById('new_profile_input').click()"
-                                    class="btn-qa" style="padding: 8px 14px; font-size: 13px; border: 1px solid #d81b60; color: #d81b60; background: transparent; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                                <i data-lucide="camera" style="width: 16px; height: 16px;"></i> ជ្រើសរូបថត
-                            </button>
-                            <input type="file" id="new_profile_input" style="display: none;" accept="image/*" onchange="previewStaffPhoto(this, 'new_profile_preview')">
-                            <small style="display: block; color: #94a3b8; margin-top: 4px;">ជ្រើសរើសរូបថតមុនបង្កើតគណនី (Optional)</small>
+                    <!-- Staff Profile Photo Upload (Modern Avatar) -->
+                    <div id="addModalAvatarContainer" style="position: relative; width: 90px; height: 90px; margin: 0 auto 20px; cursor: pointer;">
+                        <div id="new_profile_preview" style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; border: 2px solid #e2e8f0; background: #eff6ff; display: flex; align-items: center; justify-content: center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        </div>
+                        <div style="position: absolute; bottom: 0; right: 0; background: #d81b60; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
                         </div>
                     </div>
+                    <input type="file" id="new_profile_input" style="display: none;" accept="image/*" onchange="previewStaffPhoto(this, 'new_profile_preview')">
                     
                     <div class="modal-actions">
                         <button type="button" onclick="closeAddStaffModal()" class="btn-modal btn-modal-dismiss">បោះបង់</button>
@@ -2285,9 +2280,14 @@
         <!-- Edit Staff Modal -->
         <div id="editStaffModal" class="inventory-modal-overlay">
             <div class="inventory-modal">
-                <div class="modal-alert-icon" style="background: #3b82f6;">
-                    <i data-lucide="user-cog"></i>
+                <div id="editModalAvatarContainer" style="position: relative; width: 100px; height: 100px; margin: 0 auto 15px; cursor: pointer;" title="ចុចទីនេះដើម្បីប្តូររូបថត">
+                    <div id="edit_profile_preview" style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; border: 3px solid #e2e8f0; background: #eff6ff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                    </div>
+                    <div style="position: absolute; bottom: 0; right: 0; background: #d81b60; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+                    </div>
                 </div>
+                <input type="file" id="edit_profile_input" name="profile_image" style="display: none;" accept="image/*" onchange="previewStaffPhoto(this, 'edit_profile_preview')">
                 <h2 class="modal-title">កែប្រែព័ត៌មានបុគ្គលិក</h2>
                 <p class="modal-description">សូមកែប្រែព័ត៌មានខាងក្រោម។ ទុកលេខសម្ងាត់ទទេប្រសិនបើមិនចង់ប្តូរ។</p>
                 
@@ -2308,22 +2308,6 @@
                             <option value="admin">Admin</option>
                         </select>
                     </div>
-                    <!-- Staff Profile Photo Upload -->
-                    <div style="text-align: left; margin-bottom: 20px; display: flex; align-items: center; gap: 15px;">
-                        <img id="edit_profile_preview" src="/static/images/default.jpg"
-                             onerror="this.src='/static/images/default.jpg'"
-                             style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid #e2e8f0; background: white;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: 500;">រូបថត (Profile Photo)</label>
-                            <button type="button" onclick="document.getElementById('edit_profile_input').click()"
-                                    class="btn-qa" style="padding: 8px 14px; font-size: 13px; border: 1px solid #d81b60; color: #d81b60; background: transparent; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                                <i data-lucide="camera" style="width: 16px; height: 16px;"></i> ជ្រើសរូបថតថ្មី
-                            </button>
-                            <input type="file" id="edit_profile_input" style="display: none;" accept="image/*" onchange="previewStaffPhoto(this, 'edit_profile_preview')">
-                            <small style="display: block; color: #94a3b8; margin-top: 4px;">ជ្រើសរើសរូបថតថ្មីដើម្បីប្តូរ (Optional)</small>
-                        </div>
-                    </div>
-                    
                     <div class="modal-actions">
                         <button type="button" onclick="closeEditStaffModal()" class="btn-modal btn-modal-dismiss">បោះបង់</button>
                         <button type="submit" class="btn-modal btn-modal-action" style="background: #3b82f6;">រក្សាទុក</button>
@@ -3021,6 +3005,17 @@
         return String(barcode).trim().padStart(4, '0');
     }
 
+    // Convert Khmer numerals (០-៩) to English digits (0-9) so barcodes scanned
+    // while the system keyboard language is set to Khmer still resolve correctly.
+    function convertKhmerToEngDigits(str) {
+        const khmerDigits = [/០/g, /១/g, /២/g, /៣/g, /៤/g, /៥/g, /៦/g, /៧/g, /៨/g, /៩/g];
+        if (typeof str !== 'string') str = String(str);
+        for (let i = 0; i < 10; i++) {
+            str = str.replace(khmerDigits[i], i);
+        }
+        return str;
+    }
+
     async function saveExchangeRate() {
         const rateInput = document.getElementById('exchangeRateInput');
         if (!rateInput) return;
@@ -3525,8 +3520,8 @@
 
         // --- IMMEDIATE RESPONSE ---
         if (navigator.vibrate) navigator.vibrate(80);
-        const snd = document.getElementById('alertSound');
-        if (snd) { snd.currentTime = 0; snd.play().catch(()=>{}); }
+        // Use the preloaded success sound (instant, no external URL lag)
+        if (typeof playSuccessSound === 'function') playSuccessSound();
 
         const frame = document.querySelector('.scanner-frame');
         if (frame) { 
@@ -3542,15 +3537,17 @@
     }
 
     function processBarcode(code) {
+        // Sanitize at the capture entrance: convert Khmer numerals to English digits
+        const cleanBarcode = convertKhmerToEngDigits(String(code).trim());
         if (Object.keys(barcodeMap).length === 0) buildBarcodeMap();
         
-        const normalizedCode = normalizeBarcode(code);
+        const normalizedCode = normalizeBarcode(cleanBarcode);
         const product = barcodeMap[normalizedCode];
 
         if (product) {
             // Find the product card to get stock info
             const card = document.querySelector(`.card[data-barcode="${normalizedCode}"]`) || 
-                         document.querySelector(`.card[data-barcode="${code}"]`);
+                         document.querySelector(`.card[data-barcode="${cleanBarcode}"]`);
             if (card) {
                 const id = card.getAttribute('data-id');
                 const stock = parseInt(card.getAttribute('data-stock')) || 0;
@@ -3764,8 +3761,8 @@
         }
         
         renderCart();
-        const snd = document.getElementById('alertSound');
-        if (snd) { snd.currentTime = 0; snd.play().catch(()=>{}); }
+        // Click feedback is handled ONCE by the global playClickSound() in
+        // static/js/app.js — no secondary audio here (prevents double sound).
         Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'បានបន្ថែម ' + name, showConfirmButton: false, timer: 1000 });
         
         if (window.innerWidth <= 1024) document.getElementById('cartPanel').classList.add('open');
@@ -4032,7 +4029,14 @@
                     ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
                     
                     const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                    document.getElementById(previewId).src = compressedBase64;
+                    const previewEl = document.getElementById(previewId);
+                    if (previewEl) {
+                        if (previewEl.tagName === 'IMG') {
+                            previewEl.src = compressedBase64;
+                        } else {
+                            previewEl.innerHTML = `<img src="${compressedBase64}" style="width:100%; height:100%; object-fit:cover;">`;
+                        }
+                    }
                     
                     // Store the compressed image data for form submission
                     input.dataset.profileImage = compressedBase64;
@@ -5667,6 +5671,65 @@
         });
     }
 
+    // --- Bulk Delete Selected Reports ---
+    function deleteSelectedReports() {
+        const selectedCheckboxes = document.querySelectorAll('.report-row-checkbox:checked');
+        const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+
+        if (selectedIds.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'មិនទាន់បានជ្រើសរើសទេ (No Reports Selected)',
+                text: 'សូមជ្រើសរើសយ៉ាងហោចណាស់មួយវិក្កយបត្រ ដើម្បីលុប។ (Please select at least one report to delete.)'
+            });
+            return;
+        }
+
+        Swal.fire({
+            title: 'តើអ្នកប្រាកដទេ? (Are you sure?)',
+            text: `អ្នកនឹងលុប ${selectedIds.length} វិក្កយបត្រ ហើយមិនអាចត្រឡប់វិញបានទេ! (You won't be able to revert this!)`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'បាទ លុបទាំងអស់! (Yes, delete them!)'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            fetch('/api/reports/bulk-delete', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ tran_ids: selectedIds })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' || data.success) {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: `បានលុប ${data.deleted_count || selectedIds.length} វិក្កយបត្រ (Reports deleted)`,
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
+                    // Refresh the report table + summary cards
+                    if (typeof updateSummaryCards === 'function') updateSummaryCards();
+                } else {
+                    Swal.fire('Error!', data.error || data.message || 'Failed to delete reports.', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire('Error!', 'An unexpected error occurred.', 'error');
+            });
+        });
+    }
+
     // --- HARDWARE BARCODE SCANNER SUPPORT (ULTIMATE FIX V3) ---
     let hardwareBuffer = "";
     let lastKeyTime = Date.now();
@@ -5742,6 +5805,26 @@ function toggleCartDrawer() {
 function openAddStaffModal() {
     const staffModal = document.getElementById('addStaffModal');
     if (staffModal) {
+        // Bind avatar click -> hidden file picker (bound once)
+        const avatarContainer = document.getElementById('addModalAvatarContainer');
+        if (avatarContainer && !avatarContainer.dataset.avatarBound) {
+            avatarContainer.dataset.avatarBound = '1';
+            avatarContainer.addEventListener('click', () => {
+                const input = document.getElementById('new_profile_input');
+                if (input) input.click();
+            });
+        }
+        // Instant preview on file select via object URL (bound once)
+        const profileInput = document.getElementById('new_profile_input');
+        if (profileInput && !profileInput.dataset.previewBound) {
+            profileInput.dataset.previewBound = '1';
+            profileInput.addEventListener('change', function() {
+                if (this.files && this.files[0] && this.files[0].type.match('image.*')) {
+                    const pv = document.getElementById('new_profile_preview');
+                    if (pv) pv.innerHTML = `<img src="${URL.createObjectURL(this.files[0])}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                }
+            });
+        }
         staffModal.classList.add('active');
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -5767,12 +5850,35 @@ function openEditStaffModal(username, role) {
         const profileImage = cachedMember ? (cachedMember.profile_image || null) : null;
         const preview = document.getElementById('edit_profile_preview');
         if (preview) {
-            preview.src = profileImage || '/static/images/default.jpg';
+            if (profileImage) {
+                preview.innerHTML = `<img src="${profileImage}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+            } else {
+                preview.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+            }
         }
         const profileInput = document.getElementById('edit_profile_input');
         if (profileInput) {
             delete profileInput.dataset.profileImage;
             profileInput.value = '';
+        }
+        // Bind avatar click -> hidden file picker (bound once)
+        const avatarContainer = document.getElementById('editModalAvatarContainer');
+        if (avatarContainer && !avatarContainer.dataset.avatarBound) {
+            avatarContainer.dataset.avatarBound = '1';
+            avatarContainer.addEventListener('click', () => {
+                const input = document.getElementById('edit_profile_input');
+                if (input) input.click();
+            });
+        }
+        // Instant preview on file select via object URL (bound once)
+        if (profileInput && !profileInput.dataset.previewBound) {
+            profileInput.dataset.previewBound = '1';
+            profileInput.addEventListener('change', function() {
+                if (this.files && this.files[0] && this.files[0].type.match('image.*')) {
+                    const pv = document.getElementById('edit_profile_preview');
+                    if (pv) pv.innerHTML = `<img src="${URL.createObjectURL(this.files[0])}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                }
+            });
         }
         modal.classList.add('active');
         if (typeof lucide !== 'undefined') lucide.createIcons();

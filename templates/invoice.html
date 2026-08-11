@@ -6,7 +6,6 @@
     <title>វិក្កយបត្រ - NSP Cosmetic Store</title>
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
     <style>
         /* ========================================================
@@ -247,7 +246,9 @@
             <div class="qr-col">
                 <div class="qr-bank-title"><span class="qr-bank-dot" style="background:#005a9c;"></span>ABA Mobile</div>
                 <div class="aba-qr-container" style="padding: 5px;">
-                    <div id="qrcode"></div>
+                    <div class="qr-image-container d-flex justify-content-center mb-3">
+                        <img src="{{ url_for('static', filename='images/aba_qr.jpg') }}" alt="ABA QR Code" style="width: 200px; height: 200px; object-fit: contain; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px;">
+                    </div>
                     <div style="font-weight:800; color:#28a745; font-size:24px; margin: 6px 0;" id="amount">៛ 0</div>
                     <div style="font-weight:700; color:#d81b60; font-size:16px; margin-bottom: 6px;" id="usd_amount">$ 0.00</div>
                     <p style="font-size:12px; color:#666; margin:0;">សូមស្កេន QR នេះជាមួយកម្មវិធី <b>ABA Mobile</b></p>
@@ -256,7 +257,9 @@
             </div>
             <div class="qr-col">
                 <div class="qr-bank-title"><span class="qr-bank-dot" style="background:#ED1C24;"></span>ACLEDA ToanChet</div>
-                <img src="/static/images/acleda_qr.png" alt="ACLEDA QR" style="width: 100%; max-width: 200px; border-radius: 10px; margin: 0 auto; display: block;">
+                <div class="qr-image-container d-flex justify-content-center mb-3">
+                    <img src="{{ url_for('static', filename='images/acleda_qr.png') }}" alt="ACLEDA QR Code" style="width: 200px; height: 200px; object-fit: contain; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px;">
+                </div>
                 <p style="font-size:12px; color:#666; margin:10px 0 0;">ស្កេនជាមួយ <b>ACLEDA ToanChet</b> រួចបញ្ជាក់ការទូទាត់ខាងក្រោម</p>
                 <button type="button" id="acledaConfirmBtn" onclick="confirmAcledaPayment()" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (Manual Confirm)</button>
             </div>
@@ -318,13 +321,20 @@
             const data = await response.json();
 
             if (response.ok && data.status === 'success') {
-                playPaymentSuccessSound();
                 Swal.fire({
                     icon: 'success',
                     title: 'ការលក់ជោគជ័យ! | Payment Confirmed!',
                     text: 'វិក្កយបត្រកំពុងបោះពុម្ព | Receipt printing...',
                     timer: 2500,
-                    showConfirmButton: false
+                    showConfirmButton: false,
+                    didOpen: () => {
+                        try {
+                            const audio = new Audio('/static/sounds/successsound.mp3');
+                            audio.play().catch(e => console.log("Audio play blocked or handled:", e));
+                        } catch (err) {
+                            console.log("Error playing success sound:", err);
+                        }
+                    }
                 });
 
                 sessionStorage.removeItem('checkout_cart');
@@ -368,16 +378,6 @@
         } catch (error) {
             Swal.fire("បញ្ហា", "ការភ្ជាប់ទៅកាន់ម៉ាស៊ីនមេមានបញ្ហា", "error");
         }
-    }
-
-    function buildABALink(tran_id) {
-        const amount = parseFloat(TOTAL_AMOUNT).toFixed(2);
-        return [
-            '000201', '010212', '52040000', '5303704', '5802KH',
-            '00' + String('00' + tran_id.length).slice(-2) + tran_id,
-            '54' + String('00' + amount.length).slice(-2) + amount,
-            '5802KH', '6304'
-        ].join('');
     }
 
     function sendCFDState(status, extraData) {
@@ -434,12 +434,18 @@
             closePaymentModal();
             document.querySelectorAll('.swal2-container').forEach(el => el.remove());
 
-            playPaymentSuccessSound();
-
             await Swal.fire({
                 icon: 'success', title: 'ការទូទាត់ជោគជ័យ!',
                 text: 'ប្រព័ន្ធបានកត់ត្រា និងបង្កើតវិក្កយបត្ររួចរាល់! (' + confirmedTranId + ')',
-                timer: 30000, timerProgressBar: true, showConfirmButton: true, confirmButtonText: 'យល់ព្រម (OK)', allowOutsideClick: false
+                timer: 30000, timerProgressBar: true, showConfirmButton: true, confirmButtonText: 'យល់ព្រម (OK)', allowOutsideClick: false,
+                didOpen: () => {
+                    try {
+                        const audio = new Audio('/static/sounds/successsound.mp3');
+                        audio.play().catch(e => console.log("Audio play blocked or handled:", e));
+                    } catch (err) {
+                        console.log("Error playing success sound:", err);
+                    }
+                }
             });
 
             sessionStorage.removeItem('checkout_cart'); sessionStorage.removeItem('checkout_total');
@@ -458,13 +464,7 @@
         const usdEl = document.getElementById('usd_amount');
         if (usdEl) usdEl.textContent = '$ ' + parseFloat(TOTAL_AMOUNT).toFixed(2);
 
-        const qrEl = document.getElementById('qrcode');
-        if (qrEl) {
-            qrEl.innerHTML = '';
-            if (typeof QRCode !== 'undefined') {
-                new QRCode(qrEl, { text: buildABALink(tran_id), width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
-            }
-        }
+        // Static ABA QR image is displayed directly in the modal (no JS generation needed)
         document.querySelectorAll('.swal2-container').forEach(el => el.remove());
         openPaymentModal();
         sendCFDState('payment', { tran_id: tran_id });
@@ -480,7 +480,28 @@
                 if (data.status === "paid" || data.status === "completed" || data.code === "00") {
                     clearInterval(pollingInterval);
                     sendCFDState('idle');
-                    window.location.href = `/success?tran_id=${tran_id}`;
+                    closePaymentModal();
+                    document.querySelectorAll('.swal2-container').forEach(el => el.remove());
+
+                    Swal.fire({
+                        title: 'ការទូទាត់ជោគជ័យ!',
+                        text: 'ប្រព័ន្ធបានទទួលប្រាក់រួចរាល់។',
+                        icon: 'success',
+                        timer: 2500, // Wait 2.5 seconds
+                        showConfirmButton: false,
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            try {
+                                const audio = new Audio('/static/sounds/successsound.mp3');
+                                audio.play().catch(e => console.log("Audio play blocked:", e));
+                            } catch (err) {
+                                console.log("Audio error:", err);
+                            }
+                        }
+                    }).then(() => {
+                        // Redirect ONLY after the alert closes
+                        window.location.href = `/success?tran_id=${tran_id}`;
+                    });
                 }
             } catch (error) {}
         }, 3000);

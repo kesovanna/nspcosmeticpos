@@ -1434,6 +1434,37 @@ def unified_report_api():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/reports/bulk-delete', methods=['POST'])
+@csrf.exempt
+@login_required
+@admin_required
+def bulk_delete_reports_api():
+    """Bulk delete sales report records by tran_id / local_id list."""
+    try:
+        data = request.get_json(force=True, silent=True)
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Invalid JSON or Missing CSRF Token'}), 400
+        tran_ids = data.get('tran_ids') or []
+        if not isinstance(tran_ids, list) or len(tran_ids) == 0:
+            return jsonify({"status": "error", "message": "No tran_ids provided"}), 400
+
+        deleted_count = 0
+        for report_id in tran_ids:
+            report_id = str(report_id).strip()
+            if not report_id:
+                continue
+            if local_db.delete_order(report_id):
+                deleted_count += 1
+
+        return jsonify({
+            "status": "success",
+            "deleted_count": deleted_count,
+            "requested": len(tran_ids)
+        })
+    except Exception as e:
+        print(f"[bulk-delete] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/checkout', methods=['POST'])
 @csrf.exempt  
 @login_required
@@ -1737,6 +1768,36 @@ def cfd_products():
         return jsonify({'products': sample})
     except Exception as e:
         return jsonify({'products': []}), 500
+# --- BULK DELETE REPORTS API ---
+@app.route('/api/reports/bulk-delete', methods=['POST'])
+@csrf.exempt
+def bulk_delete_reports():
+    try:
+        data = request.get_json(force=True, silent=True)
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Invalid JSON or Missing CSRF Token'}), 400
+        if 'tran_ids' not in data:
+            return jsonify({'status': 'error', 'message': 'Invalid request data'}), 400
+        
+        tran_ids = data.get('tran_ids', [])
+        if not tran_ids:
+            return jsonify({'status': 'error', 'message': 'No transaction IDs provided'}), 400
+        
+        deleted_count = 0
+        for tran_id in tran_ids:
+            # ហៅមុខងារលុបពី Database តាម Tran ID ທີ່ມີស្រាប់ក្នុង local_db របស់បង
+            success = local_db.delete_order_by_tran_id(tran_id)
+            if success:
+                deleted_count += 1
+                
+        return jsonify({
+            'status': 'success', 
+            'message': f'Successfully deleted {deleted_count} reports',
+            'deleted_count': deleted_count
+        })
+    except Exception as e:
+        print(f"Error in bulk_delete_reports: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def open_browser():
     webbrowser.open_new('http://127.0.0.1:5000/')

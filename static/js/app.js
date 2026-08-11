@@ -99,13 +99,22 @@ window.executeCategorySave = executeCategorySave;
 
 // --- TARGET 3: GLOBAL AUDIO SYSTEM ---
 // បង្ខំប្រភពសំឡេងឱ្យទៅរក File ដែលបងបានដាក់ (ដាក់អក្សរតូចធំឱ្យត្រូវតាម File ពិតរបស់បង)
+// Preload reusable Audio objects ONCE — resetting currentTime = 0 before
+// play() makes the sound trigger instantly and allows rapid consecutive clicks.
 const uiClickSound = new Audio('/static/sounds/clicksound.m4a');
 const uiSuccessSound = new Audio('/static/sounds/successsound.mp3');
 
-// មុខងារលេងសំឡេងចុច globally លើគ្រប់ការ Click ទាំងអស់
-window.addEventListener('click', () => {
+// Single consolidated click-sound function — plays strictly once per call,
+// preventing duplicate/overlapping audio on product-card clicks.
+function playClickSound() {
     uiClickSound.currentTime = 0;
     uiClickSound.play().catch(err => console.log("Click sound error:", err));
+}
+window.playClickSound = playClickSound;
+
+// Global click handler — the ONE source of click feedback for card interactions
+window.addEventListener('click', () => {
+    playClickSound();
 });
 
 // មុខងារសម្រាប់លេងសំឡេងជោគជ័យ
