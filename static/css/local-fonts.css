@@ -1,0 +1,37 @@
+/* Local Khmer Fonts */
+@font-face {
+    font-family: 'Kantumruy Pro';
+    src: url('../fonts/Kantumruy-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Kantumruy Pro';
+    src: url('../fonts/Kantumruy-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Moul';
+    src: url('../fonts/Moul.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Battambang';
+    src: url('../fonts/Battambang-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Battambang';
+    src: url('../fonts/Battambang-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Siemreap';
+    src: url('../fonts/Siemreap.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}

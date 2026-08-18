@@ -1810,13 +1810,15 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
 
-# --- FIREBASE CLOUD FUNCTIONS WRAPPER ---
+# --- FIREBASE CLOUD FUNCTIONS ENTRY POINT ---
+from firebase_functions import https_fn
 from firebase_admin import initialize_app
+
 try:
     initialize_app()
 except ValueError:
-    pass 
+    pass # Prevent re-initialization error
 
-@https_fn.on_request()
-def nsp_pos_server(req: https_fn.Request) -> https_fn.Response:
-    return https_fn.wsgi_app(app, req)
+@https_fn.on_request(max_instances=10)
+def nsp_cosmetic_store_pos(req: https_fn.Request) -> https_fn.Response:
+    return https_fn.Response.from_app(app, req)

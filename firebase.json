@@ -25,7 +25,7 @@
   },
   "functions": {
     "source": ".",
-    "runtime": "python311",
+    "runtime": "python310",
     "ignore": [
       ".venv*",
       "venv*",

@@ -13,3 +13,4 @@ telethon
 grpcio
 google-cloud-firestore
 weasyprint
+gunicorn>=20.1.0
