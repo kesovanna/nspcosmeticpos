@@ -531,6 +531,29 @@ def manual_sync():
 def get_sync_status():
     return jsonify(sync.sync_status)
 
+@app.route('/api/force_sync_eod', methods=['POST'])
+@csrf.exempt
+@login_required
+def force_sync_eod():
+    try:
+        logs = []
+        logs.append("កំពុងភ្ជាប់ទៅកាន់ Firebase Firestore...")
+        
+        # Call the actual sync system function here
+        if hasattr(sync, 'push_to_firestore'):
+            sync.push_to_firestore()
+            logs.append("រុញទិន្នន័យវិក្កយបត្រ និងស្តុកជោគជ័យ...")
+        elif hasattr(sync, 'sync_all'):
+            sync.sync_all()
+            logs.append("ធ្វើសមកាលកម្មទិន្នន័យទាំងអស់ជោគជ័យ...")
+        else:
+            logs.append("ចំណាំ: អត់ឃើញមុខងារ push_to_firestore ឬ sync_all, សូមពិនិត្យមើលប្រព័ន្ធ Sync ឡើងវិញ។")
+            
+        logs.append("ដំណើរការបញ្ចប់ស្ថាពរ។")
+        return jsonify({"status": "success", "logs": logs})
+    except Exception as e:
+        return jsonify({"status": "error", "logs": [f"Error: {str(e)}"]}), 500
+
 @app.route('/api/upload-user-image', methods=['POST'])
 @csrf.exempt  
 @login_required

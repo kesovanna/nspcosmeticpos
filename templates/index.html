@@ -1445,15 +1445,11 @@
             </div>
             {% if session.get('role') == 'admin' %}
             <a href="javascript:void(0);" class="btn-music" title="Dashboard" onclick="showView('managerView'); closeSidebarMobile();"><i data-lucide="layout-dashboard"></i></a>
-            <button type="button" 
-                    onclick="openAddProductModal()"
-                    class="btn btn-link p-2 text-dark text-decoration-none" 
-                    id="topbarAddProductBtn"
-                    title="Add New Product">
-                <i class="bi bi-plus-circle fs-5"></i>
-            </button>
             {% endif %}
-            <button id="musicToggle" class="btn-music" onclick="toggleMusic(event)"><i data-lucide="music"></i></button>
+            <button onclick="startEndOfDaySync()" style="background-color: #dc2626; color: white; font-weight: bold; padding: 6px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer; transition: all 0.2s;">
+                <i data-lucide="cloud-upload"></i>
+                <span>បិទបញ្ជីលក់ថ្ងៃនេះ</span>
+            </button>
             <button class="btn-scan" onclick="openScanner()"><i data-lucide="scan-line"></i> <span>ស្កេន</span></button>
         </div>
         </div>
@@ -6823,5 +6819,82 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 })();
 </script>
+    <div id="eodSyncModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; display: none; align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 90%; max-width: 600px; padding: 24px;">
+            <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 16px; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="refresh-cw" class="spin-icon" style="color: #3b82f6;"></i> កំពុងបញ្ជូនទិន្នន័យឡើង Cloud...
+            </h3>
+            
+            <div style="width: 100%; background: #e5e7eb; border-radius: 9999px; height: 16px; margin-bottom: 16px; overflow: hidden;">
+                <div id="eodProgressBar" style="background: #22c55e; height: 100%; border-radius: 9999px; transition: width 0.5s ease; width: 0%;"></div>
+            </div>
+            
+            <div id="eodLogs" style="background: #111827; color: #4ade80; font-family: monospace; font-size: 0.875rem; padding: 12px; border-radius: 8px; height: 192px; overflow-y: auto; white-space: pre-wrap;">
+                > System ready...
+            </div>
+            
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                <button id="eodCloseBtn" onclick="closeEodModal()" class="hidden" style="display: none; background: #6b7280; color: white; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;">បិទផ្ទាំងនេះ</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .spin-icon { animation: spin 2s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+
+    <script>
+    function startEndOfDaySync() {
+        const modal = document.getElementById('eodSyncModal');
+        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
+        
+        const closeBtn = document.getElementById('eodCloseBtn');
+        closeBtn.style.display = 'none';
+        closeBtn.classList.add('hidden');
+        
+        const logConsole = document.getElementById('eodLogs');
+        const progressBar = document.getElementById('eodProgressBar');
+        
+        progressBar.style.width = '10%';
+        progressBar.style.background = '#22c55e';
+        logConsole.innerHTML = '> ចាប់ផ្តើមប្រមូលទិន្នន័យលក់ថ្ងៃនេះ...\n';
+        
+        fetch('/api/force_sync_eod', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            progressBar.style.width = '100%';
+            if(data.logs) {
+                data.logs.forEach(log => logConsole.innerHTML += `> ${log}\n`);
+            }
+            logConsole.innerHTML += '\n> ✅ ជោគជ័យ! ទិន្នន័យត្រូវបានបញ្ជូនទៅ Cloud ដោយសុវត្ថិភាព។';
+            closeBtn.style.display = 'block';
+            closeBtn.classList.remove('hidden');
+            
+            if(typeof Swal !== 'undefined') {
+                Swal.fire('ជោគជ័យ!', 'បញ្ជីលក់ថ្ងៃនេះត្រូវបានបិទ និងរក្សាទុកលើ Cloud!', 'success');
+            }
+        })
+        .catch(error => {
+            progressBar.style.background = '#ef4444';
+            logConsole.innerHTML += `\n> ❌ បរាជ័យ: ${error.message}`;
+            closeBtn.style.display = 'block';
+            closeBtn.classList.remove('hidden');
+        });
+    }
+    
+    function closeEodModal() {
+        const modal = document.getElementById('eodSyncModal');
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
+    </script>
+
 </body>
 </html>
