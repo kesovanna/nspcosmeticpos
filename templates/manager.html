@@ -343,7 +343,7 @@
         }
 
         try {
-            const response = await fetch('/api/sync', { method: 'POST' });
+            const response = await fetch('/api/force_sync_eod', { method: 'POST' });
             const result = await response.json();
             if (result.status === 'success') {
                 if (!isSilent) {

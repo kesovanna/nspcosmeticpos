@@ -78,12 +78,16 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="modalImageInput">៩. រូបភាព (Image)</label>
-                            <div class="image-upload-wrapper">
-                                <div style="display: flex; align-items: center; gap: 15px;">
-                                    <img id="modalImagePreview" src="/static/images/default.jpg" alt="Preview" class="preview-img">
-                                    <input type="file" id="modalImageInput" name="product_image" class="form-control" accept="image/*" tabindex="9" style="border: none; background: transparent !important; padding: 0; color: #bbb !important;">
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearProductPhoto()">Clear</button>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">៩. រូបភាព (Image)</label>
+                            <div id="imageDropzone" tabindex="0" class="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <i data-lucide="camera" class="w-12 h-12 text-gray-400 mb-3"></i>
+                                <p class="text-sm text-gray-500 mb-1">ចុចទីនេះ, អូសទម្លាក់, ឬ <kbd class="px-2 py-1 bg-gray-200 rounded text-xs font-mono">Ctrl+V</kbd> ដើម្បី Paste រូបភាព</p>
+                                <input type="file" name="product_image" id="modalImageInput" class="hidden" accept="image/*">
+                                <div id="imagePreviewContainer" class="hidden mt-4 relative">
+                                    <img id="modalImagePreview" src="" alt="Preview" class="max-h-48 rounded shadow-md">
+                                    <button type="button" onclick="clearProductPhoto()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-lg">
+                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -162,6 +166,41 @@ function convertRielToUSD() {
 
 // Image handling logic
 const modalImageInput = document.getElementById('modalImageInput');
+const dropzone = document.getElementById('imageDropzone');
+const previewContainer = document.getElementById('imagePreviewContainer');
+const previewImage = document.getElementById('modalImagePreview');
+const lucideIcons = dropzone ? dropzone.querySelectorAll('i[data-lucide]') : [];
+
+if (dropzone) {
+    // Handle Click
+    dropzone.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+            modalImageInput.click();
+        }
+    });
+
+    // Handle Drag and Drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, preventDefaults, false);
+    });
+    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.add('border-green-500', 'bg-green-50'), false);
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.remove('border-green-500', 'bg-green-50'), false);
+    });
+    dropzone.addEventListener('drop', (e) => {
+        let dt = e.dataTransfer;
+        let files = dt.files;
+        if(files.length) { 
+            modalImageInput.files = files; 
+            modalImageInput.dispatchEvent(new Event('change')); 
+        }
+    });
+}
+
 if (modalImageInput) {
     modalImageInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -188,11 +227,18 @@ if (modalImageInput) {
                 ctx.drawImage(img, 0, 0, width, height);
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
                 const base64Input = document.getElementById('modalImageBase64');
-                const previewImg = document.getElementById('modalImagePreview');
                 const deleteInput = document.getElementById('modalDeleteCurrentImage');
                 
                 if (base64Input) base64Input.value = dataUrl;
-                if (previewImg) previewImg.src = dataUrl;
+                if (previewImage) {
+                    previewImage.src = dataUrl;
+                    if (previewContainer) previewContainer.classList.remove('hidden');
+                    if (dropzone) {
+                        lucideIcons.forEach(icon => icon.classList.add('hidden'));
+                        const p = dropzone.querySelector('p');
+                        if (p) p.classList.add('hidden');
+                    }
+                }
                 if (deleteInput) deleteInput.value = 'false';
             };
             img.src = event.target.result;
@@ -204,12 +250,19 @@ if (modalImageInput) {
 function clearProductPhoto() {
     const input = document.getElementById('modalImageInput');
     const base64Input = document.getElementById('modalImageBase64');
-    const previewImg = document.getElementById('modalImagePreview');
     const deleteInput = document.getElementById('modalDeleteCurrentImage');
 
     if (input) input.value = '';
     if (base64Input) base64Input.value = '';
-    if (previewImg) previewImg.src = '/static/images/default.jpg';
+    if (previewImage) {
+        previewImage.src = '';
+        if (previewContainer) previewContainer.classList.add('hidden');
+        if (dropzone) {
+            lucideIcons.forEach(icon => icon.classList.remove('hidden'));
+            const p = dropzone.querySelector('p');
+            if (p) p.classList.remove('hidden');
+        }
+    }
     if (deleteInput) deleteInput.value = 'true';
 }
 

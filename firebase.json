@@ -13,8 +13,20 @@
       ".firebaserc",
       "venv/**",
       ".venv/**",
+      "venv_new/**",
+      "venv312/**",
       "__pycache__/**",
-      "templates/**"
+      "templates/**",
+      "templates_backup_stable_20260802_1520/**",
+      "dist/**",
+      "build/**",
+      "reports/**",
+      "*.zip",
+      "*.exe",
+      "*.spec",
+      "*.session",
+      "*.session-journal",
+      "deploy-debug.txt"
     ],
     "rewrites": [
     {
@@ -36,7 +48,29 @@
       "__pycache__",
       "serviceAccountKey.json",
       ".env",
-      ".env.template"
+      ".env.template",
+      "dist",
+      "dist/**",
+      "build",
+      "build/**",
+      "*.zip",
+      "*.exe",
+      "*.spec",
+      "reports",
+      "reports/**",
+      "templates_backup_stable_20260802_1520",
+      "templates_backup_stable_20260802_1520/**",
+      "deploy-debug.txt",
+      "*.session",
+      "*.session-journal",
+      "static",
+      "static/**",
+      "*.db",
+      "*.log",
+      "reports",
+      "reports/**",
+      "index_output.html",
+      "popular_products.json"
     ]
   },
   "firestore": {

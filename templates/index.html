@@ -13,13 +13,37 @@
     <!-- Bootstrap 5 & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Font Awesome 6 (Data Receiver monitor icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+
+    <!-- Firebase SDK v8 (compat) — used for Firestore dashboard fallback -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+    // ── Firebase client config (public, safe to embed) ──────────────────────
+    (function() {
+        var _cfg = {
+            apiKey: "AIzaSyDYj3LXVOfT5G9md_IkESc5tgCZMQxEqIU",
+            authDomain: "nsp-cosmetic-store-pos.firebaseapp.com",
+            projectId: "nsp-cosmetic-store-pos",
+            storageBucket: "nsp-cosmetic-store-pos.firebasestorage.app",
+            messagingSenderId: "494372682825",
+            appId: "1:494372682825:web:4c641c23bf469fe1f81398"
+        };
+        // Only initialise once (guard against hot-reload double-init)
+        if (!firebase.apps.length) {
+            firebase.initializeApp(_cfg);
+        }
+        window._nspFirestoreDB = firebase.firestore();
+    })();
+    </script>
+
     <!-- ជួសជុល៖ ហៅ app.js តែម្តងប៉ុណ្ណោះ ការពារកុំឱ្យគាំង SyntaxError -->
     <script src="{{ url_for('static', filename='js/app.js') }}?v=9999"></script>
     
@@ -1370,6 +1394,9 @@
         {% if session.get('role') == 'admin' %}
         <a href="#" class="menu-item" onclick="event.preventDefault(); showView('managerView', this); closeSidebarMobile();"><i data-lucide="layout-dashboard"></i> ផ្ទាំងគ្រប់គ្រង</a>
         {% endif %}
+        <a href="javascript:void(0);" class="menu-item" onclick="event.preventDefault(); showView('projectTerminalView', this); closeSidebarMobile();" title="Console គម្រោង">
+            <i data-lucide="terminal"></i> Project Console
+        </a>
         <a href="#" class="menu-item logout" onclick="event.preventDefault(); logoutUser();"><i data-lucide="log-out"></i> ចាកចេញ</a>
     </div>
     <div class="sidebar-footer" style="justify-content: center; padding: 20px;">
@@ -1400,7 +1427,7 @@
     <header class="top-bar">
         <div class="slogan-marquee-box">
             <span class="slogan">
-                *សូមស្វាគមន៍កមកាន់ហាងលក់គ្រឿងក្រអូប NSP Cosmetic Store * សម្រស់របស់អស់លោកអ្នក គឺជាគុណភាពនៃផលិតផលក្នុងហាងរបស់យើង * 
+                *សូមស្វាគមន៍មកកាន់ហាងលក់គ្រឿងក្រអូប NSP Cosmetic Store * សម្រស់របស់អស់លោកអ្នក គឺជាគុណភាពនៃផលិតផលក្នុងហាងរបស់យើងខ្ញុំ! * 
             </span>
         </div>
         <div class="top-row">
@@ -1449,6 +1476,9 @@
             <button onclick="startEndOfDaySync()" style="background-color: #dc2626; color: white; font-weight: bold; padding: 6px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer; transition: all 0.2s;">
                 <i data-lucide="cloud-upload"></i>
                 <span>បិទបញ្ជីលក់ថ្ងៃនេះ</span>
+            </button>
+            <button id="dataReceiverBtn" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-2 px-4 rounded-xl shadow-lg transition-all duration-200 flex items-center gap-2">
+                <i class="fas fa-database"></i> Data Receiver
             </button>
             <button class="btn-scan" onclick="openScanner()"><i data-lucide="scan-line"></i> <span>ស្កេន</span></button>
         </div>
@@ -1510,7 +1540,7 @@
                 <div class="w-full text-left flex-1 flex flex-col justify-start">
                     {% if product.image %}
                     <div class="w-full text-center mb-2">
-                        <img src="{{ product.image if product.image and product.image.startswith('data:image') else url_for('static', filename='images/' + (product.image if product.image else 'default.jpg')) }}" onerror="this.src='/static/images/default.jpg'" class="w-16 h-16 object-cover mx-auto rounded-lg block">
+                        <img src="{% if product.image and (product.image.startswith('data:image') or product.image.startswith('http://') or product.image.startswith('https://')) %}{{ product.image }}{% else %}{{ url_for('static', filename='images/' + (product.image if product.image else 'default.jpg')) }}{% endif %}" onerror="this.src='/static/images/default.jpg'" class="w-16 h-16 object-cover mx-auto rounded-lg block">
                     </div>
                     {% endif %}
                     
@@ -2516,6 +2546,20 @@
             </div>
         </div>
         <!-- END Terminology View (Guide Book) -->
+
+        <!-- START Project Terminal View -->
+        <div id="projectTerminalView" class="view-container hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800" style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="terminal" style="color: #10b981;"></i> Project Live Console (VS Code Style)
+                </h2>
+                <button onclick="clearTerminalScreen()" class="px-3 py-1 bg-gray-700 text-white rounded text-sm hover:bg-gray-600">Clear Screen</button>
+            </div>
+            <div id="projectTerminalDisplay" style="background-color: #0f172a; color: #38bdf8; padding: 15px; border-radius: 6px; font-family: 'Consolas', 'Courier New', monospace; height: calc(100vh - 180px); overflow-y: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.5; box-shadow: inset 0 4px 6px rgba(0,0,0,0.6);">
+            </div>
+        </div>
+        <!-- END Project Terminal View -->
+
 <!-- START Manager View -->
         {% if session.get('role') == 'admin' %}
         <div id="managerView" class="view-container">
@@ -2722,7 +2766,15 @@
                         </div>
                         <div style="grid-column: 1 / -1;">
                             <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">៧. រូបភាព (Image)</label>
-                            <input type="file" name="image" accept="image/*" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <div id="imageDropzone" tabindex="0" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 24px; background-color: #f8fafc; text-align: center; cursor: pointer; transition: all 0.2s;" class="hover:bg-slate-100">
+                                <i data-lucide="camera" style="width: 40px; height: 40px; color: #94a3b8; margin: 0 auto 12px block;"></i>
+                                <p style="font-size: 14px; color: #64748b; margin-bottom: 4px;">ចុចទីនេះ, អូសទម្លាក់, ឬ <kbd style="padding: 2px 6px; background-color: #e2e8f0; border-radius: 4px; font-size: 12px;">Ctrl+V</kbd> ដើម្បី Paste រូបភាព</p>
+                                <input type="file" name="image" id="productImageInput" style="display: none;" accept="image/*">
+                                <div id="imagePreviewContainer" class="hidden" style="margin-top: 16px; position: relative; display: inline-block;">
+                                    <img id="imagePreview" src="" alt="Preview" style="max-height: 160px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                                    <button type="button" onclick="clearImage()" style="position: absolute; top: -8px; right: -8px; background-color: #ef4444; color: white; border: none; border-radius: 9999px; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div style="text-align: right;">
@@ -3265,6 +3317,50 @@
     function closeAbout() { document.getElementById('aboutModal').style.display = 'none'; }
     function openSettings() { closeSidebarMobile(); document.getElementById('settingsModal').style.display = 'flex'; }
     function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+    
+    let terminalEventSource = null;
+
+    function initTerminalStream() {
+        const display = document.getElementById('projectTerminalDisplay');
+        if (terminalEventSource) return; // Already streaming
+
+        terminalEventSource = new EventSource('/api/project_terminal_stream');
+        
+        terminalEventSource.onmessage = function(event) {
+            if (!event.data.strip || event.data.trim() !== "") {
+                const isAtBottom = display.scrollHeight - display.clientHeight <= display.scrollTop + 50;
+                
+                // Append the exact stdout terminal chunk
+                display.innerHTML += `<div>${event.data}</div>`;
+                
+                // Auto scroll to bottom like a real terminal if user hasn't scrolled up
+                if (isAtBottom) {
+                    display.scrollTop = display.scrollHeight;
+                }
+            }
+        };
+
+        terminalEventSource.onerror = function() {
+            display.innerHTML += `<div style="color: #ef4444;">⚠️ [Stream Disconnected] Reconnecting to server console...</div>`;
+        };
+    }
+
+    function clearTerminalScreen() {
+        document.getElementById('projectTerminalDisplay').innerHTML = '<div style="color: #64748b;">> Terminal screen cleared.</div>';
+    }
+
+    // Hook into the SPA showView architecture
+    const baseShowView = window.showView;
+    window.showView = function(viewId) {
+        if (baseShowView) baseShowView(viewId);
+        if (viewId === 'projectTerminalView') {
+            initTerminalStream();
+            // Adjust scroll immediately
+            const display = document.getElementById('projectTerminalDisplay');
+            display.scrollTop = display.scrollHeight;
+        }
+    };
+
     function openAddProductModal() { 
         closeSidebarMobile(); 
         const modalEl = document.getElementById('addProductModal');
@@ -4118,7 +4214,7 @@
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         try {
-            const response = await fetch('/api/sync', { method: 'POST' });
+            const response = await fetch('/api/force_sync_eod', { method: 'POST' });
             let result = null;
 
             try {
@@ -4129,7 +4225,7 @@
             }
 
             if (!result || typeof result !== 'object') {
-                console.error('Invalid /api/sync response payload:', result);
+                console.error('Invalid /api/force_sync_eod response payload:', result);
                 if (!isSilent) {
                     Swal.fire({ icon: 'error', title: 'បញ្ហា', text: 'មិនទទួលបានចម្លើយត្រឹមត្រូវពីម៉ាស៊ីនមេ។' });
                 }
@@ -6197,6 +6293,67 @@ function dashStatusBadge(status) {
     return '<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;">' + dashEscapeHtml(status) + '</span>';
 }
 
+/**
+ * Fetch today's orders from Firestore 'orders' collection and compute
+ * dashboard KPIs (revenue + order count) client-side.
+ * Returns { today_revenue_usd, today_revenue_riel, today_order_count, recent_orders }
+ * Throws on any error so the caller can fallback to /api/dashboard-stats.
+ */
+async function _fetchDashboardFromFirestore() {
+    const fsdb = window._nspFirestoreDB;
+    if (!fsdb) throw new Error('Firestore not initialised');
+
+    // Build today's date string in Cambodia ICT (UTC+7) — YYYY-MM-DD
+    const nowIct = new Date(Date.now() + 7 * 3600 * 1000);
+    const todayStr = nowIct.getUTCFullYear() + '-' +
+        String(nowIct.getUTCMonth() + 1).padStart(2, '0') + '-' +
+        String(nowIct.getUTCDate()).padStart(2, '0');
+
+    // Firestore stores created_at as a Timestamp (UTC). Build the ICT
+    // day boundaries as UTC instants: ICT midnight = UTC-7h.
+    const todayStartUtc = new Date(todayStr + 'T00:00:00+07:00');
+    const todayEndUtc   = new Date(todayStr + 'T23:59:59+07:00');
+
+    const snapshot = await fsdb.collection('orders')
+        .where('created_at', '>=', todayStartUtc)
+        .where('created_at', '<=', todayEndUtc)
+        .get();
+
+    const PAID_STATUSES_JS = new Set([
+        'paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed'
+    ]);
+    const rielRate = (typeof RIEL_RATE !== 'undefined' ? RIEL_RATE : 4000);
+
+    let totalUsd = 0;
+    let orderCount = 0;
+    const recentOrders = [];
+
+    snapshot.docs.forEach(doc => {
+        const d = doc.data();
+        const status = String(d.status || '').trim().toLowerCase();
+        if (!PAID_STATUSES_JS.has(status)) return; // skip pending/cancelled
+        const usd = Number(d.total) || 0;
+        totalUsd += usd;
+        orderCount++;
+        recentOrders.push({
+            tran_id: d.tran_id || doc.id,
+            total_usd: usd,
+            status: d.status || '',
+            user: d.user || ''
+        });
+    });
+
+    // Sort recent orders newest-first (Firestore doesn't guarantee order here)
+    recentOrders.sort((a, b) => String(b.tran_id).localeCompare(String(a.tran_id)));
+
+    return {
+        today_revenue_usd: totalUsd,
+        today_revenue_riel: Math.round(totalUsd * rielRate),
+        today_order_count: orderCount,
+        recent_orders: recentOrders.slice(0, 10)
+    };
+}
+
 async function loadDashboardData(showSpinner) {
     const managerEl = document.getElementById('managerView');
     if (!managerEl) return; // view not present on this page
@@ -6208,12 +6365,56 @@ async function loadDashboardData(showSpinner) {
     if (showSpinner && refreshBtn) refreshBtn.disabled = true;
 
     try {
-        const resp = await fetch('/api/dashboard-stats', {
-            headers: { 'Accept': 'application/json' }
-        });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const data = await resp.json();
-        if (data.status === 'error') throw new Error(data.message || 'Server error');
+        let data = null;
+        let firestoreKpis = null;
+
+        // --- PRIMARY: Firestore live cloud DB for today's KPIs ---
+        try {
+            firestoreKpis = await _fetchDashboardFromFirestore();
+            console.log('[Dashboard] Loaded today KPIs from Firestore (live cloud DB):',
+                'orders=' + firestoreKpis.today_order_count,
+                'usd=' + firestoreKpis.today_revenue_usd.toFixed(2));
+        } catch (fsErr) {
+            console.warn('[Dashboard] Firestore fetch failed, falling back to /api/dashboard-stats:', fsErr.message);
+        }
+
+        // --- FALLBACK / supplemental: /api/dashboard-stats for charts, tables, profit, low-stock ---
+        try {
+            const resp = await fetch('/api/dashboard-stats?t=' + Date.now(), {
+                headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
+            });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            data = await resp.json();
+            if (data.status === 'error') throw new Error(data.message || 'Server error');
+        } catch (apiErr) {
+            if (!firestoreKpis) throw apiErr; // both failed — surface the error
+            console.warn('[Dashboard] /api/dashboard-stats also failed (offline?):', apiErr.message);
+            // Construct a minimal data object from Firestore KPIs so the UI still renders
+            data = {
+                today_revenue_usd: firestoreKpis.today_revenue_usd,
+                today_revenue_riel: firestoreKpis.today_revenue_riel,
+                today_order_count: firestoreKpis.today_order_count,
+                today_gross_profit_riel: 0,
+                today_gross_profit_usd: 0,
+                low_stock_count: 0,
+                revenue_7d: [],
+                top_categories: [],
+                recent_orders: firestoreKpis.recent_orders,
+                recent_stock_movements: []
+            };
+        }
+
+        // If Firestore KPIs loaded successfully, OVERRIDE the stale API values
+        // for the 3 live metrics (revenue + order count) with the real-time data.
+        if (firestoreKpis) {
+            data.today_revenue_usd   = firestoreKpis.today_revenue_usd;
+            data.today_revenue_riel  = firestoreKpis.today_revenue_riel;
+            data.today_order_count   = firestoreKpis.today_order_count;
+            // Also inject Firestore recent orders into the table if the API returned none
+            if ((!data.recent_orders || data.recent_orders.length === 0) && firestoreKpis.recent_orders.length > 0) {
+                data.recent_orders = firestoreKpis.recent_orders;
+            }
+        }
 
         // --- 1. KPI metric cards ---
         const elRevenueRiel = document.getElementById('dashRevenueRiel');
@@ -6358,9 +6559,10 @@ async function loadDashboardData(showSpinner) {
 
         // Refresh lucide icons (charts/tables may add none, but keep icons fresh)
         if (typeof lucide !== 'undefined') setTimeout(lucide.createIcons, 50);
+
     } catch (err) {
         console.error('[Dashboard] loadDashboardData error:', err);
-        // Silent retry on next poll; only surface once per manual refresh
+        // Surface error only on manual refresh
         if (showSpinner) {
             Swal.fire('កំហុស', 'មិនអាចផ្ទុកទិន្នន័យផ្ទាំងគ្រប់គ្រងបានទេ (Dashboard load failed)', 'error');
         }
@@ -6389,8 +6591,8 @@ async function loadCategorySummary() {
     if (!tbody) return; // table not present (non-admin)
 
     try {
-        const resp = await fetch('/api/admin/category-summary', {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        const resp = await fetch('/api/admin/category-summary?t=' + Date.now(), {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Cache-Control': 'no-cache' }
         });
         if (resp.status === 403) {
             tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:#b91c1c;">គ្មានសិទ្ធិចូលប្រើ (Access Denied)</td></tr>';
@@ -6604,10 +6806,15 @@ async function loadCategorySummary() {
                     </div>
                     <div class="form-group mb-4">
                         <label for="modalProductImage" class="form-label" style="color: #475569; font-weight: 600;">៧. រូបភាព (Image)</label>
-                        <div class="image-upload-wrapper text-center">
-                            <img id="modalImagePreview" src="/static/images/default.jpg" class="preview-img mb-2 rounded mx-auto d-block" style="max-height: 150px; max-width: 100%;">
-                            <input type="file" id="modalProductImage" accept="image/*" class="form-control form-control-sm bg-transparent border-0 text-muted" onchange="previewModalProductImage(this)">
+                        <div id="modalImageDropzone" tabindex="0" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 24px; background-color: #f8fafc; text-align: center; cursor: pointer; transition: all 0.2s;" class="hover:bg-slate-100">
+                            <i data-lucide="camera" style="width: 40px; height: 40px; color: #94a3b8; margin: 0 auto 12px block;"></i>
+                            <p style="font-size: 14px; color: #64748b; margin-bottom: 4px;">ចុចទីនេះ, អូសទម្លាក់, ឬ <kbd style="padding: 2px 6px; background-color: #e2e8f0; border-radius: 4px; font-size: 12px;">Ctrl+V</kbd> ដើម្បី Paste រូបភាព</p>
+                            <input type="file" id="modalProductImage" accept="image/*" style="display: none;" onchange="previewModalProductImage(this)">
                             <input type="hidden" name="image_base64" id="modalImageBase64">
+                            <div id="modalImagePreviewContainer" class="hidden" style="margin-top: 16px; position: relative; display: inline-block;">
+                                <img id="modalImagePreview" src="" alt="Preview" style="max-height: 160px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                                <button type="button" onclick="clearModalImage()" style="position: absolute; top: -8px; right: -8px; background-color: #ef4444; color: white; border: none; border-radius: 9999px; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+                            </div>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-danger w-100 py-2 fw-bold" style="background-color: #d81b60; border: none;">៨. រក្សាទុក (Save Product)</button>
@@ -6647,6 +6854,108 @@ document.addEventListener("DOMContentLoaded", function() {
         touchendX = e.changedTouches[0].screenX;
         handleGesture();
     }, { passive: true });
+
+    // Dropzone logic for Main Add Product Form
+    const dropzone = document.getElementById('imageDropzone');
+    const fileInput = document.getElementById('productImageInput');
+    const previewContainer = document.getElementById('imagePreviewContainer');
+    const previewImage = document.getElementById('imagePreview');
+
+    if (dropzone && fileInput) {
+        dropzone.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') { fileInput.click(); }
+        });
+
+        fileInput.addEventListener('change', handleFiles);
+
+        window.addEventListener('paste', e => {
+            if(e.clipboardData.files.length > 0) {
+                fileInput.files = e.clipboardData.files;
+                handleFiles();
+            }
+        });
+
+        function handleFiles() {
+            const file = fileInput.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    previewContainer.classList.remove('hidden');
+                    const icon = dropzone.querySelector('i');
+                    const p = dropzone.querySelector('p');
+                    if(icon) icon.style.display = 'none';
+                    if(p) p.style.display = 'none';
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        window.clearImage = function() {
+            fileInput.value = '';
+            previewImage.src = '';
+            previewContainer.classList.add('hidden');
+            const icon = dropzone.querySelector('i');
+            const p = dropzone.querySelector('p');
+            if(icon) icon.style.display = 'block';
+            if(p) p.style.display = 'block';
+        }
+    }
+
+    // Dropzone logic for Modal Add Product Form
+    const modalDropzone = document.getElementById('modalImageDropzone');
+    const modalFileInput = document.getElementById('modalProductImage');
+    const modalPreviewContainer = document.getElementById('modalImagePreviewContainer');
+    const modalPreviewImage = document.getElementById('modalImagePreview');
+
+    if (modalDropzone && modalFileInput) {
+        modalDropzone.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') { modalFileInput.click(); }
+        });
+
+        modalFileInput.addEventListener('change', handleModalFiles);
+
+        window.addEventListener('paste', e => {
+            if(e.clipboardData.files.length > 0) {
+                modalFileInput.files = e.clipboardData.files;
+                handleModalFiles();
+            }
+        });
+
+        function handleModalFiles() {
+            const file = modalFileInput.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    modalPreviewImage.src = e.target.result;
+                    modalPreviewContainer.classList.remove('hidden');
+                    const icon = modalDropzone.querySelector('i');
+                    const p = modalDropzone.querySelector('p');
+                    if(icon) icon.style.display = 'none';
+                    if(p) p.style.display = 'none';
+                    
+                    // Also trigger the existing previewModalProductImage if needed
+                    if (typeof previewModalProductImage === 'function') {
+                        previewModalProductImage(modalFileInput);
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        window.clearModalImage = function() {
+            modalFileInput.value = '';
+            modalPreviewImage.src = '';
+            modalPreviewContainer.classList.add('hidden');
+            const icon = modalDropzone.querySelector('i');
+            const p = modalDropzone.querySelector('p');
+            if(icon) icon.style.display = 'block';
+            if(p) p.style.display = 'block';
+            
+            const base64Input = document.getElementById('modalImageBase64');
+            if (base64Input) base64Input.value = '';
+        }
+    }
 });
 </script>
 <script>
@@ -6738,21 +7047,69 @@ document.addEventListener("DOMContentLoaded", function() {
    ===================================================================== */
 let productRefreshInFlight = false; // guard against overlapping fetches
 
+/**
+ * Fetch products from Firestore 'items' collection (live cloud DB).
+ * Returns an array of product objects matching the /api/products shape.
+ * Throws on any error so the caller can fallback.
+ */
+async function _fetchProductsFromFirestore() {
+    const fsdb = window._nspFirestoreDB;
+    if (!fsdb) throw new Error('Firestore not initialised');
+    const snapshot = await fsdb.collection('items').get();
+    const products = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+            id: doc.id,
+            name: d.name || '',
+            price: Number(d.price) || 0,
+            barcode: d.barcode || '',
+            image: d.image || '',
+            category: d.category || 'more',
+            stock_quantity: Number(d.stock_quantity) || 0,
+            expiry_date: d.expiry_date || null,
+            low_stock_level: d.low_stock_level || null
+        };
+    });
+
+    console.group("=== FIRESTORE LIVE PRODUCTS DATA ===");
+    console.log("Total products fetched directly from Firestore:", products.length);
+    products.forEach(p => {
+        console.log(`Product ID: ${p.id} | Name: ${p.name} | Image Source Path: ${p.image} | Is_Gdrive: ${p.image.startsWith('https://drive.google.com')}`);
+    });
+    console.groupEnd();
+
+    return products;
+}
+
 async function refreshProductGrid() {
     const grid = document.getElementById('productGrid');
     if (!grid || productRefreshInFlight) return;
     productRefreshInFlight = true;
 
     try {
-        const res = await fetch('/api/products', {
-            headers: { 'Accept': 'application/json' }
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        if (data.status !== 'success') throw new Error(data.message || 'Server error');
+        let products = [];
+        let source = 'api';
+
+        // --- PRIMARY: Firestore live cloud DB ---
+        try {
+            products = await _fetchProductsFromFirestore();
+            source = 'firestore';
+            console.log('[refreshProductGrid] Loaded', products.length, 'products from Firestore (live cloud DB)');
+        } catch (fsErr) {
+            console.warn('[refreshProductGrid] Firestore fetch failed, falling back to /api/products:', fsErr.message);
+            console.warn("--> [Sync Alert] Firestore direct fetch failed. Falling back to local/stagnant API endpoint! Error:", fsErr);
+            // --- FALLBACK: local Flask API ---
+            const res = await fetch('/api/products?t=' + Date.now(), {
+                headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (data.status !== 'success') throw new Error(data.message || 'Server error');
+            products = data.products || [];
+        }
 
         const byId = {};
-        (data.products || []).forEach(p => { byId[p.id] = p; });
+        products.forEach(p => { byId[p.id] = p; });
 
         // Update each rendered card in place: data-stock + Stock label.
         document.querySelectorAll('#productGrid .pos-product-item').forEach(card => {
@@ -6845,49 +7202,54 @@ document.addEventListener('DOMContentLoaded', function() {
     </style>
 
     <script>
-    function startEndOfDaySync() {
-        const modal = document.getElementById('eodSyncModal');
-        modal.style.display = 'flex';
-        modal.classList.remove('hidden');
+    window.startEndOfDaySync = async function() {
+        console.log("--> [Frontend Trigger] Starting End-of-Day Sync via /api/force_sync_eod");
         
-        const closeBtn = document.getElementById('eodCloseBtn');
-        closeBtn.style.display = 'none';
-        closeBtn.classList.add('hidden');
-        
-        const logConsole = document.getElementById('eodLogs');
-        const progressBar = document.getElementById('eodProgressBar');
-        
-        progressBar.style.width = '10%';
-        progressBar.style.background = '#22c55e';
-        logConsole.innerHTML = '> ចាប់ផ្តើមប្រមូលទិន្នន័យលក់ថ្ងៃនេះ...\n';
-        
-        fetch('/api/force_sync_eod', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
+        // 1. Show a loading alert to the user
+        Swal.fire({
+            title: 'កំពុងបញ្ជូនទិន្នន័យឡើង Cloud...',
+            html: 'សូមរង់ចាំមួយភ្នែក ផ្ទាំង Console កំពុងដំណើរការដេរភ្ជាប់ទិន្នន័យ។',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
             }
-        })
-        .then(response => response.json())
-        .then(data => {
-            progressBar.style.width = '100%';
-            if(data.logs) {
-                data.logs.forEach(log => logConsole.innerHTML += `> ${log}\n`);
-            }
-            logConsole.innerHTML += '\n> ✅ ជោគជ័យ! ទិន្នន័យត្រូវបានបញ្ជូនទៅ Cloud ដោយសុវត្ថិភាព។';
-            closeBtn.style.display = 'block';
-            closeBtn.classList.remove('hidden');
-            
-            if(typeof Swal !== 'undefined') {
-                Swal.fire('ជោគជ័យ!', 'បញ្ជីលក់ថ្ងៃនេះត្រូវបានបិទ និងរក្សាទុកលើ Cloud!', 'success');
-            }
-        })
-        .catch(error => {
-            progressBar.style.background = '#ef4444';
-            logConsole.innerHTML += `\n> ❌ បរាជ័យ: ${error.message}`;
-            closeBtn.style.display = 'block';
-            closeBtn.classList.remove('hidden');
         });
-    }
+
+        try {
+            // 2. Fire the POST request directly to our robust endpoint
+            const response = await fetch('/api/force_sync_eod', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.status === 'success') {
+                // 3. Success notification
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ជោគជ័យស្ថាពរ!',
+                    text: 'ទិន្នន័យលក់ និងស្តុកទាំងអស់ត្រូវបានស៊ីសង្វាក់គ្នា ១០០%។',
+                    timer: 2500,
+                    showConfirmButton: false
+                });
+                
+                // Optional: reload dashboard components if needed
+                if (typeof loadDashboardStats === 'function') loadDashboardStats();
+            } else {
+                throw new Error(data.message || 'Server rejected the sync transaction');
+            }
+        } catch (error) {
+            console.error("EOD Sync Runtime Error:", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'សមកាលកម្មបរាជ័យ',
+                text: 'មានបញ្ហាក្នុងការរុញទិន្នន័យ: ' + error.message
+            });
+        }
+    };
     
     function closeEodModal() {
         const modal = document.getElementById('eodSyncModal');
@@ -6895,6 +7257,295 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.classList.add('hidden');
     }
     </script>
+
+<!-- =====================================================================
+     DATA RECEIVER MONITOR — live Cloud Firestore diagnostic modal
+     ===================================================================== -->
+<div id="dataReceiverModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="dr-card bg-white rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl animate-fade-in">
+        <div class="dr-header p-6 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-gray-100 rounded-t-2xl">
+            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i class="fas fa-satellite-dish text-blue-600"></i> Cloud Firestore Data Receiver Monitor</h3>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <button id="refreshReceiverData" class="dr-refresh" title="Refresh live data"><i class="fas fa-rotate"></i> Refresh</button>
+                <button id="closeReceiverModal" class="dr-close text-gray-400 hover:text-gray-600 text-2xl font-semibold">&times;</button>
+            </div>
+        </div>
+        <div id="receiverModalContent" class="dr-content p-6 overflow-y-auto flex-1 font-mono text-sm space-y-4">
+            <!-- Live Firestore product metadata table is injected here -->
+        </div>
+    </div>
+</div>
+
+<style>
+    /* =====================================================================
+       DATA RECEIVER MONITOR — guaranteed styling
+       (compiled tailwind.css lacks gradient/animation/backdrop utilities)
+       ===================================================================== */
+    #dataReceiverBtn {
+        background: linear-gradient(90deg, #2563eb, #4f46e5);
+        color: #ffffff;
+        font-weight: 500;
+        padding: 8px 16px;
+        border-radius: 12px;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        white-space: nowrap;
+    }
+    #dataReceiverBtn:hover {
+        background: linear-gradient(90deg, #1d4ed8, #4338ca);
+    }
+
+    #dataReceiverModal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+        z-index: 10070;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    #dataReceiverModal.dr-open { display: flex; }
+
+    #dataReceiverModal .dr-card {
+        background: #ffffff;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 56rem;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+        animation: drFadeIn 0.25s ease-out;
+    }
+    @keyframes drFadeIn {
+        from { opacity: 0; transform: translateY(14px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    #dataReceiverModal .dr-header {
+        padding: 24px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(90deg, #f8fafc, #f1f5f9);
+        border-radius: 16px 16px 0 0;
+        flex-shrink: 0;
+    }
+    #dataReceiverModal .dr-content {
+        padding: 24px;
+        overflow-y: auto;
+        flex: 1 1 auto;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+        font-size: 14px;
+    }
+    #dataReceiverModal .dr-close {
+        background: none;
+        border: none;
+        color: #9ca3af;
+        font-size: 28px;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 4px;
+    }
+    #dataReceiverModal .dr-close:hover { color: #4b5563; }
+    #dataReceiverModal .dr-refresh {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+    #dataReceiverModal .dr-refresh:hover { background: #dbeafe; }
+</style>
+
+<script>
+/* =====================================================================
+   DATA RECEIVER MONITOR — live Cloud Firestore diagnostic modal
+   ---------------------------------------------------------------------
+   Reads the EXACT product metadata currently pulled from
+   window._nspFirestoreDB.collection('items') and renders it in a clean
+   table: Product Name | Database Image Path | Storage Link Type | Sync
+   Status. Any hidden system error (security rules, permissions, network)
+   is captured and rendered in massive bright-red text so the user can
+   diagnose WITHOUT opening browser DevTools.
+   ===================================================================== */
+(function() {
+    'use strict';
+
+    var btn = document.getElementById('dataReceiverBtn');
+    var modal = document.getElementById('dataReceiverModal');
+    var content = document.getElementById('receiverModalContent');
+    var closeBtn = document.getElementById('closeReceiverModal');
+    var refreshBtn = document.getElementById('refreshReceiverData');
+
+    if (!btn || !modal || !content) return; // elements not present on this page
+
+    function openReceiverModal() {
+        modal.classList.add('dr-open');
+        document.body.style.overflow = 'hidden'; // lock background scroll
+        renderReceiverData();
+    }
+
+    function closeReceiverModal() {
+        modal.classList.remove('dr-open');
+        document.body.style.overflow = '';
+    }
+
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openReceiverModal();
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', closeReceiverModal);
+    if (refreshBtn) refreshBtn.addEventListener('click', renderReceiverData);
+
+    // Click on the dark backdrop (outside the card) closes the modal
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeReceiverModal();
+    });
+
+    // Escape key closes the modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('dr-open')) closeReceiverModal();
+    });
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function truncatePath(path, max) {
+        var p = String(path == null ? '' : path);
+        if (p.length <= max) return p;
+        return p.slice(0, Math.floor(max / 2) - 3) + '…' + p.slice(p.length - Math.floor(max / 2) + 3);
+    }
+
+    function storageLinkType(image) {
+        var p = String(image == null ? '' : image);
+        if (p.indexOf('https://drive.google.com') === 0) return 'Google Drive Link';
+        if (p.indexOf('https://') === 0) return 'External HTTPS URL';
+        if (p.indexOf('data:image') === 0) return 'Base64 Data URL';
+        if (p.indexOf('/static/') === 0 || p.indexOf('static/') === 0) return 'Local Static Path';
+        if (p === '' || p === 'default.jpg') return 'Default Placeholder';
+        return 'Local Path';
+    }
+
+    function renderErrorHTML(err) {
+        var msg = (err && err.message) ? err.message : String(err);
+        var code = (err && err.code) ? err.code : '';
+        var name = (err && err.name) ? err.name : 'Error';
+        return '<div style="background:#7f1d1d;border:3px solid #ef4444;border-radius:14px;padding:24px;text-align:center;">' +
+            '<div style="font-size:22px;font-weight:900;color:#fecaca;margin-bottom:10px;letter-spacing:0.5px;">⚠️ FIRESTORE QUERY FAILED — HIDDEN SYSTEM ERROR CAPTURED</div>' +
+            '<div style="font-size:20px;font-weight:800;color:#f87171;word-break:break-word;line-height:1.5;">' + esc(name) + (code ? ' [' + esc(code) + ']' : '') + '</div>' +
+            '<div style="font-size:18px;font-weight:700;color:#fca5a5;word-break:break-word;line-height:1.6;margin-top:8px;">' + esc(msg) + '</div>' +
+            '<div style="margin-top:16px;font-size:12px;color:#fecaca;">Check Firestore Security Rules / network / Firebase project config. This error is normally hidden in the browser console.</div>' +
+            '</div>';
+    }
+
+    function renderReceiverData() {
+        // Loading state first — instant visual feedback
+        content.innerHTML =
+            '<div style="text-align:center;padding:48px 16px;color:#64748b;">' +
+            '<i class="fas fa-satellite-dish fa-spin" style="font-size:32px;color:#2563eb;margin-bottom:12px;display:block;"></i>' +
+            'កំពុងទាញទិន្នន័យពី Cloud Firestore... (Fetching live cloud data...)</div>';
+
+        var fsdb = window._nspFirestoreDB;
+
+        // ── HEAVY TRY-CATCH: any hidden system error is rendered in
+        //    massive bright-red text so the user can diagnose instantly ──
+        try {
+            if (!fsdb) {
+                throw new Error('window._nspFirestoreDB is NOT initialised. Firebase SDK failed to load or the init script was blocked.');
+            }
+
+            fsdb.collection('items').get().then(function(snapshot) {
+                try {
+                    var products = snapshot.docs.map(function(doc) {
+                        var d = doc.data() || {};
+                        return {
+                            id: doc.id,
+                            name: d.name || d.product_name || '(Unnamed)',
+                            image: d.image || d.image_path || ''
+                        };
+                    });
+
+                    var gdriveCount = 0;
+                    var localCount = 0;
+                    var rows = '';
+
+                    products.forEach(function(p) {
+                        // Sync parity check: Drive URLs start with https://
+                        var isGdrive = String(p.image).indexOf('https://') === 0;
+                        if (isGdrive) gdriveCount++; else localCount++;
+
+                        var badge = isGdrive
+                            ? '<span style="display:inline-flex;align-items:center;gap:6px;background:#dcfce7;color:#15803d;border:1px solid #86efac;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;">🟢 Google Drive <span style="font-weight:400;color:#16a34a;">(Success)</span></span>'
+                            : '<span style="display:inline-flex;align-items:center;gap:6px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;">🔴 Local Fallback <span style="font-weight:400;color:#dc2626;">(Sync Issue)</span></span>';
+
+                        rows += '<tr style="border-bottom:1px solid #f1f5f9;">' +
+                            '<td style="padding:10px 12px;font-weight:600;color:#1e293b;text-align:left;">' + esc(p.name) + '</td>' +
+                            '<td style="padding:10px 12px;color:#475569;text-align:left;word-break:break-all;max-width:340px;font-size:12px;">' + esc(truncatePath(p.image, 90)) + '</td>' +
+                            '<td style="padding:10px 12px;color:#334155;text-align:center;white-space:nowrap;">' + esc(storageLinkType(p.image)) + '</td>' +
+                            '<td style="padding:10px 12px;text-align:center;">' + badge + '</td>' +
+                            '</tr>';
+                    });
+
+                    var summaryBar =
+                        '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">' +
+                        '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:6px 14px;border-radius:10px;font-size:12px;font-weight:700;">📦 Total Products: ' + products.length + '</span>' +
+                        '<span style="background:#dcfce7;color:#15803d;border:1px solid #86efac;padding:6px 14px;border-radius:10px;font-size:12px;font-weight:700;">🟢 Google Drive: ' + gdriveCount + '</span>' +
+                        '<span style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:6px 14px;border-radius:10px;font-size:12px;font-weight:700;">🔴 Local Fallback: ' + localCount + '</span>' +
+                        '</div>';
+
+                    if (products.length === 0) {
+                        content.innerHTML = summaryBar +
+                            '<div style="text-align:center;padding:48px 16px;color:#94a3b8;">' +
+                            'គ្មានទិន្នន័យក្នុង Cloud Firestore (items collection is empty)</div>';
+                        return;
+                    }
+
+                    content.innerHTML = summaryBar +
+                        '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:12px;">' +
+                        '<table style="width:100%;border-collapse:collapse;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;">' +
+                        '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">' +
+                        '<th style="padding:12px;text-align:left;color:#0f172a;font-weight:700;white-space:nowrap;">Product Name</th>' +
+                        '<th style="padding:12px;text-align:left;color:#0f172a;font-weight:700;white-space:nowrap;">Database Image Path</th>' +
+                        '<th style="padding:12px;text-align:center;color:#0f172a;font-weight:700;white-space:nowrap;">Storage Link Type</th>' +
+                        '<th style="padding:12px;text-align:center;color:#0f172a;font-weight:700;white-space:nowrap;">Sync Status</th>' +
+                        '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+                        '<div style="margin-top:12px;font-size:11px;color:#94a3b8;text-align:right;">Live source: window._nspFirestoreDB.collection(\'items\') · ' + new Date().toLocaleTimeString() + '</div>';
+                } catch (renderErr) {
+                    content.innerHTML = renderErrorHTML(renderErr);
+                }
+            }).catch(function(fsErr) {
+                content.innerHTML = renderErrorHTML(fsErr);
+            });
+        } catch (err) {
+            content.innerHTML = renderErrorHTML(err);
+        }
+    }
+})();
+</script>
 
 </body>
 </html>

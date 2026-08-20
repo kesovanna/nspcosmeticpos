@@ -188,7 +188,9 @@ def push_to_firestore():
     db = get_firestore_db()
     print(f"DEBUG push_to_firestore local_db={getattr(local_db, '__file__', None)} has_get_unsynced={hasattr(local_db, 'get_unsynced_orders')}")
     if not db:
-        return False, "Could not connect to Firestore"
+        return False, "Could not connect to Firestore", []
+
+    synced_product_names = []
 
     try:
         count = 0
@@ -209,16 +211,46 @@ def push_to_firestore():
             if successfully_deleted:
                 local_db.clear_deletion_log(successfully_deleted)
 
-        # 2. Push Products (Overwrite/Update Firestore with latest local data)
+        # 2. Push Products — FULL PARITY SYNC (unconditional, no timestamp/flag filters)
+        # -----------------------------------------------------------------------
+        # Fetches ALL products from the local SQLite DB and writes every one to
+        # Firestore using .set() (overwrite semantics).  Each product is wrapped
+        # in its own try/except so a single bad record NEVER aborts the loop.
+        #
+        # IMAGE HANDLING:
+        #   - Google Drive URLs (https://drive.google.com/uc?...) are PRESERVED
+        #     as-is — they are permanent public links managed by gdrive_storage.
+        #   - Firebase Storage URLs (https://storage.googleapis.com/...) are
+        #     also preserved.
+        #   - Any other http(s) URL or data: URI is kept verbatim.
+        #   - Local filesystem paths (no scheme) are replaced with 'default.jpg'
+        #     so the cloud-hosted web app never receives a broken local path.
+        # -----------------------------------------------------------------------
         products = local_db.get_products()
+        print(f"[Product Sync] Starting full parity sync for {len(products)} local products...")
         for prod in products:
             prod_data = dict(prod)
             prod_id = prod_data.pop('id', None)
-            if prod_id:
+            if not prod_id:
+                print(f"--> [Product Sync Warning] Skipping product with no ID: {prod_data.get('name', '?')}")
+                continue
+            try:
+                # Sanitize image field: keep cloud URLs, replace local paths.
+                image_val = prod_data.get('image', '')
+                if image_val and not str(image_val).startswith('http') and not str(image_val).startswith('data:'):
+                    print(f"--> [Product Sync] Product '{prod_data.get('name')}' has local image path '{image_val}'. Replacing with 'default.jpg' for cloud sync.")
+                    prod_data['image'] = 'default.jpg'
+
                 db.collection('items').document(prod_id).set(prod_data)
+                synced_product_names.append(prod_data.get('name', 'Unknown Product'))
                 count += 1
+            except Exception as e:
+                print(f"--> [Product Sync Warning] Failed on {prod_id} ('{prod_data.get('name', '?')}'): {e}")
+                continue
 
         # 3. Push User Profiles (Sync all local users to Firestore)
+        # CRITICAL: errors here must NEVER abort the function — orders (Section 4)
+        # must always be pushed regardless of image sync failures.
         try:
             users = local_db.get_all_users()
             for user in users:
@@ -233,12 +265,15 @@ def push_to_firestore():
 
                 if user_data['profile_image'] or user_data['cover_image']:
                     print(f"Syncing images for user: {user.get('username')}")
-                    db.collection('users').document(user['username']).set(user_data, merge=True)
-                    count += 1
+                    try:
+                        db.collection('users').document(user['username']).set(user_data, merge=True)
+                        count += 1
+                    except Exception as img_e:
+                        print(f"--> [Storage Warning] Image upload failed (404/Quota). Skipping image but continuing data sync... Error: {img_e}")
         except Exception as e:
-            print(f"Error syncing user profile images: {e}")
+            # Log the error but DO NOT return early — orders must still be pushed.
+            print(f"--> [Storage Warning] Image upload failed (404/Quota). Skipping image but continuing data sync... Error: {e}")
             traceback.print_exc()
-            return False, f"Error syncing user profile images: {str(e)}"
 
         # 4. Push Orders (PILLAR 1+2+3: exactly-once, atomic, collision-free)
         unsynced = local_db.get_unsynced_orders()
@@ -287,11 +322,11 @@ def push_to_firestore():
             else:
                 print(f"⚠️ Skipping order {order.get('tran_id')}: {pushed_msg}")
 
-        return True, f"Successfully pushed {count} records to Firestore"
+        return True, f"Successfully pushed {count} records to Firestore", synced_product_names
     except Exception as e:
         print(f"Error in push_to_firestore: {e}")
         traceback.print_exc()
-        return False, f"Error pushing data: {str(e)}"
+        return False, f"Error pushing data: {str(e)}", []
 
 def sync_all():
     """Perform a full sync (Push then Pull)"""
@@ -304,7 +339,7 @@ def sync_all():
 
     try:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Syncing started...")
-        push_ok, push_msg = push_to_firestore()
+        push_ok, push_msg, synced_products = push_to_firestore()
         pull_ok, pull_msg = pull_from_firestore()
         
         success = pull_ok and push_ok
@@ -314,7 +349,8 @@ def sync_all():
         return {
             'success': success,
             'pull': pull_msg,
-            'push': push_msg
+            'push': push_msg,
+            'synced_products': synced_products
         }
     finally:
         with _sync_lock:

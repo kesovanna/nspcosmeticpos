@@ -657,7 +657,7 @@
             window.triggerSync = async function(isSilent = false) {
                 console.log("Sync triggered from layout");
                 try {
-                    const response = await fetch('/api/sync', { method: 'POST' });
+                    const response = await fetch('/api/force_sync_eod', { method: 'POST' });
                     let result = null;
 
                     try {
@@ -668,7 +668,7 @@
                     }
 
                     if (!result || typeof result !== 'object') {
-                        console.error('Invalid /api/sync response payload:', result);
+                        console.error('Invalid /api/force_sync_eod response payload:', result);
                         if (!isSilent) {
                             Swal.fire({
                                 icon: 'error',

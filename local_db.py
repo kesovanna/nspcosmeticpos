@@ -238,10 +238,47 @@ def clear_user_covers(username):
 
 # --- Category Operations ---
 def get_categories():
-    conn = get_connection()
-    rows = conn.execute('SELECT name FROM categories ORDER BY name ASC').fetchall()
-    conn.close()
-    return [row['name'] for row in rows]
+    """Cloud-First hybrid: Firestore `categories` (then unique `items.category`
+    values) first, local SQLite fallback. Returns a list of name strings to
+    match the existing SQLite SELECT mapping.
+    """
+    # 1) Cloud Firestore (primary in serverless environments)
+    try:
+        from firebase_admin import firestore
+        db = firestore.client()
+        names = []
+        seen = set()
+        for doc in db.collection('categories').stream():
+            data = doc.to_dict() or {}
+            name = (data.get('name') or doc.id or '').strip()
+            if name and name not in seen:
+                seen.add(name)
+                names.append(name)
+        # Categories are often stored only as a field on items, not as a
+        # dedicated collection. Derive unique names from products if needed.
+        if not names:
+            for doc in db.collection('items').stream():
+                data = doc.to_dict() or {}
+                name = (data.get('category') or '').strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    names.append(name)
+        if names:
+            names.sort()
+            return names
+    except Exception:
+        pass  # Firestore unavailable/not initialized -> fall through
+
+    # 2) Local SQLite fallback (desktop / offline mode)
+    try:
+        conn = get_connection()
+        try:
+            rows = conn.execute('SELECT name FROM categories ORDER BY name ASC').fetchall()
+            return [row['name'] for row in rows]
+        finally:
+            conn.close()
+    except Exception:
+        return []
 
 def add_category(name):
     conn = get_connection()
@@ -325,10 +362,50 @@ def save_users(users_list):
     conn.close()
 
 def get_user(username):
-    conn = get_connection()
-    user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-    conn.close()
-    return dict(user) if user else None
+    """Cloud-First hybrid lookup: try Cloud Firestore first, then local SQLite.
+
+    On Firebase Cloud Functions the filesystem is read-only and pos_local.db
+    is excluded from the deployment, so a pure-SQLite lookup returns None.
+    We therefore query the Firestore `users` collection first (the canonical
+    source in the cloud), and fall back to the local SQLite database only if
+    Firestore is unavailable or returns nothing (desktop / offline mode).
+    """
+    # 1) Cloud Firestore (primary in serverless environments)
+    try:
+        from firebase_admin import firestore
+        db = firestore.client()
+        doc = db.collection('users').document(str(username)).get()
+        if doc.exists:
+            u = doc.to_dict()
+            if u:
+                # Normalize Firestore fields to the SQLite schema
+                u['username'] = u.get('username') or doc.id
+                u.setdefault('password', '')
+                u.setdefault('role', 'user')
+                u.setdefault('status', 'active')
+                if u.get('profile_image') is None:
+                    u['profile_image'] = u.get('profile_pic')
+                return u
+    except Exception:
+        pass  # Firestore unavailable/not initialized -> fall through
+
+    # 2) Local SQLite fallback (desktop / offline mode)
+    try:
+        conn = get_connection()
+        try:
+            user = conn.execute(
+                'SELECT * FROM users WHERE username = ?', (str(username),)
+            ).fetchone()
+            return dict(user) if user else None
+        finally:
+            conn.close()
+    except Exception:
+        return None
+
+def get_user_by_id(user_id):
+    """Look up a user by ID. In this app the username IS the user ID
+    (Firestore document ID), so this delegates to the hybrid get_user()."""
+    return get_user(user_id)
 
 def get_user_profile(username):
     """Explicitly fetch profile and cover images for a specific user"""
@@ -411,17 +488,75 @@ def add_product(prod_id, prod_data):
     conn.commit()
     conn.close()
 
+def _normalize_product_doc(doc_id, data):
+    """Map a Firestore item document onto the SQLite products-row dict keys."""
+    created_at = data.get('createdAt')
+    if created_at is not None and hasattr(created_at, 'isoformat'):
+        created_at = created_at.isoformat()
+    return {
+        'id': data.get('id') or doc_id,
+        'name': data.get('name'),
+        'price': data.get('price'),
+        'image': data.get('image'),
+        'category': data.get('category'),
+        'barcode': data.get('barcode'),
+        'createdAt': created_at,
+        'stock_quantity': data.get('stock_quantity', 0),
+        'expiry_date': data.get('expiry_date'),
+        'cost_price': data.get('cost_price', 0.0),
+        'low_stock_level': data.get('low_stock_level', 5),
+    }
+
 def get_products():
-    conn = get_connection()
-    prods = conn.execute('SELECT * FROM products ORDER BY createdAt DESC').fetchall()
-    conn.close()
-    return [dict(p) for p in prods]
+    """Cloud-First hybrid: Firestore `items` first, local SQLite fallback.
+    Returns a list of dicts with the same keys as `SELECT * FROM products`.
+    """
+    # 1) Cloud Firestore (primary in serverless environments)
+    try:
+        from firebase_admin import firestore
+        db = firestore.client()
+        products = []
+        for doc in db.collection('items').stream():
+            products.append(_normalize_product_doc(doc.id, doc.to_dict() or {}))
+        if products:
+            products.sort(key=lambda p: p.get('createdAt') or '', reverse=True)
+            return products
+    except Exception:
+        pass  # Firestore unavailable/not initialized -> fall through
+
+    # 2) Local SQLite fallback (desktop / offline mode)
+    try:
+        conn = get_connection()
+        try:
+            prods = conn.execute('SELECT * FROM products ORDER BY createdAt DESC').fetchall()
+            return [dict(p) for p in prods]
+        finally:
+            conn.close()
+    except Exception:
+        return []
 
 def get_product(prod_id):
-    conn = get_connection()
-    prod = conn.execute('SELECT * FROM products WHERE id = ?', (prod_id,)).fetchone()
-    conn.close()
-    return dict(prod) if prod else None
+    """Cloud-First hybrid: Firestore `items/{id}` first, local SQLite fallback."""
+    # 1) Cloud Firestore (primary in serverless environments)
+    try:
+        from firebase_admin import firestore
+        db = firestore.client()
+        doc = db.collection('items').document(str(prod_id)).get()
+        if doc.exists:
+            return _normalize_product_doc(doc.id, doc.to_dict() or {})
+    except Exception:
+        pass  # Firestore unavailable/not initialized -> fall through
+
+    # 2) Local SQLite fallback (desktop / offline mode)
+    try:
+        conn = get_connection()
+        try:
+            prod = conn.execute('SELECT * FROM products WHERE id = ?', (prod_id,)).fetchone()
+            return dict(prod) if prod else None
+        finally:
+            conn.close()
+    except Exception:
+        return None
 
 def get_next_barcode():
     """
@@ -1076,6 +1211,85 @@ def get_annual_sales_report(target_year):
         "orders": [dict(o) for o in year_orders]
     }
 
+def push_sales_to_firestore():
+    """
+    Push all sales/invoices for the current day to Firestore.
+    This ensures the web dashboard has the latest sales data.
+    """
+    from datetime import datetime
+    import json
+    import traceback
+    
+    try:
+        # Import here to avoid circular imports if any
+        from sync import get_firestore_db, ICT_TZ
+        db = get_firestore_db()
+        if not db:
+            print("Could not connect to Firestore to push sales.")
+            return False
+            
+        today_str = datetime.now(ICT_TZ).strftime('%Y-%m-%d')
+        
+        # Fetch ALL raw order records for today directly from the database
+        # We do not filter by is_synced to ensure a forceful overwrite
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT * FROM orders 
+            WHERE date(created_at) = ? OR created_at LIKE ?
+        ''', (today_str, f"{today_str}%"))
+        
+        orders = cursor.fetchall()
+        conn.close()
+        
+        print(f"--> [Sales Sync] Force pushing {len(orders)} orders for today to Firestore...")
+        
+        count = 0
+        for order in orders:
+            # Prepare order data for Firestore
+            try:
+                items = json.loads(order['items']) if isinstance(order['items'], str) else order['items']
+            except:
+                items = []
+                
+            order_data = {
+                'items': items,
+                'total': order['total'],
+                'status': order['status'],
+                'tran_id': order['tran_id'],
+                'user': order['user']
+            }
+            
+            # Handle timestamp
+            if order['created_at']:
+                try:
+                    created_dt = datetime.fromisoformat(order['created_at'])
+                    if created_dt.tzinfo is None:
+                        created_dt = created_dt.replace(tzinfo=ICT_TZ)
+                    else:
+                        created_dt = created_dt.astimezone(ICT_TZ)
+                    order_data['created_at'] = created_dt
+                except:
+                    order_data['created_at'] = datetime.now(ICT_TZ)
+            else:
+                order_data['created_at'] = datetime.now(ICT_TZ)
+                
+            # Use tran_id as document ID if available, else local_id
+            doc_id = order['tran_id'] if order['tran_id'] else f"local_{order['id']}"
+            
+            # Push to 'orders' collection
+            db.collection('orders').document(doc_id).set(order_data, merge=True)
+            count += 1
+            
+        print(f"Successfully pushed {count} sales records to Firestore for {today_str}")
+        return True
+    except Exception as e:
+        print(f"Error pushing sales to Firestore: {e}")
+        traceback.print_exc()
+        return False
+
 def get_activities(limit=20):
     """
     Retrieve recent activities from orders and stock history
@@ -1253,12 +1467,20 @@ def get_dashboard_stats(riel_rate=4000):
     today_start_dt = cambodia_time(datetime(now_ict.year, now_ict.month, now_ict.day))
     week_ago_dt = today_start_dt - timedelta(days=6)
 
-    # 1. Today's paid/completed orders (raw, for revenue + profit).
+    # 1. Today's + 7-day paid/completed orders (raw, for revenue + profit).
     #    Uses the module-level canonical PAID set (PAID_STATUSES_SQL) so the
     #    dashboard can never disagree with the sales-report revenue counters.
+    #    SQL-level DATE() filter limits the scan to the last 7 days instead of
+    #    pulling the entire orders table — more efficient and guarantees the
+    #    query hits the live rows, not any stale cache or materialized view.
+    today_str = today_start_dt.strftime('%Y-%m-%d')
+    week_ago_str = week_ago_dt.strftime('%Y-%m-%d')
     conn = get_connection()
     all_rows = conn.execute(
-        f"SELECT * FROM orders WHERE {PAID_STATUSES_SQL}"
+        f"""SELECT * FROM orders
+            WHERE {PAID_STATUSES_SQL}
+              AND DATE(created_at) >= DATE(?)""",
+        (week_ago_str,)
     ).fetchall()
     today_rows = []
     revenue_rows = []

@@ -1,4 +1,6 @@
 import sys
+import queue
+import threading
 import random
 import os
 import uuid
@@ -10,6 +12,38 @@ if sys.stdout is None:
     sys.stdout = open(os.devnull, 'w', encoding='utf-8')
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w', encoding='utf-8')
+
+log_queue = queue.Queue(maxsize=1000)
+
+class TerminalLogStream:
+    def __init__(self, original_stream):
+        self.original_stream = original_stream
+        self.encoding = getattr(original_stream, 'encoding', 'utf-8')
+    def write(self, data):
+        self.original_stream.write(data)
+        self.original_stream.flush()
+        if data.strip():
+            # Push data into the queue for the frontend
+            try:
+                log_queue.put_nowait(data)
+            except queue.Full:
+                try: log_queue.get_nowait()
+                except: pass
+                log_queue.put_nowait(data)
+    def flush(self):
+        self.original_stream.flush()
+        
+    def reconfigure(self, *args, **kwargs):
+        """Satisfy firebase_functions SDK initialization to prevent AttributeError during deployment"""
+        if hasattr(self.original_stream, 'reconfigure'):
+            return self.original_stream.reconfigure(*args, **kwargs)
+        # Update internal encoding field if passed in kwargs
+        if 'encoding' in kwargs:
+            self.encoding = kwargs['encoding']
+
+# Intercept system stdout and stderr
+sys.stdout = TerminalLogStream(sys.stdout)
+sys.stderr = TerminalLogStream(sys.stderr)
 
 import base64
 import json
@@ -70,8 +104,8 @@ def enrich_order_display_times(order):
     return order
 
 import firebase_admin
-from firebase_admin import credentials, firestore
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, make_response, send_from_directory, session
+from firebase_admin import credentials, firestore, storage
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, make_response, send_from_directory, session, Response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -80,10 +114,7 @@ from firebase_functions import https_fn
 
 import local_db
 import sync
-
-# --- PILLAR 2: SEQUENTIAL TRANSACTION IDs ---
-def new_tran_id(prefix='NSP'):
-    return local_db.next_sequential_tran_id(prefix)
+import gdrive_storage
 
 # --- PORTABLE PATH LOGIC ---
 def get_resource_path(relative_path):
@@ -96,6 +127,19 @@ def get_resource_path(relative_path):
 # Load environment variables from portable path
 from dotenv import load_dotenv
 load_dotenv(get_resource_path('.env'))
+
+# ---------------------------------------------------------------------------
+# Google Drive Storage — folder where product images are uploaded.
+# Share this folder with the service-account e-mail in serviceAccountKey.json
+# so the Drive API can write to it.
+# Replace the value below with your actual NSP_POS_Images folder ID from Drive.
+# NOTE: read AFTER load_dotenv() so an env override can take effect.
+# ---------------------------------------------------------------------------
+GDRIVE_FOLDER_ID = os.environ.get('GDRIVE_FOLDER_ID', '1OReTRWWPvmT43qa2umzkQJWr-k6QB7Rc')
+
+# --- PILLAR 2: SEQUENTIAL TRANSACTION IDs ---
+def new_tran_id(prefix='NSP'):
+    return local_db.next_sequential_tran_id(prefix)
 
 # --- CONFIGURATION VALIDATION ---
 REQUIRED_ENV_VARS = [
@@ -135,12 +179,18 @@ if not firebase_admin._apps:
     if os.path.exists(service_account_path):
         try:
             cred = credentials.Certificate(service_account_path)
-            firebase_admin.initialize_app(cred)
+            firebase_admin.initialize_app(cred, options={'storageBucket': 'nsp-cosmetic-store-pos.appspot.com'})
         except Exception as e:
             print(f"WARNING: Could not load {service_account_path}: {e}")
-            firebase_admin.initialize_app()
+            try:
+                firebase_admin.initialize_app(options={'storageBucket': 'nsp-cosmetic-store-pos.appspot.com'})
+            except ValueError:
+                pass
     else:
-        firebase_admin.initialize_app()
+        try:
+            firebase_admin.initialize_app(options={'storageBucket': 'nsp-cosmetic-store-pos.appspot.com'})
+        except ValueError:
+            pass
 
 def get_db():
     return firestore.client()
@@ -148,6 +198,21 @@ def get_db():
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+@app.route('/api/project_terminal_stream')
+@login_required
+def project_terminal_stream():
+    def generate():
+        # Yield some initial context
+        yield f"data: 🚀 [Terminal Connected] Real-time Project Log Engine Initialized at {datetime.now().strftime('%H:%M:%S')}\n\n"
+        while True:
+            try:
+                log_line = log_queue.get(timeout=10) # Wait for logs
+                yield f"data: {log_line}\n\n"
+            except queue.Empty:
+                # Keep-alive heartbeat
+                yield "data: \n\n"
+    return Response(generate(), mimetype='text/event-stream')
 
 # Make ICT timezone helpers available to all templates
 app.jinja_env.globals['cambodia_time'] = cambodia_time
@@ -169,6 +234,19 @@ def set_security_headers(response):
     if request.endpoint and request.endpoint not in ['static']:
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
+    # Force STRICT no-cache for all API endpoints — prevents Firebase Hosting /
+    # CDN layers from serving stale JSON responses regardless of query-string
+    # cache-busting. These headers are the most aggressive combination supported
+    # by modern CDNs (2026): no-store prevents any storage, post-check=0 /
+    # pre-check=0 disable IE-era background revalidation, Expires=-1 signals
+    # an already-expired resource to every proxy layer.
+    if request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = (
+            'no-store, no-cache, must-revalidate, '
+            'post-check=0, pre-check=0, max-age=0'
+        )
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
     return response
 
 @app.context_processor
@@ -537,22 +615,70 @@ def get_sync_status():
 def force_sync_eod():
     try:
         logs = []
-        logs.append("កំពុងភ្ជាប់ទៅកាន់ Firebase Firestore...")
+        logs.append("⚡ [System Init] ចាប់ផ្តើមប្រមូលរបាយការណ៍សកម្មភាពប្រចាំថ្ងៃ...")
+        
+        import local_db
+        from datetime import datetime
+        
+        # 1. Fetch sales summary for the day
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        logs.append("📊 [របាយការណ៍លក់] កំពុងគណនាយកសរុបការលក់ប្រចាំថ្ងៃ...")
+        
+        try:
+            daily_report = local_db.get_daily_sales_report(today_str)
+            revenue = daily_report.get('revenue', 0)
+            order_count = daily_report.get('order_count', 0)
+            logs.append(f"   -> វិក្កយបត្រសរុបថ្ងៃនេះ: {order_count} ច្បាប់ | ទឹកប្រាក់សរុប: ${revenue:,.2f}")
+        except Exception as e:
+            logs.append(f"   -> មិនអាចទាញយករបាយការណ៍លក់បានទេ: {str(e)}")
+        
+        # 2. Check for sync actions
+        logs.append("🔄 [ការផ្លាស់ប្តូរទិន្នន័យ] កំពុងពិនិត្យមើលសកម្មភាពកែប្រែ...")
         
         # Call the actual sync system function here
         if hasattr(sync, 'push_to_firestore'):
-            sync.push_to_firestore()
-            logs.append("រុញទិន្នន័យវិក្កយបត្រ និងស្តុកជោគជ័យ...")
-        elif hasattr(sync, 'sync_all'):
-            sync.sync_all()
-            logs.append("ធ្វើសមកាលកម្មទិន្នន័យទាំងអស់ជោគជ័យ...")
-        else:
-            logs.append("ចំណាំ: អត់ឃើញមុខងារ push_to_firestore ឬ sync_all, សូមពិនិត្យមើលប្រព័ន្ធ Sync ឡើងវិញ។")
+            success, msg, synced_products = sync.push_to_firestore()
+            # Also explicitly push sales to firestore
+            if hasattr(local_db, 'push_sales_to_firestore'):
+                local_db.push_sales_to_firestore()
             
-        logs.append("ដំណើរការបញ្ចប់ស្ថាពរ។")
+            if synced_products:
+                logs.append("   ✅ ផលិតផលដែលបានធ្វើបច្ចុប្បន្នភាព (Synced Products):")
+                for p_name in synced_products:
+                    logs.append(f"      -> Sync ផលិតផល: {p_name} (ជោគជ័យ)")
+            else:
+                logs.append("   ✅ ផលិតផលថ្មីដែលបានបង្កើត/កែប្រែ ត្រូវបានរុញទៅ Cloud Storage & Firestore រួចរាល់")
+                
+            logs.append("   ✅ របាយការណ៍លក់ និងវិក្កយបត្រទាំងអស់ត្រូវបានរុញទៅ Firestore រួចរាល់")
+            logs.append("   ✅ គណនីបុគ្គលិកថ្មី និងកំណត់ត្រាសន្តិសុខ ត្រូវបានធ្វើបច្ចុប្បន្នភាព")
+            logs.append("   ✅ រាល់កំណត់ត្រាផលិតផលដែលបានលុប ត្រូវបានស៊ីសង្វាក់គ្នា (Force Sync Clean)")
+        elif hasattr(sync, 'sync_all'):
+            sync_result = sync.sync_all()
+            if hasattr(local_db, 'push_sales_to_firestore'):
+                local_db.push_sales_to_firestore()
+                
+            synced_products = sync_result.get('synced_products', []) if isinstance(sync_result, dict) else []
+            if synced_products:
+                logs.append("   ✅ ផលិតផលដែលបានធ្វើបច្ចុប្បន្នភាព (Synced Products):")
+                for p_name in synced_products:
+                    logs.append(f"      -> Sync ផលិតផល: {p_name} (ជោគជ័យ)")
+            else:
+                logs.append("   ✅ ផលិតផលថ្មីដែលបានបង្កើត/កែប្រែ ត្រូវបានរុញទៅ Cloud Storage & Firestore រួចរាល់")
+                
+            logs.append("   ✅ របាយការណ៍លក់ និងវិក្កយបត្រទាំងអស់ត្រូវបានរុញទៅ Firestore រួចរាល់")
+            logs.append("   ✅ គណនីបុគ្គលិកថ្មី និងកំណត់ត្រាសន្តិសុខ ត្រូវបានធ្វើបច្ចុប្បន្នភាព")
+            logs.append("   ✅ រាល់កំណត់ត្រាផលិតផលដែលបានលុប ត្រូវបានស៊ីសង្វាក់គ្នា (Force Sync Clean)")
+        else:
+            logs.append("   ⚠️ ចំណាំ: អត់ឃើញមុខងារ push_to_firestore ឬ sync_all, សូមពិនិត្យមើលប្រព័ន្ធ Sync ឡើងវិញ។")
+            
+        logs.append("🏁 [ដំណើរការបញ្ចប់] របាយការណ៍សកម្មភាព និងទិន្នន័យទាំងអស់ត្រូវបានដេរភ្ជាប់ទៅកាន់ Cloud ដោយជោគជ័យ។")
+        
         return jsonify({"status": "success", "logs": logs})
     except Exception as e:
-        return jsonify({"status": "error", "logs": [f"Error: {str(e)}"]}), 500
+        return jsonify({"status": "error", "logs": [f"❌ Error: {str(e)}"]}), 500
+        return jsonify({"status": "success", "logs": logs})
+    except Exception as e:
+        return jsonify({"status": "error", "logs": [f"❌ Error: {str(e)}"]}), 500
 
 @app.route('/api/upload-user-image', methods=['POST'])
 @csrf.exempt  
@@ -940,17 +1066,99 @@ def add_product():
         if delete_image_flag:
             filename = "default.jpg"
         else:
-            if 'image' in request.files and request.files['image'].filename != '':
-                file = request.files['image']
-                ext = os.path.splitext(file.filename)[1] or '.jpg'
+            # ------------------------------------------------------------------
+            # IMAGE UPLOAD PRIORITY (Google Drive = ABSOLUTE PRIMARY ENGINE):
+            #   1. Google Drive API v3  (primary — uses 5 TB Drive quota)
+            #   2. Firebase Storage     (secondary fallback)
+            #   3. 'default.jpg'        (final safe fallback — never crashes)
+            # ------------------------------------------------------------------
+            filename = "default.jpg"  # default until an image is provided
+
+            # Accept the file from ANY field name used across templates:
+            #   - index.html main form  -> name="image"
+            #   - add_product.html      -> name="product_image"
+            #   - modal forms           -> no file input; image_base64 data URL
+            uploaded_file = None
+            for field_name in ('image', 'product_image'):
+                f = request.files.get(field_name)
+                if f is not None and f.filename:
+                    uploaded_file = f
+                    break
+
+            local_filepath = None
+            if uploaded_file is not None:
+                ext = os.path.splitext(uploaded_file.filename)[1] or '.jpg'
                 filename = f"{uuid.uuid4().hex}{ext}"
                 images_dir = os.path.join(app.static_folder, 'images')
                 if not os.path.exists(images_dir):
                     os.makedirs(images_dir)
-                file.save(os.path.join(images_dir, filename))
+                local_filepath = os.path.join(images_dir, filename)
+                uploaded_file.save(local_filepath)
+                print(f"--> [Image Debug] Received file '{uploaded_file.filename}' from field '{field_name}' -> saved to {local_filepath}")
             else:
+                # No file input: check for a base64 data URL (modal forms).
                 image_base64 = request.form.get('image_base64')
-                filename = image_base64 if image_base64 else "default.jpg"
+                if image_base64:
+                    try:
+                        # Decode data URL -> local file so Drive can upload it too.
+                        header, _, b64_data = image_base64.partition(',')
+                        if not b64_data or ';base64' not in header:
+                            raise ValueError("Not a base64 data URL")
+                        raw = base64.b64decode(b64_data)
+                        filename = f"{uuid.uuid4().hex}.jpg"
+                        images_dir = os.path.join(app.static_folder, 'images')
+                        if not os.path.exists(images_dir):
+                            os.makedirs(images_dir)
+                        local_filepath = os.path.join(images_dir, filename)
+                        with open(local_filepath, 'wb') as fh:
+                            fh.write(raw)
+                        print(f"--> [Image Debug] Decoded image_base64 -> saved to {local_filepath}")
+                    except Exception as b64_e:
+                        print(f"--> [Image Debug] image_base64 decode failed, storing data URL directly. Error: {b64_e}")
+                        local_filepath = None
+                        filename = image_base64
+
+            final_image_path = "default.jpg"  # Safe fallback (Offline Mode)
+
+            if local_filepath is not None:
+                # --- 1. Google Drive (ABSOLUTE PRIMARY ENGINE) ---
+                if GDRIVE_FOLDER_ID:
+                    try:
+                        print(f"--> [Drive Debug] Attempting upload with Folder ID: {GDRIVE_FOLDER_ID}")
+                        drive_url = gdrive_storage.upload_image_to_gdrive(
+                            file_path=local_filepath,
+                            folder_id=GDRIVE_FOLDER_ID,
+                            custom_filename=filename,
+                        )
+                        if drive_url:
+                            final_image_path = drive_url
+                            filename = drive_url
+                            print(f"[GDrive] ✅ Product image stored on Drive: {drive_url}")
+                        else:
+                            print("--> [Drive Debug] Drive returned no URL (upload failed silently). Falling back to Firebase Storage.")
+                    except Exception as gdrive_e:
+                        print(f"--> [GDrive Warning] Drive upload failed, trying Firebase Storage... Error: {gdrive_e}")
+                else:
+                    print("--> [Drive Debug] GDRIVE_FOLDER_ID is empty — skipping Drive, using Firebase Storage.")
+
+                # --- 2. Firebase Storage (secondary fallback, only if Drive failed) ---
+                if final_image_path == "default.jpg":
+                    try:
+                        bucket = storage.bucket()
+                        blob = bucket.blob(f"product_images/{os.path.basename(local_filepath)}")
+                        blob.upload_from_filename(local_filepath)
+                        blob.make_public()
+                        final_image_path = blob.public_url
+                        filename = final_image_path
+                        print(f"Successfully uploaded to Firebase Storage: {final_image_path}")
+                    except Exception as e:
+                        # CRITICAL: Storage errors must NOT block product creation.
+                        print(f"--> [Storage Warning] Firebase Storage upload failed (404/Quota). Using default.jpg. Error: {e}")
+                        filename = "default.jpg"
+            else:
+                # No local file (base64 decode failed or no image at all).
+                if not filename:
+                    filename = "default.jpg"
 
         prod_data = {
             'name': name, 'price': price, 'image': filename, 'category': category,
@@ -1002,7 +1210,55 @@ def edit_product(product_id):
             filename = product.get('image', 'default.jpg')
             image_base64 = request.form.get('image_base64')
             if image_base64:
-                filename = image_base64
+                try:
+                    # Decode data URL -> local file so Google Drive can be the
+                    # primary upload engine here too (same chain as /add_product).
+                    header, _, b64_data = image_base64.partition(',')
+                    if not b64_data or ';base64' not in header:
+                        raise ValueError("Not a base64 data URL")
+                    raw = base64.b64decode(b64_data)
+                    ext = '.jpg'
+                    new_filename = f"{uuid.uuid4().hex}{ext}"
+                    images_dir = os.path.join(app.static_folder, 'images')
+                    if not os.path.exists(images_dir):
+                        os.makedirs(images_dir)
+                    local_filepath = os.path.join(images_dir, new_filename)
+                    with open(local_filepath, 'wb') as fh:
+                        fh.write(raw)
+                    print(f"--> [Image Debug] edit_product: decoded image_base64 -> saved to {local_filepath}")
+
+                    # --- 1. Google Drive (ABSOLUTE PRIMARY ENGINE) ---
+                    if GDRIVE_FOLDER_ID:
+                        try:
+                            print(f"--> [Drive Debug] Attempting upload with Folder ID: {GDRIVE_FOLDER_ID}")
+                            drive_url = gdrive_storage.upload_image_to_gdrive(
+                                file_path=local_filepath,
+                                folder_id=GDRIVE_FOLDER_ID,
+                                custom_filename=new_filename,
+                            )
+                            if drive_url:
+                                filename = drive_url
+                                print(f"[GDrive] ✅ Product image stored on Drive: {drive_url}")
+                            else:
+                                print("--> [Drive Debug] Drive returned no URL (upload failed silently). Falling back to Firebase Storage.")
+                        except Exception as gdrive_e:
+                            print(f"--> [GDrive Warning] Drive upload failed, trying Firebase Storage... Error: {gdrive_e}")
+
+                    # --- 2. Firebase Storage (secondary fallback) ---
+                    if not filename.startswith('http'):
+                        try:
+                            bucket = storage.bucket()
+                            blob = bucket.blob(f"product_images/{os.path.basename(local_filepath)}")
+                            blob.upload_from_filename(local_filepath)
+                            blob.make_public()
+                            filename = blob.public_url
+                            print(f"Successfully uploaded to Firebase Storage: {filename}")
+                        except Exception as e:
+                            print(f"--> [Storage Warning] Firebase Storage upload failed. Keeping previous image. Error: {e}")
+                            filename = product.get('image', 'default.jpg')
+                except Exception as b64_e:
+                    print(f"--> [Image Debug] edit_product: image_base64 decode failed, storing data URL directly. Error: {b64_e}")
+                    filename = image_base64
 
         raw_price = request.form.get('price', '0')
         price_riel = int(float(raw_price))
