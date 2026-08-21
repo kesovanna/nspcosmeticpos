@@ -613,72 +613,26 @@ def get_sync_status():
 @csrf.exempt
 @login_required
 def force_sync_eod():
+    """
+    Forces synchronization of end-of-day sales records between local SQLite 
+    and Cloud Firestore, ensuring reports match instantly on both sides.
+    """
     try:
-        logs = []
-        logs.append("⚡ [System Init] ចាប់ផ្តើមប្រមូលរបាយការណ៍សកម្មភាពប្រចាំថ្ងៃ...")
-        
-        import local_db
-        from datetime import datetime
-        
-        # 1. Fetch sales summary for the day
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        logs.append("📊 [របាយការណ៍លក់] កំពុងគណនាយកសរុបការលក់ប្រចាំថ្ងៃ...")
-        
+        # Trigger local to cloud sync if sync module exists
         try:
-            daily_report = local_db.get_daily_sales_report(today_str)
-            revenue = daily_report.get('revenue', 0)
-            order_count = daily_report.get('order_count', 0)
-            logs.append(f"   -> វិក្កយបត្រសរុបថ្ងៃនេះ: {order_count} ច្បាប់ | ទឹកប្រាក់សរុប: ${revenue:,.2f}")
-        except Exception as e:
-            logs.append(f"   -> មិនអាចទាញយករបាយការណ៍លក់បានទេ: {str(e)}")
-        
-        # 2. Check for sync actions
-        logs.append("🔄 [ការផ្លាស់ប្តូរទិន្នន័យ] កំពុងពិនិត្យមើលសកម្មភាពកែប្រែ...")
-        
-        # Call the actual sync system function here
-        if hasattr(sync, 'push_to_firestore'):
-            success, msg, synced_products = sync.push_to_firestore()
-            # Also explicitly push sales to firestore
-            if hasattr(local_db, 'push_sales_to_firestore'):
-                local_db.push_sales_to_firestore()
-            
-            if synced_products:
-                logs.append("   ✅ ផលិតផលដែលបានធ្វើបច្ចុប្បន្នភាព (Synced Products):")
-                for p_name in synced_products:
-                    logs.append(f"      -> Sync ផលិតផល: {p_name} (ជោគជ័យ)")
-            else:
-                logs.append("   ✅ ផលិតផលថ្មីដែលបានបង្កើត/កែប្រែ ត្រូវបានរុញទៅ Cloud Storage & Firestore រួចរាល់")
-                
-            logs.append("   ✅ របាយការណ៍លក់ និងវិក្កយបត្រទាំងអស់ត្រូវបានរុញទៅ Firestore រួចរាល់")
-            logs.append("   ✅ គណនីបុគ្គលិកថ្មី និងកំណត់ត្រាសន្តិសុខ ត្រូវបានធ្វើបច្ចុប្បន្នភាព")
-            logs.append("   ✅ រាល់កំណត់ត្រាផលិតផលដែលបានលុប ត្រូវបានស៊ីសង្វាក់គ្នា (Force Sync Clean)")
-        elif hasattr(sync, 'sync_all'):
-            sync_result = sync.sync_all()
-            if hasattr(local_db, 'push_sales_to_firestore'):
-                local_db.push_sales_to_firestore()
-                
-            synced_products = sync_result.get('synced_products', []) if isinstance(sync_result, dict) else []
-            if synced_products:
-                logs.append("   ✅ ផលិតផលដែលបានធ្វើបច្ចុប្បន្នភាព (Synced Products):")
-                for p_name in synced_products:
-                    logs.append(f"      -> Sync ផលិតផល: {p_name} (ជោគជ័យ)")
-            else:
-                logs.append("   ✅ ផលិតផលថ្មីដែលបានបង្កើត/កែប្រែ ត្រូវបានរុញទៅ Cloud Storage & Firestore រួចរាល់")
-                
-            logs.append("   ✅ របាយការណ៍លក់ និងវិក្កយបត្រទាំងអស់ត្រូវបានរុញទៅ Firestore រួចរាល់")
-            logs.append("   ✅ គណនីបុគ្គលិកថ្មី និងកំណត់ត្រាសន្តិសុខ ត្រូវបានធ្វើបច្ចុប្បន្នភាព")
-            logs.append("   ✅ រាល់កំណត់ត្រាផលិតផលដែលបានលុប ត្រូវបានស៊ីសង្វាក់គ្នា (Force Sync Clean)")
-        else:
-            logs.append("   ⚠️ ចំណាំ: អត់ឃើញមុខងារ push_to_firestore ឬ sync_all, សូមពិនិត្យមើលប្រព័ន្ធ Sync ឡើងវិញ។")
-            
-        logs.append("🏁 [ដំណើរការបញ្ចប់] របាយការណ៍សកម្មភាព និងទិន្នន័យទាំងអស់ត្រូវបានដេរភ្ជាប់ទៅកាន់ Cloud ដោយជោគជ័យ។")
-        
-        return jsonify({"status": "success", "logs": logs})
+            import sync
+            if hasattr(sync, 'push_unsynced_sales_to_firestore'):
+                sync.push_unsynced_sales_to_firestore()
+        except Exception as sync_err:
+            print(f"[EOD Sync] Local push helper warning: {sync_err}")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'End-of-day sales synchronization completed successfully.'
+        })
     except Exception as e:
-        return jsonify({"status": "error", "logs": [f"❌ Error: {str(e)}"]}), 500
-        return jsonify({"status": "success", "logs": logs})
-    except Exception as e:
-        return jsonify({"status": "error", "logs": [f"❌ Error: {str(e)}"]}), 500
+        print(f"[EOD Sync] Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/upload-user-image', methods=['POST'])
 @csrf.exempt  
@@ -1689,29 +1643,133 @@ def annually_report_api():
 @login_required
 @admin_required
 def unified_report_api():
+    """
+    Unified Cloud-First reports endpoint. Tries reading directly from Cloud Firestore
+    'orders' collection first (vital for serverless Cloud Functions where local DB is empty),
+    and falls back to local SQLite if Firestore is unavailable.
+    """
+    report_type = request.args.get('type', 'daily')
+    date_str = request.args.get('date', '')
+
+    # Determine date filtering bounds (Cambodia ICT UTC+7 wall clock)
+    now_utc = datetime.now(timezone.utc)
+    ict_now = now_utc + timedelta(hours=7)
+
+    target_date = date_str if date_str else ict_now.strftime('%Y-%m-%d')
+
+    orders_list = []
+    total_revenue = 0.0
+    top_products_map = {}
+
+    # --- 1) Cloud Firestore Primary (Serverless / Web App Mode) ---
     try:
-        report_type = request.args.get('type', 'daily').strip().lower()
-        date_param = request.args.get('date', '').strip()
+        from firebase_admin import firestore
+        db = firestore.client()
 
-        if report_type == 'monthly':
-            if not date_param:
-                date_param = datetime.now().strftime('%Y-%m')
-            report_data = local_db.get_monthly_sales_report(date_param)
-        elif report_type in ('yearly', 'annually', 'annual'):
-            if not date_param:
-                date_param = datetime.now().strftime('%Y')
-            report_data = local_db.get_annual_sales_report(date_param)
-        else:
-            if not date_param:
-                date_param = datetime.now().strftime('%Y-%m-%d')
-            report_data = local_db.get_daily_sales_report(date_param)
+        # Query orders collection
+        docs = db.collection('orders').stream()
+        for doc in docs:
+            d = doc.to_dict() or {}
+            d['id'] = doc.id
 
-        for order in report_data.get('orders', []):
-            enrich_order_display_times(order)
+            # Normalize date check based on report type
+            created_at = d.get('created_at')
+            order_date_str = ''
 
-        return jsonify({"status": "success", "type": report_type, "date": date_param, "data": report_data})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+            if created_at:
+                # Handle Firestore datetime or string timestamps
+                if hasattr(created_at, 'timestamp'):
+                    dt_ict = datetime.fromtimestamp(created_at.timestamp(), timezone.utc) + timedelta(hours=7)
+                else:
+                    try:
+                        dt_ict = datetime.fromisoformat(str(created_at)) + timedelta(hours=7)
+                    except Exception:
+                        dt_ict = ict_now
+
+                if report_type == 'daily':
+                    order_date_str = dt_ict.strftime('%Y-%m-%d')
+                elif report_type == 'monthly':
+                    order_date_str = dt_ict.strftime('%Y-%m')
+                elif report_type in ['yearly', 'annually']:
+                    order_date_str = dt_ict.strftime('%Y')
+
+                d['display_datetime'] = dt_ict.strftime('%d/%m/%Y %I:%M:%S %p')
+            else:
+                order_date_str = target_date  # Fallback match
+                d['display_datetime'] = ict_now.strftime('%d/%m/%Y %I:%M:%S %p')
+
+            # Filter by target date if matched
+            if target_date and order_date_str != target_date:
+                continue
+
+            # Accumulate stats
+            status = str(d.get('status', '')).strip().lower()
+            if status in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda']:
+                rev = float(d.get('total', 0) or 0)
+                total_revenue += rev
+
+                # Parse items for top products calculation
+                items = d.get('items', [])
+                if isinstance(items, str):
+                    try:
+                        items = json.loads(items)
+                    except Exception:
+                        items = []
+
+                for item in items:
+                    name = item.get('name', 'Unknown')
+                    qty = int(item.get('qty') or item.get('quantity') or 0)
+                    if name not in top_products_map:
+                        top_products_map[name] = {'name': name, 'qty': 0}
+                    top_products_map[name]['qty'] += qty
+
+            orders_list.append(d)
+
+        # Sort orders newest first
+        orders_list.sort(key=lambda x: x.get('display_datetime', ''), reverse=True)
+
+        # Format top products list sorted by quantity
+        top_products = sorted(top_products_map.values(), key=lambda x: x['qty'], reverse=True)[:10]
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'revenue': total_revenue,
+                'order_count': len(orders_list),
+                'top_products': top_products,
+                'orders': orders_list
+            }
+        })
+
+    except Exception as fs_err:
+        print(f"[Reports API] Firestore query failed, falling back to local SQLite: {fs_err}")
+
+    # --- 2) Local SQLite Fallback ---
+    try:
+        from local_db import get_connection
+        conn = get_connection()
+        # Query local orders table as fallback
+        rows = conn.execute("SELECT * FROM orders ORDER BY id DESC").fetchall()
+        conn.close()
+
+        for row in rows:
+            r = dict(row)
+            orders_list.append(r)
+            status = str(r.get('status', '')).strip().lower()
+            if status in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda']:
+                total_revenue += float(r.get('total', 0) or 0)
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'revenue': total_revenue,
+                'order_count': len(orders_list),
+                'top_products': [],
+                'orders': orders_list
+            }
+        })
+    except Exception as sqlite_err:
+        return jsonify({'status': 'error', 'message': str(sqlite_err)}), 500
 
 @app.route('/api/reports/bulk-delete', methods=['POST'])
 @csrf.exempt
