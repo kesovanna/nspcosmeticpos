@@ -199,6 +199,11 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+# Disable secure cookies on desktop so login/logout works over HTTP
+is_cloud = local_db.is_cloud_runtime()
+app.config['SESSION_COOKIE_SECURE'] = is_cloud
+app.config['REMEMBER_COOKIE_SECURE'] = is_cloud
+
 @app.route('/api/project_terminal_stream')
 @login_required
 def project_terminal_stream():
@@ -263,14 +268,14 @@ def sync_session_role():
         session.pop('username', None)
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_DEBUG', 'False').lower() != 'true'
+app.config['SESSION_COOKIE_SECURE'] = is_cloud
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_NAME'] = '__session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
-app.config['REMEMBER_COOKIE_SECURE'] = os.environ.get('FLASK_DEBUG', 'False').lower() != 'true'
+app.config['REMEMBER_COOKIE_SECURE'] = is_cloud
 
 # Master PIN for password resets
 MASTER_RECOVERY_PIN = os.environ.get('MASTER_RECOVERY_PIN')
@@ -787,10 +792,24 @@ def login():
         return jsonify({"status": "error", "message": f"Server Error: {str(e)}"}), 500
 
 @app.route('/logout')
-@login_required
 def logout():
-    logout_user()
-    return redirect(url_for('login'))
+    try:
+        logout_user()
+    except Exception:
+        pass
+    session.clear()
+    resp = redirect(url_for('login'))
+    cookie_kw = {
+        'expires': 0,
+        'max_age': 0,
+        'path': '/',
+        'httponly': True,
+        'samesite': 'Lax',
+        'secure': bool(app.config.get('SESSION_COOKIE_SECURE')),
+    }
+    resp.set_cookie(app.config.get('SESSION_COOKIE_NAME', '__session'), '', **cookie_kw)
+    resp.set_cookie(app.config.get('REMEMBER_COOKIE_NAME', 'remember_token'), '', **cookie_kw)
+    return resp
 
 def get_merged_categories():
     try:
@@ -870,12 +889,17 @@ def home():
         staff_list = []
         if current_user.role == 'admin':
             try:
-                db = get_db()
-                users_query = db.collection('users').stream()
-                for user_doc in users_query:
-                    user_data = user_doc.to_dict()
-                    user_data['id'] = user_doc.id
-                    staff_list.append(user_data)
+                if local_db.is_cloud_runtime():
+                    db = get_db()
+                    users_query = db.collection('users').stream()
+                    for user_doc in users_query:
+                        user_data = user_doc.to_dict()
+                        user_data['id'] = user_doc.id
+                        staff_list.append(user_data)
+                else:
+                    staff_list = local_db.get_all_users()
+                    for user_data in staff_list:
+                        user_data.setdefault('id', user_data.get('username'))
             except Exception as e:
                 print(f"Error fetching staff: {e}")
 
@@ -906,6 +930,9 @@ def process_stock_deduction(cart_items):
     local_success, local_msg = local_db.validate_and_deduct_stock_local(cart_items)
     if not local_success:
         return False, local_msg
+
+    if not local_db.is_cloud_runtime():
+        return True, "Stock deducted locally. Cloud sync pending."
 
     try:
         db = get_db()
@@ -1643,130 +1670,111 @@ def annually_report_api():
 @login_required
 @admin_required
 def unified_report_api():
-    """
-    Unified Cloud-First reports endpoint. Tries reading directly from Cloud Firestore
-    'orders' collection first (vital for serverless Cloud Functions where local DB is empty),
-    and falls back to local SQLite if Firestore is unavailable.
-    """
     report_type = request.args.get('type', 'daily')
     date_str = request.args.get('date', '')
 
-    # Determine date filtering bounds (Cambodia ICT UTC+7 wall clock)
     now_utc = datetime.now(timezone.utc)
     ict_now = now_utc + timedelta(hours=7)
-
     target_date = date_str if date_str else ict_now.strftime('%Y-%m-%d')
 
     orders_list = []
     total_revenue = 0.0
     top_products_map = {}
 
-    # --- 1) Cloud Firestore Primary (Serverless / Web App Mode) ---
-    try:
-        from firebase_admin import firestore
-        db = firestore.client()
+    import local_db
+    # --- 1) Cloud Firestore Primary (with strict Timeout) ---
+    if local_db.is_cloud_runtime():
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
 
-        # Query orders collection
-        docs = db.collection('orders').stream()
-        for doc in docs:
-            d = doc.to_dict() or {}
-            d['id'] = doc.id
+            # APPLY TIMEOUT SO IT DOES NOT HANG OFFLINE
+            docs = db.collection('orders').stream(timeout=1.5)
+            
+            for doc in docs:
+                d = doc.to_dict() or {}
+                d['id'] = doc.id
 
-            # Normalize date check based on report type
-            created_at = d.get('created_at')
-            order_date_str = ''
+                created_at = d.get('created_at')
+                order_date_str = ''
 
-            if created_at:
-                # Handle Firestore datetime or string timestamps
-                if hasattr(created_at, 'timestamp'):
-                    dt_ict = datetime.fromtimestamp(created_at.timestamp(), timezone.utc) + timedelta(hours=7)
+                if created_at:
+                    if hasattr(created_at, 'timestamp'):
+                        dt_ict = datetime.fromtimestamp(created_at.timestamp(), timezone.utc) + timedelta(hours=7)
+                    else:
+                        try:
+                            dt_ict = datetime.fromisoformat(str(created_at)) + timedelta(hours=7)
+                        except Exception:
+                            dt_ict = ict_now
+
+                    if report_type == 'daily':
+                        order_date_str = dt_ict.strftime('%Y-%m-%d')
+                    elif report_type == 'monthly':
+                        order_date_str = dt_ict.strftime('%Y-%m')
+                    elif report_type in ['yearly', 'annually']:
+                        order_date_str = dt_ict.strftime('%Y')
+
+                    d['display_datetime'] = dt_ict.strftime('%d/%m/%Y %I:%M:%S %p')
                 else:
-                    try:
-                        dt_ict = datetime.fromisoformat(str(created_at)) + timedelta(hours=7)
-                    except Exception:
-                        dt_ict = ict_now
+                    order_date_str = target_date
+                    d['display_datetime'] = ict_now.strftime('%d/%m/%Y %I:%M:%S %p')
 
-                if report_type == 'daily':
-                    order_date_str = dt_ict.strftime('%Y-%m-%d')
-                elif report_type == 'monthly':
-                    order_date_str = dt_ict.strftime('%Y-%m')
-                elif report_type in ['yearly', 'annually']:
-                    order_date_str = dt_ict.strftime('%Y')
+                if target_date and order_date_str != target_date:
+                    continue
 
-                d['display_datetime'] = dt_ict.strftime('%d/%m/%Y %I:%M:%S %p')
-            else:
-                order_date_str = target_date  # Fallback match
-                d['display_datetime'] = ict_now.strftime('%d/%m/%Y %I:%M:%S %p')
+                status = str(d.get('status', '')).strip().lower()
+                if status in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda']:
+                    rev = float(d.get('total', 0) or 0)
+                    total_revenue += rev
 
-            # Filter by target date if matched
-            if target_date and order_date_str != target_date:
-                continue
+                    items = d.get('items', [])
+                    if isinstance(items, str):
+                        try:
+                            import json
+                            items = json.loads(items)
+                        except Exception:
+                            items = []
 
-            # Accumulate stats
-            status = str(d.get('status', '')).strip().lower()
-            if status in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda']:
-                rev = float(d.get('total', 0) or 0)
-                total_revenue += rev
+                    for item in items:
+                        name = item.get('name', 'Unknown')
+                        qty = int(item.get('qty') or item.get('quantity') or 0)
+                        if name not in top_products_map:
+                            top_products_map[name] = {'name': name, 'qty': 0}
+                        top_products_map[name]['qty'] += qty
 
-                # Parse items for top products calculation
-                items = d.get('items', [])
-                if isinstance(items, str):
-                    try:
-                        items = json.loads(items)
-                    except Exception:
-                        items = []
+                orders_list.append(d)
 
-                for item in items:
-                    name = item.get('name', 'Unknown')
-                    qty = int(item.get('qty') or item.get('quantity') or 0)
-                    if name not in top_products_map:
-                        top_products_map[name] = {'name': name, 'qty': 0}
-                    top_products_map[name]['qty'] += qty
+            orders_list.sort(key=lambda x: x.get('display_datetime', ''), reverse=True)
+            top_products = sorted(top_products_map.values(), key=lambda x: x['qty'], reverse=True)[:10]
 
-            orders_list.append(d)
+            return jsonify({
+                'status': 'success',
+                'data': {
+                    'revenue': total_revenue,
+                    'order_count': len(orders_list),
+                    'top_products': top_products,
+                    'orders': orders_list
+                }
+            })
 
-        # Sort orders newest first
-        orders_list.sort(key=lambda x: x.get('display_datetime', ''), reverse=True)
+        except Exception as fs_err:
+            print(f"[Reports API] Cloud read failed/timeout, dropping to local DB: {fs_err}")
 
-        # Format top products list sorted by quantity
-        top_products = sorted(top_products_map.values(), key=lambda x: x['qty'], reverse=True)[:10]
-
-        return jsonify({
-            'status': 'success',
-            'data': {
-                'revenue': total_revenue,
-                'order_count': len(orders_list),
-                'top_products': top_products,
-                'orders': orders_list
-            }
-        })
-
-    except Exception as fs_err:
-        print(f"[Reports API] Firestore query failed, falling back to local SQLite: {fs_err}")
-
-    # --- 2) Local SQLite Fallback ---
+    # --- 2) Local SQLite Fallback (Runs instantly offline) ---
     try:
-        from local_db import get_connection
-        conn = get_connection()
-        # Query local orders table as fallback
-        rows = conn.execute("SELECT * FROM orders ORDER BY id DESC").fetchall()
-        conn.close()
-
-        for row in rows:
-            r = dict(row)
-            orders_list.append(r)
-            status = str(r.get('status', '')).strip().lower()
-            if status in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda']:
-                total_revenue += float(r.get('total', 0) or 0)
-
+        if report_type == 'daily':
+            report_data = local_db.get_daily_sales_report(target_date)
+        elif report_type == 'monthly':
+            report_data = local_db.get_monthly_sales_report(target_date)
+        else:
+            report_data = local_db.get_annual_sales_report(target_date)
+            
+        for order in report_data.get('orders', []):
+            enrich_order_display_times(order)
+            
         return jsonify({
             'status': 'success',
-            'data': {
-                'revenue': total_revenue,
-                'order_count': len(orders_list),
-                'top_products': [],
-                'orders': orders_list
-            }
+            'data': report_data
         })
     except Exception as sqlite_err:
         return jsonify({'status': 'error', 'message': str(sqlite_err)}), 500
@@ -2141,8 +2149,13 @@ def open_browser():
 
 if __name__ == '__main__':
     local_db.init_db()
-    print("Performing initial sync...")
-    sync.sync_all()
+    print("Performing initial sync in background...")
+    def _startup_sync():
+        try:
+            sync.sync_all()
+        except Exception as e:
+            print(f"Startup sync skipped (offline or network error): {e}")
+    threading.Thread(target=_startup_sync, daemon=True).start()
     Timer(1.5, open_browser).start()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)

@@ -5,6 +5,14 @@ import sys
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
+def is_cloud_runtime():
+    """True on Firebase Cloud Functions / Cloud Run; False on desktop POS."""
+    return bool(
+        os.environ.get('K_SERVICE')
+        or os.environ.get('FUNCTION_TARGET')
+        or os.environ.get('FUNCTION_NAME')
+    )
+
 # Cambodia ICT = UTC+7 (fixed, no DST)
 ICT_TZ = timezone(timedelta(hours=7), name='ICT')
 
@@ -243,31 +251,32 @@ def get_categories():
     match the existing SQLite SELECT mapping.
     """
     # 1) Cloud Firestore (primary in serverless environments)
-    try:
-        from firebase_admin import firestore
-        db = firestore.client()
-        names = []
-        seen = set()
-        for doc in db.collection('categories').stream():
-            data = doc.to_dict() or {}
-            name = (data.get('name') or doc.id or '').strip()
-            if name and name not in seen:
-                seen.add(name)
-                names.append(name)
-        # Categories are often stored only as a field on items, not as a
-        # dedicated collection. Derive unique names from products if needed.
-        if not names:
-            for doc in db.collection('items').stream():
+    if is_cloud_runtime():
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
+            names = []
+            seen = set()
+            for doc in db.collection('categories').stream():
                 data = doc.to_dict() or {}
-                name = (data.get('category') or '').strip()
+                name = (data.get('name') or doc.id or '').strip()
                 if name and name not in seen:
                     seen.add(name)
                     names.append(name)
-        if names:
-            names.sort()
-            return names
-    except Exception:
-        pass  # Firestore unavailable/not initialized -> fall through
+            # Categories are often stored only as a field on items, not as a
+            # dedicated collection. Derive unique names from products if needed.
+            if not names:
+                for doc in db.collection('items').stream():
+                    data = doc.to_dict() or {}
+                    name = (data.get('category') or '').strip()
+                    if name and name not in seen:
+                        seen.add(name)
+                        names.append(name)
+            if names:
+                names.sort()
+                return names
+        except Exception:
+            pass  # Firestore unavailable/not initialized -> fall through
 
     # 2) Local SQLite fallback (desktop / offline mode)
     try:
@@ -371,23 +380,24 @@ def get_user(username):
     Firestore is unavailable or returns nothing (desktop / offline mode).
     """
     # 1) Cloud Firestore (primary in serverless environments)
-    try:
-        from firebase_admin import firestore
-        db = firestore.client()
-        doc = db.collection('users').document(str(username)).get()
-        if doc.exists:
-            u = doc.to_dict()
-            if u:
-                # Normalize Firestore fields to the SQLite schema
-                u['username'] = u.get('username') or doc.id
-                u.setdefault('password', '')
-                u.setdefault('role', 'user')
-                u.setdefault('status', 'active')
-                if u.get('profile_image') is None:
-                    u['profile_image'] = u.get('profile_pic')
-                return u
-    except Exception:
-        pass  # Firestore unavailable/not initialized -> fall through
+    if is_cloud_runtime():
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
+            doc = db.collection('users').document(str(username)).get()
+            if doc.exists:
+                u = doc.to_dict()
+                if u:
+                    # Normalize Firestore fields to the SQLite schema
+                    u['username'] = u.get('username') or doc.id
+                    u.setdefault('password', '')
+                    u.setdefault('role', 'user')
+                    u.setdefault('status', 'active')
+                    if u.get('profile_image') is None:
+                        u['profile_image'] = u.get('profile_pic')
+                    return u
+        except Exception:
+            pass  # Firestore unavailable/not initialized -> fall through
 
     # 2) Local SQLite fallback (desktop / offline mode)
     try:
@@ -512,17 +522,18 @@ def get_products():
     Returns a list of dicts with the same keys as `SELECT * FROM products`.
     """
     # 1) Cloud Firestore (primary in serverless environments)
-    try:
-        from firebase_admin import firestore
-        db = firestore.client()
-        products = []
-        for doc in db.collection('items').stream():
-            products.append(_normalize_product_doc(doc.id, doc.to_dict() or {}))
-        if products:
-            products.sort(key=lambda p: p.get('createdAt') or '', reverse=True)
-            return products
-    except Exception:
-        pass  # Firestore unavailable/not initialized -> fall through
+    if is_cloud_runtime():
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
+            products = []
+            for doc in db.collection('items').stream():
+                products.append(_normalize_product_doc(doc.id, doc.to_dict() or {}))
+            if products:
+                products.sort(key=lambda p: p.get('createdAt') or '', reverse=True)
+                return products
+        except Exception:
+            pass  # Firestore unavailable/not initialized -> fall through
 
     # 2) Local SQLite fallback (desktop / offline mode)
     try:
@@ -538,14 +549,15 @@ def get_products():
 def get_product(prod_id):
     """Cloud-First hybrid: Firestore `items/{id}` first, local SQLite fallback."""
     # 1) Cloud Firestore (primary in serverless environments)
-    try:
-        from firebase_admin import firestore
-        db = firestore.client()
-        doc = db.collection('items').document(str(prod_id)).get()
-        if doc.exists:
-            return _normalize_product_doc(doc.id, doc.to_dict() or {})
-    except Exception:
-        pass  # Firestore unavailable/not initialized -> fall through
+    if is_cloud_runtime():
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
+            doc = db.collection('items').document(str(prod_id)).get()
+            if doc.exists:
+                return _normalize_product_doc(doc.id, doc.to_dict() or {})
+        except Exception:
+            pass  # Firestore unavailable/not initialized -> fall through
 
     # 2) Local SQLite fallback (desktop / offline mode)
     try:
