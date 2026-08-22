@@ -236,7 +236,13 @@ def set_security_headers(response):
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    if request.endpoint and request.endpoint not in ['static']:
+    path = (request.path or '')
+    is_static_asset = (
+        request.endpoint in ('static', 'favicon')
+        or path == '/favicon.ico'
+        or path.startswith('/static/')
+    )
+    if request.endpoint and not is_static_asset:
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
     # Force STRICT no-cache for all API endpoints — prevents Firebase Hosting /
@@ -316,6 +322,57 @@ def get_riel_rate():
             _cached_riel_rate = new_rate
         _last_fetch_time = now
     return _cached_riel_rate
+
+@app.route('/favicon.ico')
+def favicon():
+    icon_dir = os.path.join(app.root_path, 'static', 'images')
+    ico_path = os.path.join(icon_dir, 'favicon.ico')
+    png_path = os.path.join(icon_dir, 'favicon.png')
+    if os.path.isfile(ico_path):
+        return send_from_directory(
+            icon_dir,
+            'favicon.ico',
+            mimetype='image/x-icon',
+            max_age=86400
+        )
+    if os.path.isfile(png_path):
+        return send_from_directory(
+            icon_dir,
+            'favicon.png',
+            mimetype='image/png',
+            max_age=86400
+        )
+    from flask import abort
+    abort(404)
+
+@app.before_request
+def skip_html_for_static_and_favicon():
+    """
+    Ensure that requests for static files or favicon.ico never return HTML.
+    If the file exists, serve it. If it doesn't, abort with a 404.
+    """
+    path = (request.path or '').lstrip('/')
+    if path == 'favicon.ico' or path.startswith('static/'):
+        if path == 'favicon.ico':
+            directory = os.path.join(app.root_path, 'static', 'images')
+            filename = 'favicon.ico'
+            mimetype = 'image/x-icon'
+            if not os.path.isfile(os.path.join(directory, filename)):
+                filename = 'favicon.png'
+                mimetype = 'image/png'
+        else:
+            rel = path[len('static/'):]
+            directory = app.static_folder
+            filename = rel
+            mimetype = None
+
+        if not filename or not os.path.isfile(os.path.join(directory, filename)):
+            from flask import abort
+            abort(404)
+        kwargs = {'max_age': 86400}
+        if mimetype:
+            kwargs['mimetype'] = mimetype
+        return send_from_directory(directory, filename, **kwargs)
 
 @app.route('/add_category_endpoint', methods=['POST'])
 @csrf.exempt  
@@ -2056,6 +2113,9 @@ def invoice():
 
 @app.errorhandler(404)
 def not_found_error(error):
+    path = (request.path or '').lstrip('/')
+    if path == 'favicon.ico' or path.startswith('static/'):
+        return ('', 404)
     return render_template('ai_green.html', message="រកមិនឃើញទំព័រនេះទេ (Page Not Found)"), 404
 
 @app.errorhandler(500)
