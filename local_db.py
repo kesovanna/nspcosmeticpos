@@ -19,15 +19,15 @@ ICT_TZ = timezone(timedelta(hours=7), name='ICT')
 # Canonical set of "paid / revenue-earning" statuses. Every revenue counter
 # (dashboard stats + daily/monthly/annual sales reports) MUST use exactly
 # this set so the summary cards can never disagree with the table filters.
-# 'paid by cash' / 'paid by aba' / 'paid by acleda' are the canonical
+# 'paid by cash' / 'paid by aba' / 'paid by acleda' / 'paid by amret' are the canonical
 # payment-method statuses; 'paid' / 'completed' are the legacy bare forms.
-PAID_STATUSES = ('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed')
+PAID_STATUSES = ('paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret', 'paid', 'completed')
 
 # SQL fragment: case-insensitive, whitespace-trimmed status membership.
 # Shared by every query that aggregates revenue / order counts.
 PAID_STATUSES_SQL = (
     "LOWER(TRIM(status)) IN "
-    "('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed')"
+    "('paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret', 'paid', 'completed')"
 )
 
 def cambodia_time(dt):

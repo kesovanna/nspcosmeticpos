@@ -571,7 +571,7 @@
     // The DB stores bare 'paid'/'pending'; payment method is derived from
     // the tran_id prefix (CASH- => cash, TX => ABA). ACLEDA reuses the
     // CASH- prefix via confirmCashPayment, so those display as cash.
-    const PAID_STATUSES = ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'];
+    const PAID_STATUSES = ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret'];
 
     function getStatusGroup(order) {
         const st = String(order.status || '').trim().toLowerCase();

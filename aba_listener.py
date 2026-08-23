@@ -68,9 +68,12 @@ def update_pos_database(amount, currency, tran_id):
 async def catch_incoming_message(event):
     try:
         message_text = event.message.text or ""
+        sender = await event.get_sender()
+        sender_username = getattr(sender, 'username', '') or ''
 
+        # ABA Logic
         if "paid by" in message_text and "Trx. ID:" in message_text:
-            print("\n🔔 VALID BANK NOTIFICATION IDENTIFIED")
+            print("\n🔔 VALID ABA BANK NOTIFICATION IDENTIFIED")
             print("-" * 50)
             print(message_text.strip())
             print("-" * 50)
@@ -87,6 +90,30 @@ async def catch_incoming_message(event):
                 print(f"🔍 Extracted Values -> Currency: {currency} | Amount: {clean_amount} | Trx ID: {ref_id}")
                 update_pos_database(clean_amount, currency, ref_id)
                 
+        # Amret Logic
+        elif sender_username.lower() == 'amretplcbot' or "Amret" in message_text:
+            print("\n🔔 VALID AMRET BANK NOTIFICATION IDENTIFIED")
+            print("-" * 50)
+            print(message_text.strip())
+            print("-" * 50)
+            
+            # Example: "500 KHR បានទទួលពីគណនីលេខ 086966244 (REAM KESOVANNA)..."
+            amount_match = re.search(r'([\d,]+(?:\.\d+)?)\s*(KHR|USD)\s*បានទទួល', message_text)
+            
+            if amount_match:
+                raw_amount = amount_match.group(1)
+                currency_str = amount_match.group(2)
+                
+                currency = '$' if currency_str == 'USD' else '៛'
+                clean_amount = float(raw_amount.replace(',', ''))
+                
+                # Amret might not have a clear Trx ID in the same format, use a placeholder or extract if available
+                ref_match = re.search(r'(?:Ref|Trx\.\s*ID|Transaction ID)[\s:]*([0-9a-zA-Z]+)', message_text, re.IGNORECASE)
+                ref_id = ref_match.group(1) if ref_match else "AMRET_AUTO"
+                
+                print(f"🔍 Extracted Amret Values -> Currency: {currency} | Amount: {clean_amount} | Trx ID: {ref_id}")
+                update_pos_database(clean_amount, currency, ref_id)
+
     except Exception as e:
         print(f"❌ Error monitoring incoming message: {e}")
 

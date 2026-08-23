@@ -917,7 +917,7 @@ def home():
         for data in all_orders:
             created_at = cambodia_time(datetime.fromisoformat(data['created_at']))
             if start_date_ict <= created_at < end_date_ict:
-                if str(data.get('status', '')).strip().lower() in ('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed'):
+                if str(data.get('status', '')).strip().lower() in ('paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret', 'paid', 'completed'):
                     total_revenue += float(data.get('total', 0))
                     total_orders += 1
                     for item in data.get('items', []):
@@ -1506,7 +1506,7 @@ def reports():
         for data in all_orders:
             created_at = cambodia_time(datetime.fromisoformat(data['created_at']))
             if start_date_ict <= created_at < end_date_ict:
-                if str(data.get('status', '')).strip().lower() in ('paid by cash', 'paid by aba', 'paid by acleda', 'paid', 'completed'):
+                if str(data.get('status', '')).strip().lower() in ('paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret', 'paid', 'completed'):
                     total_revenue += float(data.get('total', 0))
                     total_orders += 1
                     for item in data.get('items', []):
@@ -1780,7 +1780,7 @@ def unified_report_api():
                     continue
 
                 status = str(d.get('status', '')).strip().lower()
-                if status in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda']:
+                if status in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret']:
                     rev = float(d.get('total', 0) or 0)
                     total_revenue += rev
 
@@ -1890,7 +1890,7 @@ def checkout_endpoint():
             return jsonify({'status': 'error', 'message': msg}), 400
 
         order_data = {
-            'items': items, 'total': total, 'discount': discount, 'status': 'paid', 'tran_id': tran_id,
+            'items': items, 'total': total, 'discount': discount, 'status': 'paid by cash', 'tran_id': tran_id,
             'user': current_user.username if hasattr(current_user, 'username') else 'guest',
             'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
@@ -1916,6 +1916,7 @@ def checkout_endpoint():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/create-aba-payment', methods=['POST'])
+@app.route('/create-amret-payment', methods=['POST'])
 @csrf.exempt  
 @login_required
 def create_aba_payment():
@@ -1971,12 +1972,16 @@ def create_acleda_payment():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/confirm-acleda', methods=['POST'])
+@app.route('/confirm-manual-payment', methods=['POST'])
 @csrf.exempt
-def confirm_acleda():
+def confirm_manual_payment():
     try:
         data = request.json or {}
         tran_id = (data.get('tran_id') or '').strip()
+        bank_name = (data.get('bank_name') or 'ACLEDA').strip().upper()
+        
+        status_string = f'paid by {bank_name.lower()}'
+        
         if not tran_id:
             return jsonify({'status': 'error', 'success': False, 'message': 'Missing tran_id'}), 400
 
@@ -1993,7 +1998,7 @@ def confirm_acleda():
                 return jsonify({'status': 'error', 'success': False, 'message': msg}), 400
 
             order_data = {
-                'items': items, 'total': total, 'discount': discount, 'status': 'paid by acleda', 'tran_id': tran_id,
+                'items': items, 'total': total, 'discount': discount, 'status': status_string, 'tran_id': tran_id,
                 'user': current_user.username if hasattr(current_user, 'username') else 'guest',
                 'created_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
             }
@@ -2001,7 +2006,7 @@ def confirm_acleda():
         else:
             current_status = str(order.get('status', '') or '').strip().lower()
             if current_status in ('pending', '', 'unpaid'):
-                local_db.update_order_status_and_time(tran_id, 'paid by acleda', datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
+                local_db.update_order_status_and_time(tran_id, status_string, datetime.now().strftime('%Y-%m-%dT%H:%M:%S'))
 
         def sync_background():
             try:
@@ -2015,7 +2020,7 @@ def confirm_acleda():
         return jsonify({
             'status': 'success',
             'success': True,
-            'message': 'ACLEDA payment confirmed',
+            'message': f'{bank_name} payment confirmed',
             'tran_id': tran_id
         })
     except Exception as e:
@@ -2061,6 +2066,90 @@ def success():
         import traceback
         traceback.print_exc()
         return render_template('ai_green.html', message="System Error: Unable to load order"), 500
+def _product_image_filename(product):
+    """Return the stored product image filename/URL, or default.jpg."""
+    if not product:
+        return 'default.jpg'
+    img = product.get('image') or product.get('image_filename') or product.get('image_url')
+    img = str(img).strip() if img else ''
+    return img or 'default.jpg'
+
+
+def _build_product_lookup():
+    """Index products by id, barcode, and lowercase name for image enrichment."""
+    by_id = {}
+    by_barcode = {}
+    by_name = {}
+    try:
+        products = local_db.get_products() or []
+    except Exception:
+        products = []
+    for p in products:
+        if not isinstance(p, dict):
+            continue
+        pid = p.get('id')
+        if pid is not None and str(pid) != '':
+            by_id[str(pid)] = p
+        barcode = p.get('barcode')
+        if barcode:
+            by_barcode[str(barcode).strip()] = p
+        name = p.get('name')
+        if name:
+            by_name[str(name).strip().lower()] = p
+    return by_id, by_barcode, by_name
+
+
+def _lookup_product_for_item(item, by_id, by_barcode, by_name):
+    """Resolve a cart/CFD item to a DB product via id, barcode, then name."""
+    if not isinstance(item, dict):
+        return None
+    prod_id = item.get('id') or item.get('product_id')
+    if prod_id not in (None, ''):
+        db_product = by_id.get(str(prod_id))
+        if db_product:
+            return db_product
+        try:
+            db_product = local_db.get_product(prod_id)
+            if db_product:
+                return db_product
+        except Exception:
+            pass
+    barcode = item.get('barcode')
+    if barcode:
+        db_product = by_barcode.get(str(barcode).strip())
+        if db_product:
+            return db_product
+    name = item.get('name')
+    if name:
+        db_product = by_name.get(str(name).strip().lower())
+        if db_product:
+            return db_product
+    return None
+
+
+def _enrich_items_with_image_filename(items):
+    """Attach image_filename (and image) from the products table onto each cart/CFD item.
+
+    CFD JS reads: it.image_filename || it.image_url || it.image
+    DB column is `image`. There is no Flask session cart — this is the backend
+    attach-point before items are stored in cfd_state or rendered on /invoice.
+    """
+    if not items:
+        return items
+    by_id, by_barcode, by_name = _build_product_lookup()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        db_product = _lookup_product_for_item(item, by_id, by_barcode, by_name)
+        filename = _product_image_filename(db_product)
+        if filename == 'default.jpg':
+            existing = item.get('image_filename') or item.get('image') or item.get('image_url') or 'default.jpg'
+            filename = str(existing).strip() or 'default.jpg'
+        item['image_filename'] = filename
+        item['image'] = filename
+    return items
+
+
 @app.route('/invoice', methods=['GET', 'POST'])
 @login_required
 def invoice():
@@ -2091,9 +2180,10 @@ def invoice():
                     'price': float(item.get('price', 0)),
                     'quantity': int(item.get('quantity', 0) or item.get('qty', 0)),
                     'qty': int(item.get('quantity', 0) or item.get('qty', 0)),
-                    'image': str(item.get('image', 'default.jpg'))[:500]
+                    'image': str(item.get('image', 'default.jpg'))[:500],
+                    'image_filename': str(item.get('image_filename') or item.get('image') or 'default.jpg')[:500],
                 })
-        items_list = sanitized_items
+        items_list = _enrich_items_with_image_filename(sanitized_items)
     except:
         items_list = []
     
@@ -2113,6 +2203,8 @@ def invoice():
 
 @app.errorhandler(404)
 def not_found_error(error):
+    if request.path.startswith('/api/') or request.path.startswith('/confirm-') or request.path.startswith('/create-') or request.path.startswith('/checkout'):
+        return jsonify({'status': 'error', 'message': 'Endpoint not found'}), 404
     path = (request.path or '').lstrip('/')
     if path == 'favicon.ico' or path.startswith('static/'):
         return ('', 404)
@@ -2120,6 +2212,8 @@ def not_found_error(error):
 
 @app.errorhandler(500)
 def internal_error(error):
+    if request.path.startswith('/api/') or request.path.startswith('/confirm-') or request.path.startswith('/create-') or request.path.startswith('/checkout'):
+        return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
     return render_template('ai_green.html', message="មានបញ្ហាបច្ចេកទេស (Internal Server Error)"), 500
 
 # ============================================================
@@ -2145,6 +2239,12 @@ def cfd_set():
             return jsonify({'status': 'error', 'message': 'Invalid status'}), 400
         payload = data.get('data') or {}
         allowed = ('total', 'amount_riel', 'usd_amount', 'tran_id', 'items', 'discount', 'shop_name', 'inv_no')
+        
+        # Enrich items with image_filename from the database BEFORE saving to cfd_state
+        items = payload.get('items', [])
+        if items:
+            _enrich_items_with_image_filename(items)
+        
         cfd_state = {
             'status': new_status,
             'data': {k: payload[k] for k in allowed if k in payload}
@@ -2167,8 +2267,13 @@ def cfd_products():
         random.shuffle(products)
         sample = []
         for p in products[:12]:
+            img = p.get('image') or p.get('image_filename') or 'default.jpg'
             sample.append({
-                'id': p.get('id'), 'name': p.get('name'), 'price': p.get('price'), 'image': p.get('image')
+                'id': p.get('id'),
+                'name': p.get('name'),
+                'price': p.get('price'),
+                'image': img,
+                'image_filename': img,
             })
         return jsonify({'products': sample})
     except Exception as e:

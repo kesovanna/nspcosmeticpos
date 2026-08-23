@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NSP Cosmetic Store - POS</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon-32.png') }}?v=4">
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='images/favicon-16.png') }}?v=4">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}?v=4">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}?v=4">
+    <link rel="icon" sizes="any" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='images/favicon-16.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/favicon-192.png') }}">
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&family=Moul&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/tailwind.css">
     
@@ -1539,7 +1539,7 @@
         <div class="product-grid" id="productGrid">
             {% for product in items %}
             <div class="card pos-product-item bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-start cursor-pointer transition-all hover:shadow-md h-full" 
-                 data-id="{{ product.id }}" data-stock="{{ product.stock_quantity }}" data-name="{{ product.name | lower }}" data-real-name="{{ product.name }}" data-price="{{ product.price }}" data-barcode="{{ product.barcode | default('') }}" data-category="{{ product.category | default('more') | lower }}" onclick="addToCart('{{ product.name }}', {{ product.price }}, '{{ product.id }}', {{ product.stock_quantity }}, false)">
+                 data-id="{{ product.id }}" data-stock="{{ product.stock_quantity }}" data-name="{{ product.name | lower }}" data-real-name="{{ product.name }}" data-price="{{ product.price }}" data-barcode="{{ product.barcode | default('') }}" data-category="{{ product.category | default('more') | lower }}" data-image="{{ product.image | default('default.jpg') }}" onclick="addToCart('{{ product.name }}', {{ product.price }}, '{{ product.id }}', {{ product.stock_quantity }}, false)">
                 
                 <div class="w-full text-left flex-1 flex flex-col justify-start">
                     {% if product.image %}
@@ -1776,7 +1776,7 @@
                                         
                                         <!-- Status -->
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
-                                            <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; {% if order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}background: #dcfce7; color: #166534;{% elif order.status|lower == 'pending' %}background: #fef9c3; color: #854d0e;{% else %}background: #fee2e2; color: #991b1b;{% endif %}">
+                                            <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; display: inline-block; {% if order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret'] %}background: #dcfce7; color: #166534;{% elif order.status|lower == 'pending' %}background: #fef9c3; color: #854d0e;{% else %}background: #fee2e2; color: #991b1b;{% endif %}">
                                                 {{ order.status }}
                                             </span>
                                         </td>
@@ -1784,7 +1784,7 @@
                                         <!-- Receipt -->
                                         <td rowspan="{{ items|length }}" style="background: #ffffff; text-align: center !important; border: 1px solid #cbd5e1; padding: 8px; vertical-align: middle; white-space: nowrap !important;">
                                             {% set filename = "invoice_" + (order.tran_id or order.local_id)|string + ".pdf" %}
-                                            {% if order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'] %}
+                                            {% if order.status|lower in ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret'] %}
                                                 <button onclick="viewReceipt('{{ order.tran_id or order.local_id }}')" 
                                                    style="padding: 6px 12px; background-color: #e0f2fe; color: #0284c7; font-weight: 600; text-decoration: none; border: 1px solid #bae6fd; border-radius: 6px; font-size: 12px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); min-width: 80px;">
                                                     មើលវិក្កយបត្រ
@@ -3848,12 +3848,16 @@
         if (item) {
             item.qty++;
         } else {
-            // Find barcode from card if not provided
+            // Find barcode and image from card if not provided
             let barcode = "";
+            let image = "default.jpg";
             const card = document.querySelector(`.card[data-id="${id}"]`);
-            if (card) barcode = normalizeBarcode(card.getAttribute('data-barcode'));
+            if (card) {
+                barcode = normalizeBarcode(card.getAttribute('data-barcode'));
+                image = card.getAttribute('data-image') || "default.jpg";
+            }
             
-            cart.push({ id, name, price, barcode, qty: 1, stock: availableStock });
+            cart.push({ id, name, price, barcode, image, qty: 1, stock: availableStock });
         }
         
         renderCart();
@@ -5055,13 +5059,13 @@
             
             // Status badge styling
             let badgeStyle = 'background: #fee2e2; color: #991b1b;';
-            if (['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'].includes(statusLower)) {
+            if (['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret'].includes(statusLower)) {
                 badgeStyle = 'background: #dcfce7; color: #166534;';
             } else if (statusLower === 'pending') {
                 badgeStyle = 'background: #fef9c3; color: #854d0e;';
             }
             
-            const hasReceipt = ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda'].includes(statusLower);
+            const hasReceipt = ['paid', 'completed', 'paid by cash', 'paid by aba', 'paid by acleda', 'paid by amret'].includes(statusLower);
             
             // Format Time & Date
             const dtStr = order.display_datetime || order.display_time || '';

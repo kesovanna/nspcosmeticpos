@@ -109,13 +109,14 @@
         @keyframes btn-spin { to { transform: rotate(360deg); } }
         .qr-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px; }
         .swal2-container { z-index: 10000 !important; }
-        .qr-modal { background: #fff; width: 100%; max-width: 760px; border-radius: 20px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-height: 92vh; overflow-y: auto; }
+        .qr-modal { background: #fff; width: 100%; max-width: 1000px; border-radius: 20px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); max-height: 92vh; overflow-y: auto; }
         .qr-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .qr-modal-header h3 { margin: 0; font-size: 18px; color: #333; }
         .qr-modal-close { background: transparent; border: none; font-size: 28px; line-height: 1; cursor: pointer; color: #666; }
         .qr-modal-close:hover { color: #d81b60; }
-        .qr-modal-grid { display: flex; gap: 20px; align-items: stretch; }
-        .qr-col { flex: 1; border: 1px solid #eee; border-radius: 14px; padding: 18px 14px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .qr-modal-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+        @media (min-width: 768px) { .qr-modal-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        .qr-col { flex: 1; border: 1px solid #eee; border-radius: 14px; padding: 18px 14px; text-align: center; display: flex; flex-direction: column; align-items: center; height: 100%; }
         .qr-bank-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; color: #333; margin-bottom: 12px; }
         .qr-bank-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
 
@@ -249,23 +250,47 @@
         <div class="qr-modal-grid">
             <div class="qr-col">
                 <div class="qr-bank-title"><span class="qr-bank-dot" style="background:#005a9c;"></span>ABA Mobile</div>
-                <div class="aba-qr-container" style="padding: 5px;">
+                <div class="aba-qr-container flex flex-col h-full w-full" style="padding: 5px; display: flex; flex-direction: column; height: 100%;">
                     <div class="qr-image-container d-flex justify-content-center mb-3">
-                        <img src="{{ url_for('static', filename='images/aba_qr.jpg') }}" alt="ABA QR Code" style="width: 200px; height: 200px; object-fit: contain; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px;">
+                        <img src="{{ url_for('static', filename='images/aba_qr.jpg') }}" alt="ABA QR Code" style="width: 100%; max-height: 200px; object-fit: contain; aspect-ratio: 1/1; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px;">
                     </div>
                     <div style="font-weight:800; color:#28a745; font-size:24px; margin: 6px 0;" id="amount">៛ 0</div>
                     <div style="font-weight:700; color:#d81b60; font-size:16px; margin-bottom: 6px;" id="usd_amount">$ 0.00</div>
                     <p style="font-size:12px; color:#666; margin:0;">សូមស្កេន QR នេះជាមួយកម្មវិធី <b>ABA Mobile</b></p>
                     <div id="polling-status" style="font-size:13px; color:#005a9c; margin-top:12px; font-weight:bold; animation: pulse 2s infinite;">🔄 កំពុងរង់ចាំការបង់ប្រាក់...</div>
+                    <div class="mt-auto w-full" style="margin-top: auto; width: 100%;">
+                        <button type="button" onclick="confirmManualPayment('ABA')" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (OK)</button>
+                    </div>
+                </div>
+            </div>
+            <div class="qr-col">
+                <div class="qr-bank-title"><span class="qr-bank-dot" style="background:#00a651;"></span>Amret Mobile</div>
+                <div class="amret-qr-container flex flex-col h-full w-full" style="padding: 5px; display: flex; flex-direction: column; height: 100%;">
+                    <div class="qr-image-container d-flex justify-content-center mb-3">
+                        <img src="{{ url_for('static', filename='images/amret_qr.jpg') }}" alt="Amret QR Code" style="width: 100%; max-height: 200px; object-fit: contain; aspect-ratio: 1/1; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px;">
+                    </div>
+                    <div style="font-weight:800; color:#28a745; font-size:24px; margin: 6px 0;" id="amret_amount">៛ 0</div>
+                    <div style="font-weight:700; color:#d81b60; font-size:16px; margin-bottom: 6px;" id="amret_usd_amount">$ 0.00</div>
+                    <p style="font-size:12px; color:#666; margin:0;">ស្កេនជាមួយ <b>Amret Mobile</b></p>
+                    <div id="amret-polling-status" style="font-size:13px; color:#00a651; margin-top:12px; font-weight:bold; animation: pulse 2s infinite;">🔄 កំពុងរង់ចាំការបង់ប្រាក់...</div>
+                    <div class="mt-auto w-full" style="margin-top: auto; width: 100%;">
+                        <button type="button" onclick="confirmManualPayment('Amret')" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (OK)</button>
+                    </div>
                 </div>
             </div>
             <div class="qr-col">
                 <div class="qr-bank-title"><span class="qr-bank-dot" style="background:#ED1C24;"></span>ACLEDA ToanChet</div>
-                <div class="qr-image-container d-flex justify-content-center mb-3">
-                    <img src="{{ url_for('static', filename='images/acleda_qr.png') }}" alt="ACLEDA QR Code" style="width: 200px; height: 200px; object-fit: contain; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px;">
+                <div class="acleda-qr-container flex flex-col h-full w-full" style="padding: 5px; display: flex; flex-direction: column; height: 100%;">
+                    <div class="qr-image-container d-flex justify-content-center mb-3">
+                        <img src="{{ url_for('static', filename='images/acleda_qr.png') }}" alt="ACLEDA QR Code" style="width: 100%; max-height: 200px; object-fit: contain; aspect-ratio: 1/1; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px;">
+                    </div>
+                    <div style="font-weight:800; color:#28a745; font-size:24px; margin: 6px 0;" id="acleda_amount">៛ 0</div>
+                    <div style="font-weight:700; color:#d81b60; font-size:16px; margin-bottom: 6px;" id="acleda_usd_amount">$ 0.00</div>
+                    <p style="font-size:12px; color:#666; margin:0;">ស្កេនជាមួយ <b>ACLEDA ToanChet</b> រួចបញ្ជាក់ការទូទាត់ខាងក្រោម</p>
+                    <div class="mt-auto w-full" style="margin-top: auto; width: 100%;">
+                        <button type="button" id="acledaConfirmBtn" onclick="confirmManualPayment('ACLEDA')" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (OK)</button>
+                    </div>
                 </div>
-                <p style="font-size:12px; color:#666; margin:10px 0 0;">ស្កេនជាមួយ <b>ACLEDA ToanChet</b> រួចបញ្ជាក់ការទូទាត់ខាងក្រោម</p>
-                <button type="button" id="acledaConfirmBtn" onclick="confirmAcledaPayment()" class="btn-success" style="width: 100%; margin-top: 15px;">បញ្ជាក់ការទូទាត់ (Manual Confirm)</button>
             </div>
         </div>
     </div>
@@ -411,7 +436,7 @@
         sendCFDState('idle');
     }
 
-    async function confirmAcledaPayment() {
+    async function confirmManualPayment(bankName) {
         const btn = document.getElementById('acledaConfirmBtn');
         const originalBtnHTML = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span>កំពុងដំណើរការ...'; }
@@ -419,14 +444,15 @@
             let tran_id = activeTranId || sessionStorage.getItem('checkout_tran_id');
             const itemsToSend = CART_ITEMS || JSON.parse(sessionStorage.getItem('checkout_cart') || "[]");
 
-            const response = await fetch('/confirm-acleda', {
+            const response = await fetch('/confirm-manual-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     tran_id: tran_id,
                     items: itemsToSend,
                     total: parseFloat(TOTAL_AMOUNT),
-                    discount: parseFloat(finalDiscount)
+                    discount: parseFloat(finalDiscount),
+                    bank_name: bankName
                 })
             });
 
@@ -467,6 +493,16 @@
         if (amountEl) amountEl.textContent = '៛ ' + rielTotal;
         const usdEl = document.getElementById('usd_amount');
         if (usdEl) usdEl.textContent = '$ ' + parseFloat(TOTAL_AMOUNT).toFixed(2);
+        
+        const amretAmountEl = document.getElementById('amret_amount');
+        if (amretAmountEl) amretAmountEl.textContent = '៛ ' + rielTotal;
+        const amretUsdEl = document.getElementById('amret_usd_amount');
+        if (amretUsdEl) amretUsdEl.textContent = '$ ' + parseFloat(TOTAL_AMOUNT).toFixed(2);
+
+        const acledaAmountEl = document.getElementById('acleda_amount');
+        if (acledaAmountEl) acledaAmountEl.textContent = '៛ ' + rielTotal;
+        const acledaUsdEl = document.getElementById('acleda_usd_amount');
+        if (acledaUsdEl) acledaUsdEl.textContent = '$ ' + parseFloat(TOTAL_AMOUNT).toFixed(2);
 
         // Static ABA QR image is displayed directly in the modal (no JS generation needed)
         document.querySelectorAll('.swal2-container').forEach(el => el.remove());

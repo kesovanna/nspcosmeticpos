@@ -51,9 +51,42 @@
                 radial-gradient(ellipse at 20% 10%, rgba(255,255,255,0.08), transparent 50%),
                 radial-gradient(ellipse at 80% 90%, rgba(216,27,96,0.18), transparent 50%);
         }
+        #cfd-fs-btn {
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        #cfd-fs-btn:hover { transform: scale(1.05); }
+        #cfd-fs-btn:active { transform: scale(0.97); }
+        @media (max-width: 640px) {
+            #cfd-items { max-height: 28vh !important; }
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-white overflow-hidden h-screen w-screen" ondblclick="toggleFullScreen()">
+
+<!-- Full Screen Overlay for Initial Interaction -->
+<div id="cfd-fs-overlay" class="fixed inset-0 z-[9999] bg-slate-950/90 flex flex-col items-center justify-center cursor-pointer backdrop-blur-sm transition-opacity duration-500" onclick="startCFD()">
+    <div class="text-center p-8 bg-white/10 rounded-3xl border border-white/20 shadow-2xl pulse-soft">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mx-auto mb-6 text-pink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+        </svg>
+        <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Tap anywhere to Start Customer Display</h2>
+        <p class="text-slate-300 text-lg md:text-xl">ចុចទីនេះដើម្បីចាប់ផ្តើមអេក្រង់អតិថិជន</p>
+    </div>
+</div>
+
+<!-- Full Screen toggle — floats above idle + checkout views -->
+<button id="cfd-fs-btn" type="button" onclick="event.stopPropagation(); toggleFullScreen();"
+    class="fixed top-3 right-3 sm:top-4 sm:right-4 z-50 bg-black/55 hover:bg-black/75 text-white px-2.5 sm:px-3.5 py-2 rounded-xl shadow-lg border border-white/20 transition-all duration-300 flex items-center gap-2"
+    title="ពេញអេក្រង់ | Full Screen" aria-label="Toggle Full Screen">
+    <svg id="cfd-fs-expand" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+    </svg>
+    <svg id="cfd-fs-compress" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9L4 4m0 0v4m0-4h4m7 5l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4m7-5l5 5m0 0v-4m0 4h-4" />
+    </svg>
+    <span id="cfd-fs-label" class="hidden md:inline text-sm font-bold tracking-wide">ពេញអេក្រង់</span>
+</button>
 
 <!-- ================= IDLE STATE: PRODUCT SLIDESHOW ================= -->
 <div id="cfd-idle" class="absolute inset-0 transition-opacity duration-700">
@@ -62,91 +95,106 @@
     <!-- Branding + gradient overlay -->
     <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/20 grain-overlay"></div>
     <!-- Header -->
-    <div class="absolute top-0 inset-x-0 flex items-center justify-between px-10 py-6">
-        <div class="flex items-center gap-4">
-            <img src="/static/images/nsp_logo.png" class="w-14 h-14 rounded-2xl object-cover shadow-lg" onerror="this.style.display='none'">
+    <div class="absolute top-0 inset-x-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-6 md:px-10 py-4 md:py-6 pr-16 sm:pr-20 md:pr-36">
+        <div class="flex items-center gap-3 md:gap-4">
+            <img src="/static/images/nsp_logo.png" class="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-2xl object-cover shadow-lg" onerror="this.style.display='none'">
             <div>
-                <div class="text-3xl font-black tracking-wide" style="color:#d81b60;">NSP Cosmetic Store</div>
-                <div class="text-slate-400 text-sm tracking-widest uppercase">Customer Display</div>
+                <div class="text-lg sm:text-2xl md:text-3xl font-black tracking-wide" style="color:#d81b60;">NSP Cosmetic Store</div>
+                <div class="text-slate-400 text-xs sm:text-sm tracking-widest uppercase">Customer Display</div>
             </div>
         </div>
-        <div class="text-right">
-            <div class="text-slate-300 text-sm">សូមស្វាគមន៍ | Welcome</div>
-            <div id="idle-clock" class="text-2xl font-bold text-white"></div>
+        <div class="text-left sm:text-right">
+            <div class="text-slate-300 text-xs sm:text-sm">សូមស្វាគមន៍ | Welcome</div>
+            <div id="idle-clock" class="text-lg sm:text-xl md:text-2xl font-bold text-white"></div>
         </div>
     </div>
     <!-- Product name banner -->
-    <div class="absolute bottom-10 inset-x-0 text-center px-10">
-        <div id="slide-name" class="text-5xl font-extrabold text-white drop-shadow-lg mb-2">កំពុងផ្ទុក...</div>
-        <div id="slide-price" class="text-2xl font-bold text-pink-400 drop-shadow">—</div>
+    <div class="absolute bottom-6 sm:bottom-10 inset-x-0 text-center px-4 sm:px-8 md:px-10">
+        <div id="slide-name" class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-white drop-shadow-lg mb-2 leading-tight">កំពុងផ្ទុក...</div>
+        <div id="slide-price" class="text-base sm:text-xl md:text-2xl font-bold text-pink-400 drop-shadow">—</div>
     </div>
 </div>
 
 <!-- ================= ACTIVE STATE: CHECKOUT QR VIEW ================= -->
-<div id="cfd-active" class="absolute inset-0 hidden flex-col items-center justify-center bg-slate-950 transition-opacity duration-500 px-8">
+<div id="cfd-active" class="absolute inset-0 hidden flex-col items-center justify-start md:justify-center bg-slate-950 transition-opacity duration-500 px-3 sm:px-6 md:px-8 py-4 md:py-6 overflow-y-auto">
     <div class="w-full max-w-6xl">
         <!-- Header -->
-        <div class="flex items-center justify-between mb-8">
-            <div class="flex items-center gap-4">
-                <img src="/static/images/nsp_logo.png" class="w-12 h-12 rounded-xl object-cover" onerror="this.style.display='none'">
-                <div class="text-3xl font-black tracking-wide" style="color:#d81b60;">NSP Cosmetic Store</div>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 md:mb-8 pr-12 sm:pr-16 md:pr-0">
+            <div class="flex items-center gap-3 md:gap-4">
+                <img src="/static/images/nsp_logo.png" class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl object-cover" onerror="this.style.display='none'">
+                <div class="text-lg sm:text-2xl md:text-3xl font-black tracking-wide" style="color:#d81b60;">NSP Cosmetic Store</div>
             </div>
-            <div class="flex items-center gap-3 bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 px-5 py-2.5 rounded-full text-xl font-bold pulse-soft">
-                <span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span>
+            <div class="flex items-center gap-2 sm:gap-3 bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-full text-sm sm:text-lg md:text-xl font-bold pulse-soft">
+                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-400 inline-block"></span>
                 ស្កេនដើម្បីបង់ប្រាក់ | Scan to Pay
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 items-stretch">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 md:gap-8 items-stretch">
             <!-- LEFT: Cart Summary -->
-            <div class="lg:col-span-2 bg-white/5 backdrop-blur border border-white/10 rounded-3xl p-8 flex flex-col">
-                <h2 class="text-2xl font-extrabold text-white mb-6 flex items-center gap-3">
-                    <span class="text-3xl">🛒</span> បញ្ជីទំនិញ | Cart Summary
+            <div class="lg:col-span-2 bg-white/5 backdrop-blur border border-white/10 rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 flex flex-col">
+                <h2 class="text-lg sm:text-xl md:text-2xl font-extrabold text-white mb-3 md:mb-6 flex items-center gap-2 md:gap-3">
+                    <span class="text-2xl md:text-3xl">🛒</span> បញ្ជីទំនិញ | Cart Summary
                 </h2>
                 <div id="cfd-items" class="flex-1 overflow-y-auto space-y-3 pr-2" style="max-height: 340px;"></div>
-                <div class="border-t border-white/10 mt-6 pt-5 space-y-2">
-                    <div class="flex justify-between text-2xl text-slate-300">
+                <div class="border-t border-white/10 mt-4 md:mt-6 pt-4 md:pt-5 space-y-2">
+                    <div class="flex justify-between text-lg sm:text-xl md:text-2xl text-slate-300">
                         <span>សរុប | Total</span>
                         <span id="cfd-total-usd" class="font-bold text-white">$ 0.00</span>
                     </div>
-                    <div class="flex justify-between text-3xl">
+                    <div class="flex justify-between text-xl sm:text-2xl md:text-3xl">
                         <span class="font-bold" style="color:#d81b60;">៛ Riel</span>
                         <span id="cfd-total-riel" class="font-black" style="color:#28a745;">៛ 0</span>
                     </div>
                 </div>
             </div>
 
-            <!-- RIGHT: Two QR codes -->
-            <div class="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <!-- RIGHT: Three QR codes -->
+            <div class="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
                 <!-- ABA -->
-                <div class="bg-white rounded-3xl p-6 flex flex-col items-center justify-between shadow-2xl">
-                    <div class="flex items-center gap-2 mb-4">
+                <div class="bg-white rounded-2xl md:rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-between shadow-2xl">
+                    <div class="flex items-center gap-2 mb-3 md:mb-4">
                         <span class="w-3 h-3 rounded-full" style="background:#005a9c;"></span>
-                        <span class="text-xl font-extrabold text-slate-800">ABA Mobile</span>
+                        <span class="text-base sm:text-lg md:text-xl font-extrabold text-slate-800">ABA Mobile</span>
                     </div>
-                    <div class="bg-white p-3 rounded-2xl border border-slate-200">
+                    <div class="bg-white p-2 sm:p-3 rounded-2xl border border-slate-200">
                         <div id="cfd-qr-aba" class="mx-auto"></div>
                     </div>
-                    <div class="text-center mt-4">
-                        <div id="cfd-amount-usd" class="text-2xl font-black text-slate-800">$ 0.00</div>
-                        <div id="cfd-amount-riel" class="text-lg font-bold" style="color:#d81b60;">៛ 0</div>
+                    <div class="text-center mt-3 md:mt-4">
+                        <div id="cfd-amount-usd" class="text-xl sm:text-2xl font-black text-slate-800">$ 0.00</div>
+                        <div id="cfd-amount-riel" class="text-base sm:text-lg font-bold" style="color:#d81b60;">៛ 0</div>
                     </div>
-                    <div class="text-sm text-slate-500 mt-3 text-center">ស្កេនជាមួយកម្មវិធី <b>ABA Mobile</b></div>
+                    <div class="text-xs sm:text-sm text-slate-500 mt-2 sm:mt-3 text-center">ស្កេនជាមួយកម្មវិធី <b>ABA Mobile</b></div>
+                </div>
+                <!-- Amret -->
+                <div class="bg-white rounded-2xl md:rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-between shadow-2xl">
+                    <div class="flex items-center gap-2 mb-3 md:mb-4">
+                        <span class="w-3 h-3 rounded-full" style="background:#00a651;"></span>
+                        <span class="text-base sm:text-lg md:text-xl font-extrabold text-slate-800">Amret Mobile</span>
+                    </div>
+                    <div class="bg-white p-2 sm:p-3 rounded-2xl border border-slate-200">
+                        <img src="{{ url_for('static', filename='images/amret_qr.jpg') }}" alt="Amret QR" class="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain rounded-xl mx-auto" onerror="this.src='https://cdn-icons-png.flaticon.com/512/924/924514.png';">
+                    </div>
+                    <div class="text-center mt-3 md:mt-4">
+                        <div id="cfd-amret-usd" class="text-xl sm:text-2xl font-black text-slate-800">$ 0.00</div>
+                        <div id="cfd-amret-riel" class="text-base sm:text-lg font-bold" style="color:#00a651;">៛ 0</div>
+                    </div>
+                    <div class="text-xs sm:text-sm text-slate-500 mt-2 sm:mt-3 text-center">ស្កេនជាមួយ <b>Amret Mobile</b></div>
                 </div>
                 <!-- ACLEDA -->
-                <div class="bg-white rounded-3xl p-6 flex flex-col items-center justify-between shadow-2xl">
-                    <div class="flex items-center gap-2 mb-4">
+                <div class="bg-white rounded-2xl md:rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-between shadow-2xl">
+                    <div class="flex items-center gap-2 mb-3 md:mb-4">
                         <span class="w-3 h-3 rounded-full" style="background:#ED1C24;"></span>
-                        <span class="text-xl font-extrabold text-slate-800">ACLEDA ToanChet</span>
+                        <span class="text-base sm:text-lg md:text-xl font-extrabold text-slate-800">ACLEDA ToanChet</span>
                     </div>
-                    <div class="bg-white p-3 rounded-2xl border border-slate-200">
-                        <img src="/static/images/acleda_qr.png" alt="ACLEDA QR" class="w-44 h-44 object-contain rounded-xl mx-auto">
+                    <div class="bg-white p-2 sm:p-3 rounded-2xl border border-slate-200">
+                        <img src="/static/images/acleda_qr.png" alt="ACLEDA QR" class="w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44 object-contain rounded-xl mx-auto">
                     </div>
-                    <div class="text-center mt-4">
-                        <div id="cfd-acleda-usd" class="text-2xl font-black text-slate-800">$ 0.00</div>
-                        <div id="cfd-acleda-riel" class="text-lg font-bold" style="color:#ED1C24;">៛ 0</div>
+                    <div class="text-center mt-3 md:mt-4">
+                        <div id="cfd-acleda-usd" class="text-xl sm:text-2xl font-black text-slate-800">$ 0.00</div>
+                        <div id="cfd-acleda-riel" class="text-base sm:text-lg font-bold" style="color:#ED1C24;">៛ 0</div>
                     </div>
-                    <div class="text-sm text-slate-500 mt-3 text-center">ស្កេនជាមួយ <b>ACLEDA ToanChet</b></div>
+                    <div class="text-xs sm:text-sm text-slate-500 mt-2 sm:mt-3 text-center">ស្កេនជាមួយ <b>ACLEDA ToanChet</b></div>
                 </div>
             </div>
         </div>
@@ -176,7 +224,7 @@
     }
 
     function productImgSrc(p) {
-        const img = p.image || 'default.jpg';
+        const img = p.image || p.image_url || p.image_filename || 'default.jpg';
         if (img.startsWith('http') || img.startsWith('data:')) return img;
         return '/static/images/' + img;
     }
@@ -204,7 +252,7 @@
         img.src = productImgSrc(p);
         // Apply the 4-animation rotation (round-robin by slide index)
         img.className = 'w-full h-full object-cover ' + animList[slideIdx % animList.length];
-        img.onerror = () => { img.src = '/static/images/default.jpg'; };
+        img.onerror = function() { this.onerror = null; this.src = '/static/images/nsp_logo.png'; };
         const overlay = document.createElement('div');
         overlay.className = 'absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/30';
         newLayer.appendChild(img);
@@ -274,25 +322,33 @@
         }
         items.forEach(it => {
             const row = document.createElement('div');
-            row.className = 'flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl px-4 py-3';
+            row.className = 'flex items-center gap-3 sm:gap-4 bg-white/5 border border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3';
             const qty = it.qty || it.quantity || 1;
             const price = parseFloat(it.price || 0);
             const img = document.createElement('img');
-            img.src = productImgSrc(it);
-            img.className = 'w-12 h-12 rounded-xl object-cover';
-            img.onerror = () => { img.src = '/static/images/default.jpg'; };
+            
+            // Use actual product image with fallback to nsp_logo.png
+            const imgSrc = it.image_filename || it.image_url || it.image;
+            if (imgSrc && imgSrc.trim() !== '') {
+                img.src = imgSrc.startsWith('http') || imgSrc.startsWith('data:') ? imgSrc : '/static/images/' + imgSrc;
+            } else {
+                img.src = '/static/images/nsp_logo.png';
+            }
+            
+            img.className = 'w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover flex-shrink-0';
+            img.onerror = function() { this.onerror = null; this.src = '/static/images/nsp_logo.png'; };
             const info = document.createElement('div');
-            info.className = 'flex-1';
+            info.className = 'flex-1 min-w-0';
             const name = document.createElement('div');
-            name.className = 'text-lg font-bold text-white';
+            name.className = 'text-sm sm:text-base md:text-lg font-bold text-white truncate';
             name.textContent = it.name || 'Item';
             const sub = document.createElement('div');
-            sub.className = 'text-sm text-slate-400';
+            sub.className = 'text-xs sm:text-sm text-slate-400';
             sub.textContent = qty + ' x $' + price.toFixed(2);
             info.appendChild(name);
             info.appendChild(sub);
             const total = document.createElement('div');
-            total.className = 'text-xl font-black text-emerald-400';
+            total.className = 'text-base sm:text-lg md:text-xl font-black text-emerald-400 flex-shrink-0';
             total.textContent = '$' + (qty * price).toFixed(2);
             row.appendChild(img);
             row.appendChild(info);
@@ -307,6 +363,8 @@
         document.getElementById('cfd-amount-riel').textContent = '៛ ' + riel.toLocaleString('en-US');
         document.getElementById('cfd-acleda-usd').textContent = '$' + totalUsd.toFixed(2);
         document.getElementById('cfd-acleda-riel').textContent = '៛ ' + riel.toLocaleString('en-US');
+        document.getElementById('cfd-amret-usd').textContent = '$' + totalUsd.toFixed(2);
+        document.getElementById('cfd-amret-riel').textContent = '៛ ' + riel.toLocaleString('en-US');
 
         // ABA QR (dynamic, mirrors POS)
         renderABAQR(data.tran_id || 'TX-CFD', totalUsd);
@@ -350,14 +408,56 @@
         } catch (e) { console.error('cfd poll error:', e); }
     }
 
-    // ============ FULLSCREEN TOGGLE (double-tap / double-click) ============
-    function toggleFullScreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(e => {});
-        } else {
-            document.exitFullscreen();
+    // ============ FULLSCREEN TOGGLE (button + double-tap / double-click) ============
+    function isFullScreen() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+    }
+
+    function startCFD() {
+        const overlay = document.getElementById('cfd-fs-overlay');
+        if (overlay) {
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.style.display = 'none', 500);
+        }
+        if (!isFullScreen()) {
+            toggleFullScreen();
         }
     }
+
+    function syncFullScreenUI() {
+        const on = isFullScreen();
+        const expand = document.getElementById('cfd-fs-expand');
+        const compress = document.getElementById('cfd-fs-compress');
+        const label = document.getElementById('cfd-fs-label');
+        const btn = document.getElementById('cfd-fs-btn');
+        if (expand) expand.classList.toggle('hidden', on);
+        if (compress) compress.classList.toggle('hidden', !on);
+        if (label) label.textContent = on ? 'ចាកចេញ' : 'ពេញអេក្រង់';
+        if (btn) {
+            btn.title = on ? 'ចាកចេញពីអេក្រង់ពេញ | Exit Full Screen' : 'ពេញអេក្រង់ | Full Screen';
+            btn.setAttribute('aria-label', btn.title);
+        }
+    }
+
+    function toggleFullScreen() {
+        const root = document.documentElement;
+        if (!isFullScreen()) {
+            const req = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+            if (req) {
+                Promise.resolve(req.call(root)).catch(err => {
+                    console.log('Error attempting to enable full-screen mode: ' + (err && err.message ? err.message : err));
+                });
+            }
+        } else {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+            if (exit) exit.call(document);
+        }
+    }
+
+    document.addEventListener('fullscreenchange', syncFullScreenUI);
+    document.addEventListener('webkitfullscreenchange', syncFullScreenUI);
+    document.addEventListener('MSFullscreenChange', syncFullScreenUI);
+    syncFullScreenUI();
 
     // ============ SCREEN WAKE LOCK (prevent tablet sleeping) ============
     let wakeLock = null;
