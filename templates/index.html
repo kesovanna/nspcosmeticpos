@@ -7555,5 +7555,35 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 </script>
 
+<script>
+// ក្បាច់អមតៈការពារកុំឱ្យ SPA លុបចោល (រចនាបថ: ទាញវែងពេញ Sidebar, ថ្លា Glass Effect)
+setInterval(function() {
+    let badge = document.getElementById('nsp-immortal-badge');
+    
+    if (!navigator.onLine) {
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.id = 'nsp-immortal-badge';
+            
+            // 💡 កែប្រែ: width: 220px (ឱ្យវែង), justify-content: center (នៅកណ្តាល), rgba(...) & backdrop-filter (ឱ្យថ្លា និងព្រិលផ្ទៃក្រោយ)
+            badge.style.cssText = 'position: fixed !important; bottom: 75px !important; left: 20px !important; width: 220px !important; justify-content: center !important; background-color: rgba(30, 41, 59, 0.75) !important; backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; color: white !important; padding: 10px 16px !important; border-radius: 9999px !important; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; z-index: 2147483647 !important; display: flex !important; align-items: center !important; gap: 10px !important; font-family: sans-serif !important; pointer-events: none !important;';
+            
+            badge.innerHTML = `
+                <svg style="animation: nsp-spin-fast 1s linear infinite; height: 18px; width: 18px; color: #38bdf8;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span style="font-size: 14px; font-weight: 500; letter-spacing: 0.5px;">Connecting...</span>
+                <style>@keyframes nsp-spin-fast { 100% { transform: rotate(360deg); } }</style>
+            `;
+            if (document.body) document.body.appendChild(badge);
+        } else {
+            badge.style.setProperty('display', 'flex', 'important');
+        }
+    } else {
+        if (badge) badge.style.setProperty('display', 'none', 'important');
+    }
+}, 500);
+</script>
 </body>
 </html>

@@ -548,5 +548,46 @@
     }
 </script>
 <style> @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } } </style>
+<!-- Global network status toasts (SweetAlert2) — checkout / QR page -->
+<script>
+(function initNetworkStatusToasts() {
+    if (window.__nspNetworkStatusBound) return;
+    window.__nspNetworkStatusBound = true;
+
+    function showNetworkToast(type) {
+        if (typeof Swal === 'undefined') return;
+        if (type === 'offline') {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'warning',
+                title: 'គ្មានអ៊ីនធឺណិត។ កំពុងដំណើរការក្រៅបណ្តាញ។',
+                text: 'No Internet Connection. Running in offline mode.',
+                showConfirmButton: false,
+                timer: 5000,
+                timerProgressBar: true
+            });
+        } else {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: 'បានភ្ជាប់អ៊ីនធឺណិត',
+                text: 'Connected to Internet.',
+                showConfirmButton: false,
+                timer: 2500,
+                timerProgressBar: true
+            });
+        }
+    }
+
+    window.addEventListener('offline', function () { showNetworkToast('offline'); });
+    window.addEventListener('online', function () { showNetworkToast('online'); });
+
+    if (!navigator.onLine) {
+        showNetworkToast('offline');
+    }
+})();
+</script>
 </body>
 </html>
