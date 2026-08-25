@@ -8,13 +8,21 @@ def main():
     work_dir = os.path.dirname(os.path.abspath(__file__))
     
     # ១. រត់ ABA Listener ស្ងាត់ៗនៅពីក្រោយ (កុំឱ្យវាមកដណ្តើម Tab)
-    aba_process = subprocess.Popen([sys.executable, "aba_listener.py"], cwd=work_dir)
+    if getattr(sys, 'frozen', False):
+        base_dir = sys._MEIPASS
+    else:
+        base_dir = work_dir
+
+    aba_path = os.path.join(base_dir, "aba_listener.py")
+    main_path = os.path.join(base_dir, "main.py")
+
+    aba_process = subprocess.Popen([sys.executable, aba_path], cwd=base_dir)
 
     try:
         # ២. ទាញយក main.py មករត់ក្នុង Tab ដើមនេះផ្ទាល់តែម្តង!
         # ការធ្វើបែបនេះ ការពារមិនឱ្យ VS Code បើក Tab ថ្មីរញ៉េរញ៉ៃ
         sys.argv.append("--no-reload") # បិទ Reloader កុំឱ្យវិលវល់
-        runpy.run_path("main.py", run_name="__main__")
+        runpy.run_path(main_path, run_name="__main__")
         
     except KeyboardInterrupt:
         # ពេលបងចុច Ctrl + C វានឹងរត់ចូលកន្លែងនេះ

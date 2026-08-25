@@ -196,6 +196,7 @@ def get_db():
     return firestore.client()
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max payload size
 app.secret_key = os.environ.get('SECRET_KEY')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
@@ -1232,12 +1233,25 @@ def add_product():
     merged_categories = get_merged_categories()
     return render_template('add_product.html', products=products, categories=merged_categories)
 
+@app.route('/api/product/<product_id>', methods=['GET'])
+@login_required
+def get_product_api(product_id):
+    product = local_db.get_product(product_id)
+    if not product:
+        return jsonify({'status': 'error', 'message': 'Product not found'}), 404
+    
+    # Ensure ID is included
+    product['id'] = product_id
+    return jsonify({'status': 'success', 'product': product})
+
 @app.route('/edit_product/<product_id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def edit_product(product_id):
     product = local_db.get_product(product_id)
     if not product:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Product not found'}), 404
         return "Not Found", 404
 
     if request.method == 'POST':
@@ -1337,6 +1351,10 @@ def edit_product(product_id):
             print(f"Cloud update fallback: {e}")
         
         sync.trigger_auto_sync(delay=5)
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'success', 'message': 'Product updated successfully'})
+            
         return redirect(url_for('manager'))
         
     merged_categories = get_merged_categories()

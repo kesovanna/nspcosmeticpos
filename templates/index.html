@@ -491,8 +491,7 @@
         }
 
         @media (max-width: 600px) {
-            /* ---- HIDE Music & Sync on Phones ---- */
-            #musicToggle { display: none !important; }
+            /* ---- HIDE Sync on Phones ---- */
             #syncIndicator { display: none !important; }
 
             /* ---- TOP BAR: HORIZONTAL SCROLL (no wrapping) ---- */
@@ -716,12 +715,9 @@
            ========================================================= */
         @media (min-width: 768px) and (max-width: 1200px) {
 
-            /* ---- 1. HIDE Cloud Sync + Music (🎵) on tablets/mobiles ---- */
+            /* ---- 1. HIDE Cloud Sync on tablets/mobiles ---- */
             /* Sync indicator: the clickable cloud sync widget */
             #syncIndicator { display: none !important; }
-
-            /* Music button (🎵) — the toggleMusic() element */
-            #musicToggle { display: none !important; }
 
             /* Dashboard admin link uses .btn-music class too; hide it as well
                so the header is fully decluttered on compact screens */
@@ -2035,9 +2031,9 @@
                                             <button onclick="quickRestock('{{ item.id }}', '{{ item.name }}')" class="btn-edit-small" title="Quick Restock" style="color: #059669;">
                                                 <i data-lucide="package-plus" style="width: 18px; height: 18px;"></i>
                                             </button>
-                                            <a href="{{ url_for('edit_product', product_id=item.id) }}" class="btn-edit-small" title="Edit Product">
+                                            <button onclick="openEditProductModal('{{ item.id }}')" class="btn-edit-small" title="Edit Product">
                                                 <i data-lucide="edit-3" style="width: 18px; height: 18px;"></i>
-                                            </a>
+                                            </button>
                                             <button onclick="viewStockHistory('{{ item.id }}', '{{ item.name }}')" class="btn-edit-small" title="View History" style="color: #3b82f6;">
                                                 <i data-lucide="history" style="width: 18px; height: 18px;"></i>
                                             </button>
@@ -3043,7 +3039,6 @@
         </style>
 
 <audio id="alertSound" src="https://s3.amazonaws.com/freecodecamp/simonSound1.mp3" preload="auto"></audio>
-<audio id="bgMusic" loop preload="auto"><source src="{{ url_for('static', filename='sounds/audiobg-music.mp3') }}" type="audio/mpeg"></audio>
 
 <script>
     const RIEL_RATE = {{ riel_rate }};
@@ -3995,21 +3990,6 @@
     }
 
     // Note: The checkout() function has been moved to static/js/app.js for better maintainability and error handling.
-    
-    function toggleMusic(e) { 
-        if(e) e.stopPropagation(); 
-        const m = document.getElementById('bgMusic'); 
-        const btn = document.getElementById('musicToggle');
-        
-        if (m.paused) {
-            m.volume = 0.3; 
-            m.play();
-            btn.classList.add('playing'); // Turns on the glow!
-        } else {
-            m.pause();
-            btn.classList.remove('playing'); // Turns off the glow!
-        } 
-    }
 
     window.onclick = function(e) { ['settingsModal', 'aboutModal', 'userManagementModal'].forEach(id => { if (e.target == document.getElementById(id)) document.getElementById(id).style.display = 'none'; }); }
 
@@ -5552,9 +5532,9 @@
                             <button onclick="quickRestock('${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" class="btn-edit-small" title="Quick Restock" style="color: #059669;">
                                 <i data-lucide="package-plus" style="width: 18px; height: 18px;"></i>
                             </button>
-                            <a href="/edit_product/${p.id}" class="btn-edit-small" title="Edit Product">
+                            <button onclick="openEditProductModal('${p.id}')" class="btn-edit-small" title="Edit Product">
                                 <i data-lucide="edit-3" style="width: 18px; height: 18px;"></i>
-                            </a>
+                            </button>
                             <button onclick="viewStockHistory('${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" class="btn-edit-small" title="View History" style="color: #3b82f6;">
                                 <i data-lucide="history" style="width: 18px; height: 18px;"></i>
                             </button>
@@ -6832,6 +6812,72 @@ async function loadCategorySummary() {
         </div>
     </div>
 </div>
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 850px; width: 90%;">
+        <div class="modal-content" style="background: #ffffff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); max-height: 90vh; display: flex; flex-direction: column; border: none;">
+            
+            <div class="modal-header border-b border-gray-200 p-4 flex-shrink-0">
+                <h5 class="modal-title text-xl font-bold" id="editProductModalLabel" style="color: #1e293b;">កែប្រែទំនិញ (Edit Product)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-6 flex-grow" style="overflow-y: auto !important; -webkit-overflow-scrolling: touch;">
+                <form id="editProductForm" method="POST" enctype="multipart/form-data" class="space-y-4 pb-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" id="editProductId" name="product_id">
+                    <input type="hidden" id="editDeleteCurrentImage" name="delete_current_image" value="false">
+                    
+                    <div class="form-group mb-3">
+                        <label for="editProductName" class="form-label" style="color: #475569; font-weight: 600;">១. ឈ្មោះទំនិញ (Product Name)</label>
+                        <input type="text" id="editProductName" name="name" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editCategory" class="form-label" style="color: #475569; font-weight: 600;">២. ប្រភេទ (Category)</label>
+                        <select id="editCategory" name="category" class="form-select" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;" required>
+                            <option value="" disabled>-- សូមជ្រើសរើសប្រភេទ (Select Category) --</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editRielInput" class="form-label" style="color: #475569; font-weight: 600;">៣. តម្លៃ (Price in Riel ៛)</label>
+                        <input type="number" id="editRielInput" name="price" step="1" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;" required oninput="updateEditUsdPrice(this.value)">
+                        <div id="editUsdPreview" class="text-info small mt-1" style="font-weight: bold;">ស្មើនឹង (Equals): $ 0.00</div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editStockQuantity" class="form-label" style="color: #475569; font-weight: 600;">៤. ចំនួនក្នុងស្តុក (Stock)</label>
+                        <input type="number" id="editStockQuantity" name="stock_quantity" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editBarcodeInput" class="form-label" style="color: #475569; font-weight: 600;">៥. បាកូដ (Barcode)</label>
+                        <input type="text" id="editBarcodeInput" name="barcode" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;">
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="editExpiryDate" class="form-label" style="color: #475569; font-weight: 600;">៦. ថ្ងៃផុតកំណត់ (Expiration Date)</label>
+                        <input type="date" id="editExpiryDate" name="expiry_date" class="form-control" style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e293b;">
+                    </div>
+                    <div class="form-group mb-4">
+                        <label for="editProductImage" class="form-label" style="color: #475569; font-weight: 600;">៧. រូបភាព (Image)</label>
+                        <div id="editImageDropzone" tabindex="0" style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 24px; background-color: #f8fafc; text-align: center; cursor: pointer; transition: all 0.2s;" class="hover:bg-slate-100">
+                            <i data-lucide="camera" style="width: 40px; height: 40px; color: #94a3b8; margin: 0 auto 12px block;"></i>
+                            <p style="font-size: 14px; color: #64748b; margin-bottom: 4px;">ចុចទីនេះ, អូសទម្លាក់, ឬ <kbd style="padding: 2px 6px; background-color: #e2e8f0; border-radius: 4px; font-size: 12px;">Ctrl+V</kbd> ដើម្បី Paste រូបភាព</p>
+                            <input type="file" id="editProductImage" accept="image/*" style="display: none;" onchange="previewEditProductImage(this)">
+                            <input type="hidden" name="image_base64" id="editImageBase64">
+                            <div id="editImagePreviewContainer" class="hidden" style="margin-top: 16px; position: relative; display: inline-block;">
+                                <img id="editImagePreview" src="" alt="Preview" style="max-height: 160px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                                <button type="button" onclick="clearEditImage()" style="position: absolute; top: -8px; right: -8px; background-color: #ef4444; color: white; border: none; border-radius: 9999px; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100 py-2 fw-bold" style="background-color: #d81b60; border: none;">៨. រក្សាទុកការកែប្រែ (Save Changes)</button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     // មុខងារឆ្លាតវៃ V3: អូសអេក្រង់ទៅឆ្វេង (Swipe Left) ដើម្បីបិទ Sidebar
@@ -6964,6 +7010,223 @@ document.addEventListener("DOMContentLoaded", function() {
             if (base64Input) base64Input.value = '';
         }
     }
+
+    // Dropzone logic for Edit Product Modal
+    const editDropzone = document.getElementById('editImageDropzone');
+    const editFileInput = document.getElementById('editProductImage');
+    const editPreviewContainer = document.getElementById('editImagePreviewContainer');
+    const editPreviewImage = document.getElementById('editImagePreview');
+
+    if (editDropzone && editFileInput) {
+        editDropzone.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') { editFileInput.click(); }
+        });
+
+        editFileInput.addEventListener('change', handleEditFiles);
+
+        window.addEventListener('paste', e => {
+            if(e.clipboardData.files.length > 0 && document.getElementById('editProductModal').classList.contains('show')) {
+                editFileInput.files = e.clipboardData.files;
+                handleEditFiles();
+            }
+        });
+
+        function handleEditFiles() {
+            const file = editFileInput.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    editPreviewImage.src = e.target.result;
+                    editPreviewContainer.classList.remove('hidden');
+                    const icon = editDropzone.querySelector('i');
+                    const p = editDropzone.querySelector('p');
+                    if(icon) icon.style.display = 'none';
+                    if(p) p.style.display = 'none';
+                    
+                    if (typeof previewEditProductImage === 'function') {
+                        previewEditProductImage(editFileInput);
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        window.clearEditImage = function() {
+            editFileInput.value = '';
+            editPreviewImage.src = '';
+            editPreviewContainer.classList.add('hidden');
+            const icon = editDropzone.querySelector('i');
+            const p = editDropzone.querySelector('p');
+            if(icon) icon.style.display = 'block';
+            if(p) p.style.display = 'block';
+            
+            const base64Input = document.getElementById('editImageBase64');
+            if (base64Input) base64Input.value = '';
+            
+            document.getElementById('editDeleteCurrentImage').value = 'true';
+        }
+    }
+});
+
+// Edit Product Modal Functions
+function openEditProductModal(productId) {
+    // Fetch product data
+    fetch(`/api/product/${productId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const p = data.product;
+                
+                // Populate form
+                document.getElementById('editProductId').value = p.id;
+                document.getElementById('editProductName').value = p.name || '';
+                document.getElementById('editCategory').value = p.category || 'more';
+                
+                // Price
+                const rielRate = typeof RIEL_RATE !== 'undefined' ? RIEL_RATE : 4000;
+                const priceRiel = Math.round((p.price || 0) * rielRate);
+                document.getElementById('editRielInput').value = priceRiel;
+                updateEditUsdPrice(priceRiel);
+                
+                document.getElementById('editStockQuantity').value = p.stock_quantity || 0;
+                document.getElementById('editBarcodeInput').value = p.barcode || p.id;
+                document.getElementById('editExpiryDate').value = p.expiry_date || '';
+                
+                // Image
+                document.getElementById('editDeleteCurrentImage').value = 'false';
+                document.getElementById('editImageBase64').value = '';
+                document.getElementById('editProductImage').value = '';
+                
+                const previewContainer = document.getElementById('editImagePreviewContainer');
+                const previewImage = document.getElementById('editImagePreview');
+                const dropzone = document.getElementById('editImageDropzone');
+                const icon = dropzone.querySelector('i');
+                const pText = dropzone.querySelector('p');
+                
+                if (p.image && p.image !== 'default.jpg') {
+                    const imageSrc = p.image.startsWith('http') || p.image.startsWith('data:') 
+                        ? p.image 
+                        : `/static/images/${p.image}`;
+                        
+                    previewImage.src = imageSrc;
+                    previewContainer.classList.remove('hidden');
+                    if(icon) icon.style.display = 'none';
+                    if(pText) pText.style.display = 'none';
+                } else {
+                    previewImage.src = '';
+                    previewContainer.classList.add('hidden');
+                    if(icon) icon.style.display = 'block';
+                    if(pText) pText.style.display = 'block';
+                }
+                
+                // Z-Index and Backdrop Fix
+                const modalEl = document.getElementById('editProductModal');
+                if (modalEl.parentNode !== document.body) {
+                    document.body.appendChild(modalEl);
+                }
+                modalEl.style.zIndex = "99999"; 
+                const modal = new bootstrap.Modal(modalEl, {
+                    backdrop: false
+                });
+                modal.show();
+            } else {
+                Swal.fire('Error', 'Could not load product data', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching product:', err);
+            Swal.fire('Error', 'Failed to fetch product details', 'error');
+        });
+}
+
+function updateEditUsdPrice(rielValue) {
+    const rielRate = typeof RIEL_RATE !== 'undefined' ? RIEL_RATE : 4000;
+    const usd = (parseFloat(rielValue) || 0) / rielRate;
+    const preview = document.getElementById('editUsdPreview');
+    if (preview) {
+        preview.innerText = `ស្មើនឹង (Equals): $ ${usd.toFixed(2)}`;
+    }
+}
+
+function previewEditProductImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('editImageBase64').value = e.target.result;
+            document.getElementById('editDeleteCurrentImage').value = 'false';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// Handle Edit Form Submission
+document.addEventListener('DOMContentLoaded', function() {
+    const editForm = document.getElementById('editProductForm');
+    if (editForm) {
+        editForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const productId = document.getElementById('editProductId').value;
+            const formData = new FormData(this);
+            
+            fetch(`/edit_product/${productId}`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'កែប្រែជោគជ័យ / Updated successfully',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                    
+                    // Close modal
+                    const modalEl = document.getElementById('editProductModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    
+                    // Refresh UI
+                    if (typeof refreshProductGrid === 'function') {
+                        refreshProductGrid();
+                    } else {
+                        window.location.reload();
+                    }
+                    
+                    // Update table row if in inventory view
+                    const row = document.getElementById(`product-row-${productId}`);
+                    if (row) {
+                        const nameCell = row.querySelector('td:nth-child(4)');
+                        const catCell = row.querySelector('td:nth-child(5)');
+                        const stockCell = row.querySelector('td:nth-child(6)');
+                        const priceCell = row.querySelector('td:nth-child(7)');
+                        
+                        if (nameCell) nameCell.textContent = formData.get('name');
+                        if (catCell) catCell.textContent = formData.get('category');
+                        if (stockCell) stockCell.textContent = formData.get('stock_quantity');
+                        
+                        const rielRate = typeof RIEL_RATE !== 'undefined' ? RIEL_RATE : 4000;
+                        const usdPrice = (parseFloat(formData.get('price')) || 0) / rielRate;
+                        if (priceCell) priceCell.textContent = `$${usdPrice.toFixed(2)}`;
+                    }
+                } else {
+                    Swal.fire('Error', data.message || 'Failed to update product', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire('Error', 'An error occurred while updating the product.', 'error');
+            });
+        });
+    }
 });
 </script>
 <script>
@@ -7078,13 +7341,6 @@ async function _fetchProductsFromFirestore() {
             low_stock_level: d.low_stock_level || null
         };
     });
-
-    console.group("=== FIRESTORE LIVE PRODUCTS DATA ===");
-    console.log("Total products fetched directly from Firestore:", products.length);
-    products.forEach(p => {
-        console.log(`Product ID: ${p.id} | Name: ${p.name} | Image Source Path: ${p.image} | Is_Gdrive: ${p.image.startsWith('https://drive.google.com')}`);
-    });
-    console.groupEnd();
 
     return products;
 }
