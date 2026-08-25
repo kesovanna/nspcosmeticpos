@@ -27,7 +27,7 @@ sync_status = {
 
 def get_firestore_db():
     try:
-        return firestore.client()
+        return firestore.client(database_id='default')
     except Exception as e:
         print(f"Error initializing Firestore client: {e}")
         traceback.print_exc()

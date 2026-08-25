@@ -1761,7 +1761,7 @@ def unified_report_api():
     if local_db.is_cloud_runtime():
         try:
             from firebase_admin import firestore
-            db = firestore.client()
+            db = firestore.client(database_id='default')
 
             # APPLY TIMEOUT SO IT DOES NOT HANG OFFLINE
             docs = db.collection('orders').stream(timeout=1.5)
