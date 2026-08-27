@@ -45,6 +45,22 @@ class TerminalLogStream:
 sys.stdout = TerminalLogStream(sys.stdout)
 sys.stderr = TerminalLogStream(sys.stderr)
 
+# Startup backup runs in start_app.py BEFORE this stdout wrap, so those prints
+# never hit log_queue on their own. Replay them now for Project Live Console.
+try:
+    import auto_backup
+    for _backup_line in auto_backup.drain_logs_for_console():
+        try:
+            log_queue.put_nowait(_backup_line)
+        except queue.Full:
+            try:
+                log_queue.get_nowait()
+            except Exception:
+                pass
+            log_queue.put_nowait(_backup_line)
+except Exception:
+    pass
+
 import base64
 import json
 import smtplib
@@ -2322,35 +2338,10 @@ def check_status():
     return jsonify({"status": "pending"})
 
 @app.route('/success')
-@app.route('/success')
 def success():
     tran_id = request.args.get('tran_id')
     print(f"DEBUG: Attempting to load success page for ID: {tran_id}")
-    
-    try:
-        if not tran_id or not all(c.isalnum() or c in '-_' for c in tran_id):
-            return render_template('ai_green.html', message="Invalid transaction ID"), 400
-        
-        order = local_db.get_order(tran_id)
-        if order is None:
-            return render_template('ai_green.html', message="Order not found"), 404
-            
-        # ជួសជុលចំណុចស្លាប់៖ បំប្លែង items ពី String JSON ឱ្យទៅជាបញ្ជី (List) ពិតប្រាកដ
-        if 'items' in order and isinstance(order['items'], str):
-            try:
-                order['items'] = json.loads(order['items'])
-            except Exception as json_err:
-                print(f"⚠️ JSON Parse warning for items: {json_err}")
-                order['items'] = []
-                
-        riel_rate = get_riel_rate()
-        return render_template('success.html', order=order, RIEL_RATE=riel_rate)
-        
-    except Exception as e:
-        print(f"❌ CRASH DETECTED IN SUCCESS ROUTE: {e}") 
-        import traceback
-        traceback.print_exc()
-        return render_template('ai_green.html', message="System Error: Unable to load order"), 500
+    return render_template('success.html')
 def _product_image_filename(product):
     """Return the stored product image filename/URL, or default.jpg."""
     if not product:

@@ -2555,7 +2555,7 @@
                 </h2>
                 <button onclick="clearTerminalScreen()" class="px-3 py-1 bg-gray-700 text-white rounded text-sm hover:bg-gray-600">Clear Screen</button>
             </div>
-            <div id="projectTerminalDisplay" style="background-color: #0f172a; color: #38bdf8; padding: 15px; border-radius: 6px; font-family: 'Consolas', 'Courier New', monospace; height: calc(100vh - 180px); overflow-y: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.5; box-shadow: inset 0 4px 6px rgba(0,0,0,0.6);">
+            <div id="projectTerminalDisplay" style="background-color: #1e1e1e; color: #4AF626; padding: 15px; border-radius: 6px; font-family: Consolas, 'Courier New', monospace; height: calc(100vh - 180px); overflow-y: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.5; box-shadow: inset 0 4px 6px rgba(0,0,0,0.6);">
             </div>
         </div>
         <!-- END Project Terminal View -->
@@ -3328,9 +3328,13 @@
         terminalEventSource.onmessage = function(event) {
             if (!event.data.strip || event.data.trim() !== "") {
                 const isAtBottom = display.scrollHeight - display.clientHeight <= display.scrollTop + 50;
-                
-                // Append the exact stdout terminal chunk
-                display.innerHTML += `<div>${event.data}</div>`;
+                const logText = String(event.data);
+                const isError = /Error|Exception|Traceback|❌/i.test(logText);
+                const lineHtml = isError
+                    ? `<div><span style="color: #FF5555;">${logText}</span></div>`
+                    : `<div>${logText}</div>`;
+
+                display.innerHTML += lineHtml;
                 
                 // Auto scroll to bottom like a real terminal if user hasn't scrolled up
                 if (isAtBottom) {
@@ -3340,12 +3344,12 @@
         };
 
         terminalEventSource.onerror = function() {
-            display.innerHTML += `<div style="color: #ef4444;">⚠️ [Stream Disconnected] Reconnecting to server console...</div>`;
+            display.innerHTML += `<div><span style="color: #FF5555;">⚠️ [Stream Disconnected] Reconnecting to server console...</span></div>`;
         };
     }
 
     function clearTerminalScreen() {
-        document.getElementById('projectTerminalDisplay').innerHTML = '<div style="color: #64748b;">> Terminal screen cleared.</div>';
+        document.getElementById('projectTerminalDisplay').innerHTML = '<div style="color: #808080;">> Terminal screen cleared.</div>';
     }
 
     // Hook into the SPA showView architecture

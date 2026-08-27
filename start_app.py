@@ -8,7 +8,8 @@ def main():
     print("🚀 កំពុងចាប់ផ្តើមប្រព័ន្ធ NSP Cosmetic POS (ទម្រង់ ១-Tab ងាយស្រួលបិទ)...")
     
     # ០. ធ្វើការ Backup ទិន្នន័យមុនពេលប្រព័ន្ធដំណើរការ
-    print("💾 កំពុងត្រួតពិនិត្យ និង Backup ទិន្នន័យ...")
+    # record_log() prints to the terminal AND stores the line for Project Live Console.
+    auto_backup.record_log("💾 កំពុងត្រួតពិនិត្យ និង Backup ទិន្នន័យ...")
     auto_backup.backup_database()
     
     work_dir = os.path.dirname(os.path.abspath(__file__))

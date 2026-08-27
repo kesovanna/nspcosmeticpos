@@ -2,6 +2,7 @@
   "hosting": {
     "site": "nsp-cosmetic-store-pos",
     "public": ".",
+    "cleanUrls": true,
     "ignore": [
       "firebase.json",
       "**/.*",
