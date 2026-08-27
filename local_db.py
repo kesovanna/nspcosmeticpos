@@ -5,6 +5,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
+from firebase_admin import firestore
+
 def is_cloud_runtime():
     """True on Firebase Cloud Functions / Cloud Run; False on desktop POS."""
     return bool(
@@ -352,16 +354,34 @@ def clear_deletion_log(product_ids):
 
 # --- User Operations ---
 def save_users(users_list):
-    """Bulk save/update users from Firestore"""
+    """Bulk save/update users from Firestore.
+
+    Never persist a NULL password. If the incoming dict has no hash
+    (common when Firestore user docs only contain profile/cover images),
+    keep the existing local hash instead of wiping it.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     for user in users_list:
+        username = user.get('username')
+        if not username:
+            continue
+
+        incoming_pw = user.get('password')
+        if incoming_pw is None or incoming_pw == '':
+            existing = cursor.execute(
+                'SELECT password FROM users WHERE username = ?', (username,)
+            ).fetchone()
+            password = existing['password'] if existing and existing['password'] else ''
+        else:
+            password = str(incoming_pw)
+
         cursor.execute('''
             INSERT OR REPLACE INTO users (username, password, role, status, profile_image, cover_image)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (
-            user.get('username'),
-            user.get('password'),
+            username,
+            password,
             user.get('role', 'user'),
             user.get('status', 'active'),
             user.get('profile_image'),
@@ -371,26 +391,28 @@ def save_users(users_list):
     conn.close()
 
 def get_user(username):
-    """Cloud-First hybrid lookup: try Cloud Firestore first, then local SQLite.
-
-    On Firebase Cloud Functions the filesystem is read-only and pos_local.db
-    is excluded from the deployment, so a pure-SQLite lookup returns None.
-    We therefore query the Firestore `users` collection first (the canonical
-    source in the cloud), and fall back to the local SQLite database only if
-    Firestore is unavailable or returns nothing (desktop / offline mode).
-    """
     # 1) Cloud Firestore (primary in serverless environments)
     if is_cloud_runtime():
         try:
             from firebase_admin import firestore
+            # បិទកូដចាស់ចោលសិន (មិនបាច់លុបទេ)
+            # db = firestore.client()
+
+            # ប្រើកូដថ្មីនេះពីក្រោម៖
             db = firestore.client()
             doc = db.collection('users').document(str(username)).get()
             if doc.exists:
                 u = doc.to_dict()
                 if u:
-                    # Normalize Firestore fields to the SQLite schema
                     u['username'] = u.get('username') or doc.id
-                    u.setdefault('password', '')
+                    
+                    # 🛡️ ការពារសុវត្ថិភាព ១០០% ប្រឆាំងនឹង NoneType / Non-string password
+                    pw = u.get('password')
+                    if pw is None or not isinstance(pw, str):
+                        u['password'] = ''
+                    else:
+                        u['password'] = str(pw)
+                        
                     u.setdefault('role', 'user')
                     u.setdefault('status', 'active')
                     if u.get('profile_image') is None:
@@ -403,10 +425,37 @@ def get_user(username):
     try:
         conn = get_connection()
         try:
-            user = conn.execute(
+            user_row = conn.execute(
                 'SELECT * FROM users WHERE username = ?', (str(username),)
             ).fetchone()
-            return dict(user) if user else None
+            if user_row:
+                u = dict(user_row)
+                pw = u.get('password')
+                if pw is None or not isinstance(pw, str):
+                    u['password'] = ''
+                else:
+                    u['password'] = str(pw)
+                return u
+            return None
+        finally:
+            conn.close()
+    except Exception:
+        return None
+
+    # 2) Local SQLite fallback (desktop / offline mode)
+    try:
+        conn = get_connection()
+        try:
+            user_row = conn.execute(
+                'SELECT * FROM users WHERE username = ?', (str(username),)
+            ).fetchone()
+            if user_row:
+                u = dict(user_row)
+                # Coerce password to string to prevent Werkzeug .split() crash
+                pw = u.get('password')
+                u['password'] = str(pw) if pw is not None else ''
+                return u
+            return None
         finally:
             conn.close()
     except Exception:

@@ -21,8 +21,8 @@ WTForms==3.2.2
 firebase-admin==7.5.0
 firebase_functions==0.6.0
 
-# Google Cloud (unpinned to let pip satisfy firebase-admin constraints)
-google-api-core
+# Google Cloud (google-api-core pinned to prevent %28default%29 Cloud Function bug)
+google-api-core==2.34.0
 google-api-python-client
 google-auth
 google-auth-httplib2

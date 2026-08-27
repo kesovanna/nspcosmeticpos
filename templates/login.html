@@ -65,6 +65,19 @@
 </div>
 
 <script>
+    // មុខងារបន្ថែម៖ ភ្ជាប់ប៊ូតុង Enter លើប្រអប់វាយអក្សរទាំងអស់ឱ្យហៅការ Login
+    window.onload = function() {
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAuth();
+                }
+            });
+        });
+    };
+
     function togglePassword() {
         const passField = document.getElementById('password');
         const toggleIcon = document.querySelector('.toggle-password');
@@ -102,7 +115,6 @@
     }
 
     async function handleAuth() {
-        // Correctly getting elements by ID now
         const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
         

@@ -4749,10 +4749,12 @@
 
     // --- Apply report data to stats cards, labels, header and table ---
     function applyReportData(data, type, headerText) {
-        const stats = data.data;
+        const stats = data.data || {};
         const revenueUSD = stats.revenue || 0;
         const revenueRiel = revenueUSD * 4000;
-        const orderCount = stats.order_count || 0;
+        const rawOrders = stats.orders || [];
+        const validOrders = rawOrders.filter(o => o && o.tran_id);
+        const orderCount = validOrders.length;
         const topProductName = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].name : 'N/A';
         const topProductQty = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].qty : 'N/A';
         
@@ -4789,8 +4791,8 @@
             headerLabel.textContent = headerText;
         }
         
-        // Re-render the table rows
-        renderReportTable(stats.orders || []);
+        // Re-render the table rows (valid orders only — skip ghost aggregation rows)
+        renderReportTable(validOrders);
     }
 
     // --- Month Picker Function ---
@@ -4973,10 +4975,12 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        const stats = data.data;
+                        const stats = data.data || {};
                         const revenueUSD = stats.revenue || 0;
                         const revenueRiel = revenueUSD * 4000;
-                        const orderCount = stats.order_count || 0;
+                        const rawOrders = stats.orders || [];
+                        const validOrders = rawOrders.filter(o => o && o.tran_id);
+                        const orderCount = validOrders.length;
                         const topProductName = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].name : 'N/A';
                         const topProductQty = stats.top_products && stats.top_products.length > 0 ? stats.top_products[0].qty : 'N/A';
                         
@@ -4988,8 +4992,8 @@
                         }
                         window.currentTopProducts = stats.top_products || [];
                         
-                        // Re-render the table rows too
-                        renderReportTable(stats.orders || []);
+                        // Re-render the table rows too (valid orders only — skip ghost aggregation rows)
+                        renderReportTable(validOrders);
                     }
                 })
                 .catch(error => console.error('Error updating summary cards:', error));
@@ -5244,6 +5248,10 @@
                         // Update summary cards dynamically
                         if (typeof updateSummaryCards === 'function') {
                             updateSummaryCards();
+                        }
+                        // Also refresh the Manager Dashboard KPI cards immediately
+                        if (typeof loadDashboardData === 'function') {
+                            loadDashboardData(false);
                         }
                     } else {
                         Swal.fire('Error!', data.error || data.message || 'Failed to delete report.', 'error');
@@ -5799,6 +5807,8 @@
                     });
                     // Refresh the report table + summary cards
                     if (typeof updateSummaryCards === 'function') updateSummaryCards();
+                    // Also refresh the Manager Dashboard KPI cards immediately
+                    if (typeof loadDashboardData === 'function') loadDashboardData(false);
                 } else {
                     Swal.fire('Error!', data.error || data.message || 'Failed to delete reports.', 'error');
                 }
