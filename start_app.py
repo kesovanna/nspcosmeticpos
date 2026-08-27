@@ -2,9 +2,15 @@ import subprocess
 import sys
 import os
 import runpy
+import auto_backup
 
 def main():
     print("🚀 កំពុងចាប់ផ្តើមប្រព័ន្ធ NSP Cosmetic POS (ទម្រង់ ១-Tab ងាយស្រួលបិទ)...")
+    
+    # ០. ធ្វើការ Backup ទិន្នន័យមុនពេលប្រព័ន្ធដំណើរការ
+    print("💾 កំពុងត្រួតពិនិត្យ និង Backup ទិន្នន័យ...")
+    auto_backup.backup_database()
+    
     work_dir = os.path.dirname(os.path.abspath(__file__))
     
     # ១. រត់ ABA Listener ស្ងាត់ៗនៅពីក្រោយ (កុំឱ្យវាមកដណ្តើម Tab)
